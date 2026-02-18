@@ -1,0 +1,27 @@
+---
+import AdminLayout from '@/layouts/AdminLayout.astro';
+import { db } from '@/lib/db/connection';
+import { users } from '@/lib/db/schema';
+import { eq } from 'drizzle-orm';
+
+const { id } = Astro.params;
+// Placeholder for user edit logic
+const [user] = await db.select().from(users).where(eq(users.id, id));
+
+if (!user) return Astro.redirect('/admin/users');
+---
+
+<AdminLayout title={`Editar Usuario: ${user.name}`}>
+    <div class="p-6 bg-white rounded-lg shadow-sm">
+        <h1 class="text-xl font-bold mb-4">Editar Usuario</h1>
+        <p class="text-gray-500">Funcionalidad de edición de usuario pendiente de implementación detallada.</p>
+        <div class="mt-4">
+            <p><strong>ID:</strong> {user.id}</p>
+            <p><strong>Email:</strong> {user.email}</p>
+            <p><strong>Rol:</strong> {user.role}</p>
+        </div>
+        <div class="mt-6">
+             <a href="/admin/users" class="text-indigo-600 hover:text-indigo-900">Volver</a>
+        </div>
+    </div>
+</AdminLayout>

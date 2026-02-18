@@ -1,0 +1,170 @@
+---
+import Navigation from './Navigation.astro';
+import MobileMenu from './MobileMenu.astro';
+import { SOCIAL_LINKS } from '@/lib/utils/constants';
+---
+
+<header class="sticky top-0 z-50 w-full">
+  <!-- Banner promocional -->
+  <div class="bg-secondary text-white text-center py-2 px-4">
+    <p class="text-xs sm:text-sm font-medium tracking-wide">
+      ✨ <strong>10% de descuento</strong> pagando con transferencia bancaria |
+      <a href={SOCIAL_LINKS.whatsapp} target="_blank" rel="noopener" class="underline hover:text-primary transition-colors">
+        Pedidos urgentes por WhatsApp
+      </a>
+    </p>
+  </div>
+
+  <!-- Header principal -->
+  <div class="glass border-b border-gray-100">
+    <div class="container">
+      <div class="flex items-center justify-between h-16 md:h-20">
+        <!-- Botón hamburguesa (móvil) -->
+        <button
+          id="mobile-menu-toggle"
+          class="lg:hidden p-2 rounded-lg hover:bg-primary/20 transition-colors"
+          aria-label="Abrir menú"
+          aria-expanded="false"
+        >
+          <svg class="w-6 h-6 text-brand-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
+        </button>
+
+        <!-- Logo -->
+        <a href="/" class="flex items-center gap-3 group">
+          <div class="w-10 h-10 md:w-12 md:h-12 rounded-full bg-primary flex items-center justify-center overflow-hidden shadow-md group-hover:shadow-lg transition-shadow">
+            <span class="font-heading font-bold text-lg md:text-xl text-brand-black">D</span>
+          </div>
+          <div class="hidden sm:block">
+            <h1 class="font-heading font-bold text-lg md:text-xl text-brand-black leading-none">Deco Moi</h1>
+            <p class="text-2xs text-gray-400 tracking-widest uppercase">Souvenirs & Regalos</p>
+          </div>
+        </a>
+
+        <!-- Navegación desktop -->
+        <Navigation />
+
+        <!-- Acciones -->
+        <div class="flex items-center gap-2 md:gap-4">
+          <!-- Búsqueda -->
+          <button
+            id="search-toggle"
+            class="p-2 rounded-lg hover:bg-primary/20 transition-colors"
+            aria-label="Buscar"
+          >
+            <svg class="w-5 h-5 text-dark-gray" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+          </button>
+
+          <!-- Carrito -->
+          <button
+            id="cart-toggle"
+            class="relative p-2 rounded-lg hover:bg-primary/20 transition-colors group"
+            aria-label="Carrito de compras"
+          >
+            <svg class="w-5 h-5 text-dark-gray group-hover:text-brand-black transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+            </svg>
+            <!-- Badge del carrito -->
+            <span
+              id="cart-badge"
+              class="absolute -top-0.5 -right-0.5 w-5 h-5 bg-secondary text-white text-2xs font-bold rounded-full flex items-center justify-center opacity-0 scale-0 transition-all duration-300"
+            >
+              0
+            </span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Barra de búsqueda expandible -->
+  <div
+    id="search-bar"
+    class="absolute top-full left-0 w-full bg-white shadow-lg transform -translate-y-full opacity-0 pointer-events-none transition-all duration-300 z-40"
+  >
+    <div class="container py-4">
+      <form class="flex gap-3" action="/productos" method="GET">
+        <input
+          type="text"
+          name="buscar"
+          placeholder="¿Qué estás buscando?"
+          class="input flex-1"
+          autocomplete="off"
+        />
+        <button type="submit" class="btn btn-primary">
+          Buscar
+        </button>
+        <button
+          type="button"
+          id="search-close"
+          class="p-3 rounded-lg hover:bg-gray-100 transition-colors"
+          aria-label="Cerrar búsqueda"
+        >
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </form>
+    </div>
+  </div>
+</header>
+
+<!-- Menú móvil -->
+<MobileMenu />
+
+<script>
+  // Toggle búsqueda
+  const searchToggle = document.getElementById('search-toggle');
+  const searchBar = document.getElementById('search-bar');
+  const searchClose = document.getElementById('search-close');
+
+  function openSearch() {
+    if (searchBar) {
+      searchBar.classList.remove('-translate-y-full', 'opacity-0', 'pointer-events-none');
+      searchBar.classList.add('translate-y-0', 'opacity-100', 'pointer-events-auto');
+      const input = searchBar.querySelector('input');
+      if (input) input.focus();
+    }
+  }
+
+  function closeSearch() {
+    if (searchBar) {
+      searchBar.classList.add('-translate-y-full', 'opacity-0', 'pointer-events-none');
+      searchBar.classList.remove('translate-y-0', 'opacity-100', 'pointer-events-auto');
+    }
+  }
+
+  searchToggle?.addEventListener('click', openSearch);
+  searchClose?.addEventListener('click', closeSearch);
+
+  // Toggle menú móvil
+  const menuToggle = document.getElementById('mobile-menu-toggle');
+  const mobileMenu = document.getElementById('mobile-menu');
+  const menuOverlay = document.getElementById('mobile-menu-overlay');
+  const menuClose = document.getElementById('mobile-menu-close');
+
+  function openMobileMenu() {
+    mobileMenu?.classList.remove('-translate-x-full');
+    mobileMenu?.classList.add('translate-x-0');
+    menuOverlay?.classList.remove('opacity-0', 'pointer-events-none');
+    menuOverlay?.classList.add('opacity-100', 'pointer-events-auto');
+    document.body.style.overflow = 'hidden';
+    menuToggle?.setAttribute('aria-expanded', 'true');
+  }
+
+  function closeMobileMenu() {
+    mobileMenu?.classList.add('-translate-x-full');
+    mobileMenu?.classList.remove('translate-x-0');
+    menuOverlay?.classList.add('opacity-0', 'pointer-events-none');
+    menuOverlay?.classList.remove('opacity-100', 'pointer-events-auto');
+    document.body.style.overflow = '';
+    menuToggle?.setAttribute('aria-expanded', 'false');
+  }
+
+  menuToggle?.addEventListener('click', openMobileMenu);
+  menuClose?.addEventListener('click', closeMobileMenu);
+  menuOverlay?.addEventListener('click', closeMobileMenu);
+</script>

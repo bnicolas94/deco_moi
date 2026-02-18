@@ -1,0 +1,151 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import ProductGrid from '../../components/product/ProductGrid.astro';
+import { getProducts, getCategoryBySlug, getAllCategories } from '@/lib/services/ProductService';
+import { PRODUCTS_PER_PAGE } from '@/lib/utils/constants';
+
+const { categoria } = Astro.params;
+if (!categoria) return Astro.redirect('/productos');
+
+const category = await getCategoryBySlug(categoria);
+if (!category) return Astro.redirect('/productos');
+
+const url = new URL(Astro.request.url);
+const sortBy = (url.searchParams.get('ordenar') as any) || 'newest';
+const page = parseInt(url.searchParams.get('pagina') || '1');
+
+const { products, total } = await getProducts({
+  categorySlug: categoria,
+  sortBy,
+  page,
+  perPage: PRODUCTS_PER_PAGE,
+});
+
+const allCategories = await getAllCategories();
+const siblingCategories = allCategories.filter(c => c.parentId === category.parentId && c.id !== category.id);
+const totalPages = Math.ceil(total / PRODUCTS_PER_PAGE);
+
+const sortOptions = [
+  { value: 'newest', label: 'Más recientes' },
+  { value: 'price-asc', label: 'Precio: menor a mayor' },
+  { value: 'price-desc', label: 'Precio: mayor a menor' },
+  { value: 'name', label: 'Nombre A-Z' },
+];
+---
+
+<BaseLayout
+  title={`${category.name} — Deco Moi`}
+  description={category.description || `Explorá nuestra colección de ${category.name.toLowerCase()}`}
+>
+  <!-- Breadcrumb -->
+  <div class="bg-white border-b border-gray-100">
+    <div class="container py-3">
+      <nav class="flex items-center gap-2 text-sm text-gray-400" aria-label="Breadcrumb">
+        <a href="/" class="hover:text-brand-black transition-colors">Inicio</a>
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+        </svg>
+        <a href="/productos" class="hover:text-brand-black transition-colors">Productos</a>
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+        </svg>
+        <span class="text-brand-black font-medium">{category.name}</span>
+      </nav>
+    </div>
+  </div>
+
+  <div class="container py-8 md:py-12">
+    <!-- Encabezado de categoría -->
+    <div class="mb-8">
+      <h1 class="text-3xl md:text-4xl font-heading font-bold text-brand-black mb-2">{category.name}</h1>
+      {category.description && (
+        <p class="text-gray-500 text-lg">{category.description}</p>
+      )}
+      <p class="text-sm text-gray-400 mt-2">{total} {total === 1 ? 'producto' : 'productos'}</p>
+    </div>
+
+    <!-- Categorías hermanas -->
+    {siblingCategories.length > 0 && (
+      <div class="flex flex-wrap gap-2 mb-8">
+        <a
+          href={`/productos/${categoria}`}
+          class="px-4 py-2 rounded-full text-sm font-medium bg-primary text-brand-black transition-colors"
+        >
+          {category.name}
+        </a>
+        {siblingCategories.map((sib) => (
+          <a
+            href={`/productos/${sib.slug}`}
+            class="px-4 py-2 rounded-full text-sm font-medium bg-light-gray text-dark-gray hover:bg-primary/20 transition-colors"
+          >
+            {sib.name}
+          </a>
+        ))}
+      </div>
+    )}
+
+    <!-- Ordenamiento -->
+    <div class="flex items-center justify-between mb-6 pb-4 border-b border-gray-100">
+      <p class="text-sm text-gray-400 hidden sm:block">
+        Mostrando {Math.min((page - 1) * PRODUCTS_PER_PAGE + 1, total)}-{Math.min(page * PRODUCTS_PER_PAGE, total)} de {total}
+      </p>
+      <div class="flex items-center gap-2 ml-auto">
+        <label for="sort-select" class="text-sm text-gray-400 whitespace-nowrap">Ordenar:</label>
+        <select
+          id="sort-select"
+          class="input text-sm py-2 px-3 w-auto min-w-[180px]"
+          onchange="window.location.href = this.value"
+        >
+          {sortOptions.map((opt) => {
+            const params = new URLSearchParams();
+            params.set('ordenar', opt.value);
+            return (
+              <option
+                value={`/productos/${categoria}?${params.toString()}`}
+                selected={sortBy === opt.value}
+              >
+                {opt.label}
+              </option>
+            );
+          })}
+        </select>
+      </div>
+    </div>
+
+    <!-- Grilla de productos -->
+    <ProductGrid products={products} emptyMessage={`No hay productos en ${category.name}`} />
+
+    <!-- Paginación -->
+    {totalPages > 1 && (
+      <nav class="flex items-center justify-center gap-2 mt-10" aria-label="Paginación">
+        {page > 1 && (
+          <a
+            href={`/productos/${categoria}?ordenar=${sortBy}&pagina=${page - 1}`}
+            class="px-4 py-2 rounded-lg border border-gray-200 text-sm text-dark-gray hover:bg-primary/10 transition-colors"
+          >
+            ← Anterior
+          </a>
+        )}
+        {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+          <a
+            href={`/productos/${categoria}?ordenar=${sortBy}&pagina=${p}`}
+            class:list={[
+              "w-10 h-10 rounded-lg flex items-center justify-center text-sm font-medium transition-colors",
+              p === page ? "bg-primary text-brand-black" : "border border-gray-200 text-dark-gray hover:bg-primary/10"
+            ]}
+          >
+            {p}
+          </a>
+        ))}
+        {page < totalPages && (
+          <a
+            href={`/productos/${categoria}?ordenar=${sortBy}&pagina=${page + 1}`}
+            class="px-4 py-2 rounded-lg border border-gray-200 text-sm text-dark-gray hover:bg-primary/10 transition-colors"
+          >
+            Siguiente →
+          </a>
+        )}
+      </nav>
+    )}
+  </div>
+</BaseLayout>

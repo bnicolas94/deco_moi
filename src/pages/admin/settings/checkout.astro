@@ -1,0 +1,208 @@
+---
+import AdminLayout from '@/layouts/AdminLayout.astro';
+import { getCheckoutFields } from '@/lib/services/ConfigService';
+
+const fields = await getCheckoutFields();
+---
+
+<AdminLayout title="Configuración de Checkout">
+    <div class="mb-8 flex justify-between items-end">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900">Configuración de Checkout</h1>
+            <p class="text-gray-500 mt-1">Gestiona los campos que tus clientes deben completar al finalizar la compra.</p>
+        </div>
+    </div>
+
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        <div class="p-6 border-b border-gray-100 flex justify-between items-center">
+            <h2 class="text-lg font-semibold text-gray-800">Campos del Formulario</h2>
+            <button id="add-field-btn" class="btn btn-primary btn-sm">
+                + Añadir Campo
+            </button>
+        </div>
+
+        <div class="p-6">
+            <form id="fields-form">
+                <div id="fields-list" class="space-y-4">
+                    {fields.sort((a, b) => a.order - b.order).map((field, index) => (
+                        <div class="field-item flex gap-4 p-4 bg-gray-50 rounded-lg border border-gray-200 group" data-id={field.id}>
+                            <div class="flex-shrink-0 flex items-center cursor-move text-gray-400">
+                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8h16M4 16h16" />
+                                </svg>
+                            </div>
+                            
+                            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 flex-1">
+                                <div class="col-span-1">
+                                    <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Etiqueta</label>
+                                    <input type="text" name={`label-${index}`} value={field.label} class="input w-full" />
+                                </div>
+                                <div class="col-span-1">
+                                    <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Tipo</label>
+                                    <select name={`type-${index}`} class="input w-full">
+                                        <option value="text" selected={field.type === 'text'}>Texto</option>
+                                        <option value="email" selected={field.type === 'email'}>Email</option>
+                                        <option value="tel" selected={field.type === 'tel'}>Teléfono</option>
+                                        <option value="number" selected={field.type === 'number'}>Número</option>
+                                    </select>
+                                </div>
+                                <div class="col-span-1 flex items-center gap-4">
+                                    <div class="flex items-center gap-2">
+                                        <input type="checkbox" name={`required-${index}`} checked={field.required} class="w-4 h-4 rounded text-primary" />
+                                        <span class="text-sm font-medium text-gray-700">Obligatorio</span>
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <select name={`width-${index}`} class="text-xs border-gray-200 rounded">
+                                            <option value="full" selected={field.width === 'full'}>Ancho Total</option>
+                                            <option value="half" selected={field.width === 'half'}>Medio Ancho</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="col-span-1 flex items-center justify-end">
+                                    <button type="button" class="remove-field-btn text-error hover:text-red-700 p-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                        </svg>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+
+                <div class="mt-8 flex justify-end">
+                    <button type="submit" class="btn btn-primary px-8">
+                        Guardar Configuración
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</AdminLayout>
+
+<script>
+    import Sortable from 'sortablejs';
+
+    const form = document.getElementById('fields-form');
+    const addBtn = document.getElementById('add-field-btn');
+    const fieldsList = document.getElementById('fields-list');
+
+    // Inicializar Sortable
+    if (fieldsList) {
+        new Sortable(fieldsList, {
+            animation: 150,
+            handle: '.cursor-move',
+            ghostClass: 'bg-indigo-50',
+            onEnd: () => {
+                // Opcional: Re-indexar órdenes visualmente
+            }
+        });
+    }
+
+    // Función para manejar el guardado
+    form?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const btn = form.querySelector('button[type="submit"]') as HTMLButtonElement;
+        const originalText = btn.textContent;
+        
+        btn.textContent = 'Guardando...';
+        btn.disabled = true;
+
+        // Recopilar datos en el orden actual del DOM
+        const items = document.querySelectorAll('.field-item');
+        const fields = Array.from(items).map((item, index) => {
+            const el = item as HTMLElement;
+            return {
+                id: el.dataset.id || `field_${Date.now()}_${index}`,
+                label: (el.querySelector('input[name^="label-"]') as HTMLInputElement).value,
+                type: (el.querySelector('select[name^="type-"]') as HTMLSelectElement).value,
+                required: (el.querySelector('input[name^="required-"]') as HTMLInputElement).checked,
+                width: (el.querySelector('select[name^="width-"]') as HTMLSelectElement).value,
+                order: index + 1
+            };
+        });
+
+        try {
+            const response = await fetch('/api/admin/config/checkout-fields', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ fields })
+            });
+
+            if (response.ok) {
+                alert('Configuración guardada correctamente');
+            } else {
+                alert('Error al guardar la configuración');
+            }
+        } catch (err) {
+            console.error(err);
+            alert('Error de red al intentar guardar');
+        } finally {
+            btn.textContent = originalText;
+            btn.disabled = false;
+        }
+    });
+
+    // Eliminar campo
+    fieldsList?.addEventListener('click', (e) => {
+        const target = e.target as HTMLElement;
+        const removeBtn = target.closest('.remove-field-btn');
+        if (removeBtn) {
+            const item = removeBtn.closest('.field-item');
+            if (confirm('¿Estás seguro de que deseas eliminar este campo?')) {
+                item?.remove();
+            }
+        }
+    });
+
+    // Añadir campo
+    addBtn?.addEventListener('click', () => {
+        const index = document.querySelectorAll('.field-item').length;
+        const newField = document.createElement('div');
+        newField.className = 'field-item flex gap-4 p-4 bg-gray-50 rounded-lg border border-gray-200 group animate-in fade-in slide-in-from-top-2';
+        newField.dataset.id = `new_field_${Date.now()}`;
+        
+        newField.innerHTML = `
+            <div class="flex-shrink-0 flex items-center cursor-move text-gray-400">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8h16M4 16h16" />
+                </svg>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 flex-1">
+                <div class="col-span-1">
+                    <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Etiqueta</label>
+                    <input type="text" name="label-${index}" placeholder="Ej: Dirección" class="input w-full" />
+                </div>
+                <div class="col-span-1">
+                    <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Tipo</label>
+                    <select name="type-${index}" class="input w-full">
+                        <option value="text">Texto</option>
+                        <option value="email">Email</option>
+                        <option value="tel">Teléfono</option>
+                        <option value="number">Número</option>
+                    </select>
+                </div>
+                <div class="col-span-1 flex items-center gap-4">
+                    <div class="flex items-center gap-2">
+                        <input type="checkbox" name="required-${index}" checked class="w-4 h-4 rounded text-primary" />
+                        <span class="text-sm font-medium text-gray-700">Obligatorio</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <select name="width-${index}" class="text-xs border-gray-200 rounded">
+                            <option value="full">Ancho Total</option>
+                            <option value="half">Medio Ancho</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="col-span-1 flex items-center justify-end">
+                    <button type="button" class="remove-field-btn text-error hover:text-red-700 p-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        `;
+        fieldsList?.appendChild(newField);
+    });
+</script>

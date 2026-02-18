@@ -1,0 +1,67 @@
+---
+import type { PriceRule } from '@/types/product';
+import { formatPrice } from '@/lib/utils/formatters';
+
+interface Props {
+  basePrice: number;
+  priceRules: PriceRule[];
+}
+
+const { basePrice, priceRules } = Astro.props;
+const price = Number(basePrice);
+---
+
+{priceRules && priceRules.length > 0 && (
+  <div class="overflow-hidden rounded-xl border border-gray-100">
+    <table class="w-full text-sm">
+      <thead>
+        <tr class="bg-light-gray">
+          <th class="px-4 py-3 text-left font-heading font-semibold text-brand-black text-xs uppercase tracking-wider">Cantidad</th>
+          <th class="px-4 py-3 text-right font-heading font-semibold text-brand-black text-xs uppercase tracking-wider">Precio unit.</th>
+          <th class="px-4 py-3 text-right font-heading font-semibold text-brand-black text-xs uppercase tracking-wider">Descuento</th>
+          <th class="px-4 py-3 text-right font-heading font-semibold text-brand-black text-xs uppercase tracking-wider hidden sm:table-cell">Con transf.</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-50">
+        {priceRules.map((rule, index) => {
+          const discount = Number(rule.discountPercentage || 0);
+          const unitPrice = rule.fixedPrice
+            ? Number(rule.fixedPrice)
+            : price * (1 - discount / 100);
+          const transferPrice = unitPrice * 0.9;
+          const rangeText = rule.maxQuantity
+            ? `${rule.minQuantity} - ${rule.maxQuantity}`
+            : `${rule.minQuantity}+`;
+          const isHighlighted = discount >= 10;
+
+          return (
+            <tr class:list={[
+              'transition-colors hover:bg-primary/5',
+              { 'bg-gold/5': isHighlighted }
+            ]}>
+              <td class="px-4 py-3 font-medium text-dark-gray">{rangeText}</td>
+              <td class="px-4 py-3 text-right font-semibold text-brand-black">{formatPrice(unitPrice)}</td>
+              <td class="px-4 py-3 text-right">
+                {discount > 0 ? (
+                  <span class="inline-flex items-center px-2 py-0.5 rounded-full text-2xs font-semibold bg-success/10 text-success">
+                    -{discount}%
+                  </span>
+                ) : (
+                  <span class="text-gray-400 text-xs">—</span>
+                )}
+              </td>
+              <td class="px-4 py-3 text-right text-success font-medium hidden sm:table-cell">
+                {formatPrice(transferPrice)}
+              </td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
+    <div class="px-4 py-2 bg-success/5 border-t border-success/10">
+      <p class="text-2xs text-success font-medium text-center">
+        💰 10% adicional pagando con transferencia bancaria
+      </p>
+    </div>
+  </div>
+)}

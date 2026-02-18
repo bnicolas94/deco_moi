@@ -1,0 +1,49 @@
+---
+import { NAV_LINKS, MAIN_CATEGORIES } from '@/lib/utils/constants';
+---
+
+<nav class="hidden lg:flex items-center gap-8" aria-label="Navegación principal">
+  {NAV_LINKS.map((link) => (
+    <div class="relative group">
+      {link.label === 'Productos' ? (
+        <>
+          <a
+            href={link.href}
+            class="flex items-center gap-1 font-heading font-medium text-sm text-dark-gray hover:text-brand-black transition-colors py-2"
+          >
+            {link.label}
+            <svg class="w-4 h-4 transition-transform group-hover:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+            </svg>
+          </a>
+
+          {/* Dropdown de categorías */}
+          <div class="absolute top-full left-1/2 -translate-x-1/2 pt-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300">
+            <div class="bg-white rounded-xl shadow-xl border border-gray-100 py-3 min-w-[220px]">
+              <div class="px-4 pb-2 mb-2 border-b border-gray-100">
+                <a href="/productos" class="text-sm font-heading font-semibold text-brand-black hover:text-accent transition-colors">
+                  Ver todo
+                </a>
+              </div>
+              {MAIN_CATEGORIES.map((cat) => (
+                <a
+                  href={`/productos/${cat.slug}`}
+                  class="block px-4 py-2 text-sm text-dark-gray hover:bg-primary/10 hover:text-brand-black transition-colors"
+                >
+                  {cat.name}
+                </a>
+              ))}
+            </div>
+          </div>
+        </>
+      ) : (
+        <a
+          href={link.href}
+          class="font-heading font-medium text-sm text-dark-gray hover:text-brand-black transition-colors py-2 relative after:absolute after:bottom-0 after:left-0 after:w-0 after:h-0.5 after:bg-accent hover:after:w-full after:transition-all after:duration-300"
+        >
+          {link.label}
+        </a>
+      )}
+    </div>
+  ))}
+</nav>

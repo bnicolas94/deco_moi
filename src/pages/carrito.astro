@@ -1,0 +1,25 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import CartPageContent from '../components/cart/CartPageContent';
+
+const pageTitle = "Mi Carrito | Deco Moi";
+---
+
+<BaseLayout title={pageTitle}>
+    <section class="py-12 bg-off-white min-h-[70vh]">
+        <div class="container">
+            <header class="mb-10 text-center md:text-left">
+                <nav class="flex items-center gap-2 text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">
+                    <a href="/" class="hover:text-primary transition-colors">Inicio</a>
+                    <span>/</span>
+                    <span class="text-dark-gray">Mi Carrito</span>
+                </nav>
+                <h1 class="text-3xl md:text-5xl font-heading font-bold text-brand-black">
+                    Mi <span class="text-gradient-gold">Carrito</span>
+                </h1>
+            </header>
+
+            <CartPageContent client:only="preact" />
+        </div>
+    </section>
+</BaseLayout>

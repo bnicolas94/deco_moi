@@ -1,0 +1,104 @@
+---
+import type { Product } from '@/types/product';
+import { formatPrice } from '@/lib/utils/formatters';
+
+interface Props {
+  product: Product;
+  showQuickView?: boolean;
+}
+
+const { product, showQuickView = false } = Astro.props;
+
+const basePrice = Number(product.basePrice);
+const finalPrice = product.isOnSale && product.salePrice
+  ? Number(product.salePrice)
+  : basePrice;
+const transferPrice = finalPrice * 0.9;
+const discountPct = product.isOnSale && product.salePrice
+  ? Math.round(((basePrice - Number(product.salePrice)) / basePrice) * 100)
+  : 0;
+const mainImage = product.images?.[0] || null;
+---
+
+<article class="card card-hover group" data-product-id={product.id}>
+  <a href={`/producto/${product.slug}`} class="block">
+    <div class="relative aspect-product overflow-hidden bg-light-gray">
+      {mainImage ? (
+        <img
+          src={mainImage}
+          alt={product.name}
+          loading="lazy"
+          class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+        />
+      ) : (
+        <div class="absolute inset-0 flex items-center justify-center">
+          <div class="text-center p-4">
+            <svg class="w-12 h-12 mx-auto text-gray-300 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+            <p class="text-2xs text-gray-400">Imagen próximamente</p>
+          </div>
+        </div>
+      )}
+
+      {/* Badges */}
+      <div class="absolute top-3 left-3 flex flex-col gap-1.5">
+        {product.isOnSale && (
+          <span class="badge badge-sale text-2xs">-{discountPct}%</span>
+        )}
+        {product.isFeatured && (
+          <span class="badge badge-featured text-2xs">⭐ Destacado</span>
+        )}
+      </div>
+
+      {/* Overlay de hover */}
+      <div class="absolute inset-0 bg-brand-black/0 group-hover:bg-brand-black/10 transition-colors duration-300"></div>
+    </div>
+  </a>
+
+  <div class="p-4">
+    <h3 class="font-heading font-semibold text-sm text-brand-black mb-1 line-clamp-2 min-h-[2.5rem]">
+      <a href={`/producto/${product.slug}`} class="hover:text-accent transition-colors">
+        {product.name}
+      </a>
+    </h3>
+
+    {product.shortDescription && (
+      <p class="text-2xs text-gray-400 mb-2 line-clamp-1">{product.shortDescription}</p>
+    )}
+
+    <div class="mb-1">
+      {product.isOnSale && product.salePrice ? (
+        <div class="flex items-center gap-2">
+          <span class="price-original">{formatPrice(basePrice)}</span>
+          <span class="price-current text-base">{formatPrice(finalPrice)}</span>
+        </div>
+      ) : (
+        <span class="price-current text-base">{formatPrice(finalPrice)}</span>
+      )}
+    </div>
+
+    <div class="price-transfer text-2xs mb-3">
+      {formatPrice(transferPrice)} con transferencia (10% off)
+    </div>
+
+    {product.minOrder && product.minOrder > 1 && (
+      <p class="text-2xs text-gray-400 mb-2">Pedido mín. {product.minOrder} unidades</p>
+    )}
+
+    <button
+      class="btn btn-primary btn-sm w-full text-xs add-to-cart-btn"
+      data-product-id={product.id}
+      data-product-name={product.name}
+      data-product-slug={product.slug}
+      data-product-sku={product.sku}
+      data-product-price={finalPrice}
+      data-product-image={mainImage || ''}
+    >
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+      </svg>
+      Agregar al carrito
+    </button>
+  </div>
+</article>

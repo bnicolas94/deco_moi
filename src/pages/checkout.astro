@@ -1,0 +1,29 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import CheckoutForm from '../components/checkout/CheckoutForm';
+import { getCheckoutFields } from '@/lib/services/ConfigService';
+
+const fields = await getCheckoutFields();
+const pageTitle = "Finalizar Compra | Deco Moi";
+---
+
+<BaseLayout title={pageTitle}>
+    <section class="py-12 bg-off-white min-h-[80vh]">
+        <div class="container">
+            <header class="mb-12 text-center">
+                <nav class="flex items-center justify-center gap-2 text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">
+                    <a href="/" class="hover:text-primary transition-colors">Inicio</a>
+                    <span>/</span>
+                    <a href="/carrito" class="hover:text-primary transition-colors">Carrito</a>
+                    <span>/</span>
+                    <span class="text-dark-gray">Checkout</span>
+                </nav>
+                <h1 class="text-3xl md:text-5xl font-heading font-bold text-brand-black">
+                    Finalizar <span class="text-gradient-gold">Compra</span>
+                </h1>
+            </header>
+
+            <CheckoutForm client:only="preact" fields={fields} />
+        </div>
+    </section>
+</BaseLayout>

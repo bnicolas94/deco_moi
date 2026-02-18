@@ -1,0 +1,24 @@
+---
+import AdminLayout from '@/layouts/AdminLayout.astro';
+import MockupGenerator from '@/components/mockup/MockupGenerator';
+import TestReact from '@/components/TestReact';
+---
+
+<AdminLayout title="Generador de Mockups - Admin | Deco Moi">
+    <div class="bg-gray-50 min-h-screen">
+        <div class="container py-8">
+            <header class="mb-8">
+                <nav class="flex items-center gap-2 text-sm text-gray-500 mb-2">
+                    <a href="/admin" class="hover:text-indigo-600">Admin</a>
+                    <span>/</span>
+                    <span class="text-gray-900 font-medium">Mockups</span>
+                </nav>
+                <h1 class="text-3xl font-heading font-bold text-gray-900">Generador de Mockups</h1>
+                <p class="text-gray-500 mt-2">Crea y configura plantillas de visualización 3D para tus productos.</p>
+            </header>
+
+            <TestReact client:only="react" />
+            <MockupGenerator client:only="react" mode="admin" />
+        </div>
+    </div>
+</AdminLayout>

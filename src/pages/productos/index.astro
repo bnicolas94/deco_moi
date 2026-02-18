@@ -1,0 +1,234 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import ProductGrid from '../../components/product/ProductGrid.astro';
+import { getProducts, getAllCategories } from '@/lib/services/ProductService';
+import { PRODUCTS_PER_PAGE } from '@/lib/utils/constants';
+
+// Leer parámetros de URL
+const url = new URL(Astro.request.url);
+const search = url.searchParams.get('buscar') || undefined;
+const sortBy = (url.searchParams.get('ordenar') as any) || 'newest';
+const page = parseInt(url.searchParams.get('pagina') || '1');
+const minPrice = url.searchParams.get('precio_min') ? parseFloat(url.searchParams.get('precio_min')!) : undefined;
+const maxPrice = url.searchParams.get('precio_max') ? parseFloat(url.searchParams.get('precio_max')!) : undefined;
+
+const { products, total } = await getProducts({
+  search,
+  sortBy,
+  page,
+  perPage: PRODUCTS_PER_PAGE,
+  minPrice,
+  maxPrice,
+});
+
+const categories = await getAllCategories();
+const topCategories = categories.filter(c => c.parentId !== null && [2, 3].includes(c.parentId as number));
+const totalPages = Math.ceil(total / PRODUCTS_PER_PAGE);
+
+const sortOptions = [
+  { value: 'newest', label: 'Más recientes' },
+  { value: 'price-asc', label: 'Precio: menor a mayor' },
+  { value: 'price-desc', label: 'Precio: mayor a menor' },
+  { value: 'name', label: 'Nombre A-Z' },
+  { value: 'popular', label: 'Más populares' },
+];
+---
+
+<BaseLayout
+  title="Productos — Deco Moi"
+  description="Explorá nuestro catálogo de souvenirs y regalos personalizados. Chocolates, velas, tejidos y más."
+>
+  <!-- Breadcrumb -->
+  <div class="bg-white border-b border-gray-100">
+    <div class="container py-3">
+      <nav class="flex items-center gap-2 text-sm text-gray-400" aria-label="Breadcrumb">
+        <a href="/" class="hover:text-brand-black transition-colors">Inicio</a>
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+        </svg>
+        <span class="text-brand-black font-medium">Productos</span>
+      </nav>
+    </div>
+  </div>
+
+  <div class="container py-8 md:py-12">
+    <!-- Encabezado -->
+    <div class="mb-8">
+      <h1 class="text-3xl md:text-4xl font-heading font-bold text-brand-black mb-2">
+        {search ? `Resultados para "${search}"` : 'Nuestros Productos'}
+      </h1>
+      <p class="text-gray-500">
+        {total} {total === 1 ? 'producto encontrado' : 'productos encontrados'}
+      </p>
+    </div>
+
+    <div class="flex flex-col lg:flex-row gap-8">
+      <!-- Sidebar de filtros (desktop) -->
+      <aside class="lg:w-64 flex-shrink-0">
+        <!-- Filtros móvil toggle -->
+        <button
+          id="filters-toggle"
+          class="lg:hidden w-full btn btn-outline mb-4 justify-between"
+        >
+          <span class="flex items-center gap-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+            </svg>
+            Filtros
+          </span>
+          <svg class="w-4 h-4 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+
+        <div id="filters-panel" class="hidden lg:block space-y-6">
+          <!-- Categorías -->
+          <div>
+            <h3 class="font-heading font-semibold text-sm text-brand-black mb-3 uppercase tracking-wider">Categorías</h3>
+            <ul class="space-y-1">
+              <li>
+                <a
+                  href="/productos"
+                  class:list={["block px-3 py-2 rounded-lg text-sm transition-colors", !Astro.url.pathname.includes('/productos/') ? 'bg-primary/20 text-brand-black font-medium' : 'text-dark-gray hover:bg-gray-50']}
+                >
+                  Todos los productos
+                </a>
+              </li>
+              {topCategories.map((cat) => (
+                <li>
+                  <a
+                    href={`/productos/${cat.slug}`}
+                    class="block px-3 py-2 rounded-lg text-sm text-dark-gray hover:bg-gray-50 transition-colors"
+                  >
+                    {cat.name}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          <!-- Rango de precio -->
+          <div>
+            <h3 class="font-heading font-semibold text-sm text-brand-black mb-3 uppercase tracking-wider">Precio</h3>
+            <form method="GET" action="/productos" class="space-y-3">
+              {search && <input type="hidden" name="buscar" value={search} />}
+              <input type="hidden" name="ordenar" value={sortBy} />
+              <div class="flex gap-2">
+                <input
+                  type="number"
+                  name="precio_min"
+                  placeholder="Min"
+                  value={minPrice || ''}
+                  class="input text-sm py-2"
+                />
+                <input
+                  type="number"
+                  name="precio_max"
+                  placeholder="Max"
+                  value={maxPrice || ''}
+                  class="input text-sm py-2"
+                />
+              </div>
+              <button type="submit" class="btn btn-sm btn-outline w-full text-xs">
+                Aplicar
+              </button>
+            </form>
+          </div>
+
+          <!-- Descuento -->
+          <div class="p-4 rounded-xl bg-success/5 border border-success/10">
+            <div class="flex items-center gap-2 mb-2">
+              <span class="text-lg">💰</span>
+              <span class="font-heading font-semibold text-sm text-success">10% OFF</span>
+            </div>
+            <p class="text-xs text-dark-gray">
+              En todos los productos pagando con transferencia bancaria
+            </p>
+          </div>
+        </div>
+      </aside>
+
+      <!-- Contenido principal -->
+      <div class="flex-1">
+        <!-- Barra de ordenamiento -->
+        <div class="flex items-center justify-between mb-6 pb-4 border-b border-gray-100">
+          <p class="text-sm text-gray-400 hidden sm:block">
+            Mostrando {Math.min((page - 1) * PRODUCTS_PER_PAGE + 1, total)}-{Math.min(page * PRODUCTS_PER_PAGE, total)} de {total}
+          </p>
+
+          <div class="flex items-center gap-2 ml-auto">
+            <label for="sort-select" class="text-sm text-gray-400 whitespace-nowrap">Ordenar por:</label>
+            <select
+              id="sort-select"
+              class="input text-sm py-2 px-3 w-auto min-w-[180px]"
+              onchange="window.location.href = this.value"
+            >
+              {sortOptions.map((opt) => {
+                const params = new URLSearchParams(url.searchParams);
+                params.set('ordenar', opt.value);
+                params.delete('pagina');
+                return (
+                  <option
+                    value={`/productos?${params.toString()}`}
+                    selected={sortBy === opt.value}
+                  >
+                    {opt.label}
+                  </option>
+                );
+              })}
+            </select>
+          </div>
+        </div>
+
+        <!-- Grilla de productos -->
+        <ProductGrid products={products} />
+
+        <!-- Paginación -->
+        {totalPages > 1 && (
+          <nav class="flex items-center justify-center gap-2 mt-10" aria-label="Paginación">
+            {page > 1 && (
+              <a
+                href={`/productos?${(() => { const p = new URLSearchParams(url.searchParams); p.set('pagina', String(page - 1)); return p.toString(); })()}`}
+                class="px-4 py-2 rounded-lg border border-gray-200 text-sm text-dark-gray hover:bg-primary/10 transition-colors"
+              >
+                ← Anterior
+              </a>
+            )}
+
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+              <a
+                href={`/productos?${(() => { const params = new URLSearchParams(url.searchParams); params.set('pagina', String(p)); return params.toString(); })()}`}
+                class:list={[
+                  "w-10 h-10 rounded-lg flex items-center justify-center text-sm font-medium transition-colors",
+                  p === page ? "bg-primary text-brand-black" : "border border-gray-200 text-dark-gray hover:bg-primary/10"
+                ]}
+              >
+                {p}
+              </a>
+            ))}
+
+            {page < totalPages && (
+              <a
+                href={`/productos?${(() => { const p = new URLSearchParams(url.searchParams); p.set('pagina', String(page + 1)); return p.toString(); })()}`}
+                class="px-4 py-2 rounded-lg border border-gray-200 text-sm text-dark-gray hover:bg-primary/10 transition-colors"
+              >
+                Siguiente →
+              </a>
+            )}
+          </nav>
+        )}
+      </div>
+    </div>
+  </div>
+</BaseLayout>
+
+<script>
+  // Toggle filtros en móvil
+  const filtersToggle = document.getElementById('filters-toggle');
+  const filtersPanel = document.getElementById('filters-panel');
+
+  filtersToggle?.addEventListener('click', () => {
+    filtersPanel?.classList.toggle('hidden');
+    filtersPanel?.classList.toggle('block');
+  });
+</script>

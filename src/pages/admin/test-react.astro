@@ -1,0 +1,29 @@
+---
+import TestReact from '@/components/TestReact';
+import DebugInfo from '@/components/DebugInfo';
+import { AdminMockupView } from '@/components/mockup/AdminMockupView';
+---
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>React Isolation Test</title>
+</head>
+<body>
+    <h1>Prueba Aislada de React</h1>
+    <p>Si ves los componentes abajo, React funciona.</p>
+    
+    <div id="test-root">
+        <DebugInfo client:only="react" />
+        <TestReact client:only="react" />
+    </div>
+
+    <hr />
+
+    <div id="app-root">
+        <AdminMockupView client:only="react" />
+    </div>
+</body>
+</html>

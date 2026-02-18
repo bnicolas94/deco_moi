@@ -1,0 +1,363 @@
+---
+import AdminLayout from '@/layouts/AdminLayout.astro';
+import { db } from '@/lib/db/connection';
+import { orders, orderItems, products, users, addresses } from '@/lib/db/schema';
+import { eq } from 'drizzle-orm';
+import { ArrowLeft, Package, User, MapPin, CreditCard, Trash2, Save } from 'lucide-react';
+
+const { id } = Astro.params;
+
+if (!id) return Astro.redirect('/admin/orders');
+
+// Fetch order with related data
+const order = await db.query.orders.findFirst({
+    where: eq(orders.id, id),
+    with: {
+        user: true,
+        items: {
+            with: {
+                product: true
+            }
+        }
+    }
+});
+
+if (!order) return Astro.redirect('/admin/orders');
+
+let shippingAddress = null;
+if (order.shippingAddressId) {
+    shippingAddress = await db.query.addresses.findFirst({
+        where: eq(addresses.id, order.shippingAddressId)
+    });
+}
+
+const statusOptions = [
+    { value: 'pending', label: 'Pendiente' },
+    { value: 'confirmed', label: 'Confirmada' },
+    { value: 'processing', label: 'Procesando' },
+    { value: 'shipped', label: 'Enviado' },
+    { value: 'delivered', label: 'Entregado' },
+    { value: 'cancelled', label: 'Cancelado' },
+];
+
+const paymentStatusOptions = [
+    { value: 'pending', label: 'Pendiente' },
+    { value: 'approved', label: 'Pagado' },
+    { value: 'rejected', label: 'Fallido' },
+];
+
+// Procesar shippingData fuera del template para evitar errores de compilación
+const shippingDataEntries = order.shippingData ? Object.entries(order.shippingData as Record<string, any>) : [];
+---
+
+<AdminLayout title={`Orden #${order.orderNumber}`}>
+    <div class="mb-6">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+                <a href="/admin/orders" class="inline-flex items-center text-sm text-gray-500 hover:text-gray-700 mb-2">
+                    <ArrowLeft className="w-4 h-4 mr-1" />
+                    Volver a la lista
+                </a>
+                <h1 class="text-2xl font-bold text-gray-900">
+                    Orden <span class="text-indigo-600">#{order.orderNumber}</span>
+                </h1>
+                <p class="text-sm text-gray-500">
+                    Realizada el {new Date(order.createdAt).toLocaleString()}
+                </p>
+            </div>
+            <div class="flex items-center gap-3" id="delete-container">
+                <button 
+                    type="button"
+                    id="delete-order-btn"
+                    class="inline-flex items-center px-4 py-2 border border-rose-200 text-rose-600 bg-rose-50 hover:bg-rose-600 hover:text-white rounded-lg transition-all text-sm font-medium"
+                >
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Eliminar Orden
+                </button>
+
+                <div id="confirm-delete-box" class="hidden items-center gap-2 bg-rose-50 p-1 rounded-lg border border-rose-100 animate-in fade-in zoom-in duration-200">
+                    <span class="text-xs text-rose-700 font-bold px-2">¿Seguro?</span>
+                    <button 
+                        type="button"
+                        id="final-delete-btn" 
+                        class="bg-rose-600 text-white px-3 py-1.5 rounded-md text-xs font-bold hover:bg-rose-700 transition-colors shadow-sm"
+                    >
+                        Sí, eliminar
+                    </button>
+                    <button 
+                        type="button"
+                        id="cancel-delete-btn" 
+                        class="bg-white text-gray-600 px-3 py-1.5 rounded-md text-xs font-medium border border-gray-200 hover:bg-gray-50 transition-colors"
+                    >
+                        No
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <!-- Main Content (Items) -->
+        <div class="lg:col-span-2 space-y-6">
+            <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-100">
+                <h2 class="text-lg font-medium text-gray-900 mb-4 border-b pb-2 flex items-center">
+                    <Package className="w-5 h-5 mr-2 text-gray-400" />
+                    Ítems del Pedido
+                </h2>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead>
+                            <tr>
+                                <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Producto</th>
+                                <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Precio</th>
+                                <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Cant.</th>
+                                <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Subtotal</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-200">
+                            {order.items.map((item) => (
+                                <tr>
+                                    <td class="px-3 py-3 text-sm text-gray-900">
+                                        <div class="font-medium">{item.productName}</div>
+                                        {item.productSku && <div class="text-xs text-gray-500">SKU: {item.productSku}</div>}
+                                        {item.variantId && (
+                                            <div class="text-xs text-indigo-600 font-medium">Variante: {item.product?.name || 'Cargando...'}</div>
+                                        )}
+                                        {item.customization && (
+                                            <div class="text-xs text-amber-600 mt-1 italic border-l-2 border-amber-200 pl-2">
+                                                Personalización: {JSON.stringify(item.customization)}
+                                            </div>
+                                        )}
+                                    </td>
+                                    <td class="px-3 py-3 text-sm text-gray-500">${parseFloat(item.unitPrice).toFixed(2)}</td>
+                                    <td class="px-3 py-3 text-sm text-gray-500">{item.quantity}</td>
+                                    <td class="px-3 py-3 text-sm text-gray-900 text-right font-medium">${parseFloat(item.subtotal).toFixed(2)}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                        <tfoot>
+                             <tr>
+                                <td colspan="3" class="px-3 py-3 text-sm font-medium text-gray-900 text-right">Subtotal:</td>
+                                <td class="px-3 py-3 text-sm text-gray-900 text-right">${parseFloat(order.subtotal).toFixed(2)}</td>
+                            </tr>
+                            {parseFloat(order.shippingCost) > 0 && (
+                                <tr>
+                                    <td colspan="3" class="px-3 py-3 text-sm font-medium text-gray-900 text-right">Envío:</td>
+                                    <td class="px-3 py-3 text-sm text-gray-900 text-right">${parseFloat(order.shippingCost).toFixed(2)}</td>
+                                </tr>
+                            )}
+                            {parseFloat(order.discountAmount) > 0 && (
+                                <tr>
+                                    <td colspan="3" class="px-3 py-3 text-sm font-medium text-gray-900 text-right text-green-600">Descuento:</td>
+                                    <td class="px-3 py-3 text-sm text-green-600 text-right">-${parseFloat(order.discountAmount).toFixed(2)}</td>
+                                </tr>
+                            )}
+                            <tr class="bg-gray-50">
+                                <td colspan="3" class="px-3 py-3 text-base font-bold text-gray-900 text-right">Total:</td>
+                                <td class="px-3 py-3 text-base font-bold text-gray-900 text-right">${parseFloat(order.total).toFixed(2)}</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sidebar Info -->
+        <div class="space-y-6">
+            <!-- Status Management -->
+            <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-100">
+                <h2 class="text-lg font-medium text-gray-900 mb-4 border-b pb-2">Estado del Pedido</h2>
+                
+                <form id="status-form" class="space-y-4">
+                    <div>
+                        <label for="status" class="block text-sm font-medium text-gray-700 mb-1">Estado General</label>
+                        <select id="status" name="status" class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border h-10 px-3">
+                            {statusOptions.map(opt => (
+                                <option value={opt.value} selected={order.status === opt.value}>{opt.label}</option>
+                            ))}
+                        </select>
+                    </div>
+
+                    <div>
+                        <label for="paymentStatus" class="block text-sm font-medium text-gray-700 mb-1">Estado del Pago</label>
+                        <select id="paymentStatus" name="paymentStatus" class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border h-10 px-3">
+                            {paymentStatusOptions.map(opt => (
+                                <option value={opt.value} selected={order.paymentStatus === opt.value}>{opt.label}</option>
+                            ))}
+                        </select>
+                    </div>
+
+                    <button type="submit" class="w-full flex items-center justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors">
+                        <Save className="w-4 h-4 mr-2" />
+                        Guardar Cambios
+                    </button>
+                </form>
+            </div>
+
+            <!-- Customer Info -->
+            <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-100">
+                <h2 class="text-lg font-medium text-gray-900 mb-4 border-b pb-2 flex items-center">
+                    <User className="w-5 h-5 mr-2 text-gray-400" />
+                    Cliente
+                </h2>
+                <div class="space-y-3 text-sm">
+                    <div>
+                        <span class="block text-gray-500 text-xs text-uppercase font-bold mb-1">Nombre</span>
+                        <span class="font-medium text-gray-900">{order.user?.name || 'Administrador'}</span>
+                    </div>
+                    <div>
+                        <span class="block text-gray-500 text-xs text-uppercase font-bold mb-1">Email</span>
+                        <span class="font-medium text-gray-900">{order.user?.email || 'admin@decomoi.com'}</span>
+                    </div>
+                    <div>
+                        <span class="block text-gray-500 text-xs text-uppercase font-bold mb-1">Teléfono</span>
+                        <span class="font-medium text-gray-900">{order.user?.phone || '-'}</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Shipping Info -->
+            <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-100 text-wrap overflow-hidden">
+                <h2 class="text-lg font-medium text-gray-900 mb-4 border-b pb-2 flex items-center">
+                    <MapPin className="w-5 h-5 mr-2 text-gray-400" />
+                    Envío
+                </h2>
+                {shippingAddress ? (
+                    <div class="space-y-2 text-sm text-gray-600">
+                        <p class="font-medium text-gray-900">{shippingAddress.name}</p>
+                        <p>{shippingAddress.street} {shippingAddress.number}</p>
+                        {shippingAddress.floor && <p>{shippingAddress.floor} {shippingAddress.apartment}</p>}
+                        <p>{shippingAddress.city}, {shippingAddress.state}</p>
+                        <p>{shippingAddress.postalCode}</p>
+                        <p>{shippingAddress.country}</p>
+                    </div>
+                ) : (
+                    <div>
+                         {shippingDataEntries.length > 0 ? (
+                            <div class="space-y-2 text-sm text-gray-600">
+                                {shippingDataEntries.map(([key, val]) => (
+                                    <div class="border-b border-gray-50 py-1">
+                                        <span class="text-xs text-gray-400 uppercase font-bold block">{key}</span>
+                                        <span class="text-gray-900">{val}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <p class="text-sm text-gray-500 italic">No hay datos de envío disponibles.</p>
+                        )}
+                    </div>
+                )}
+            </div>
+
+             <!-- Payment method -->
+            <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-100">
+                <h2 class="text-lg font-medium text-gray-900 mb-4 border-b pb-2 flex items-center">
+                    <CreditCard className="w-5 h-5 mr-2 text-gray-400" />
+                    Pago
+                </h2>
+                <div class="space-y-2 text-sm">
+                     <div>
+                        <span class="block text-gray-500 text-xs uppercase font-bold mb-1">Método</span>
+                        <span class="font-medium text-gray-900 uppercase p-1.5 bg-gray-100 rounded inline-block">{order.paymentMethod}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</AdminLayout>
+
+<script define:vars={{ id }}>
+    console.log('Controlador de orden cargado:', id);
+
+    function initHandlers() {
+        const deleteBtn = document.getElementById('delete-order-btn');
+        const confirmBox = document.getElementById('confirm-delete-box');
+        const finalDeleteBtn = document.getElementById('final-delete-btn');
+        const cancelDeleteBtn = document.getElementById('cancel-delete-btn');
+        const statusForm = document.getElementById('status-form');
+
+        if (deleteBtn && !deleteBtn.dataset.handled) {
+            deleteBtn.dataset.handled = "true";
+            deleteBtn.addEventListener('click', () => {
+                deleteBtn.classList.add('hidden');
+                confirmBox?.classList.remove('hidden');
+                confirmBox?.classList.add('flex');
+            });
+        }
+
+        if (cancelDeleteBtn) {
+            cancelDeleteBtn.onclick = () => {
+                confirmBox?.classList.add('hidden');
+                confirmBox?.classList.remove('flex');
+                deleteBtn?.classList.remove('hidden');
+            };
+        }
+
+        if (finalDeleteBtn && !finalDeleteBtn.dataset.handled) {
+            finalDeleteBtn.dataset.handled = "true";
+            finalDeleteBtn.addEventListener('click', async () => {
+                finalDeleteBtn.disabled = true;
+                const originalText = finalDeleteBtn.innerHTML;
+                finalDeleteBtn.innerHTML = 'Borrando...';
+                
+                try {
+                    console.log('Enviando solicitud DELETE para:', id);
+                    const response = await fetch(`/api/orders/${id}`, { method: 'DELETE' });
+                    
+                        if (response.ok) {
+                            window.showToast('Orden eliminada correctamente');
+                            setTimeout(() => window.location.href = '/admin/orders', 1500);
+                        } else {
+                            const error = await response.json();
+                            window.showToast('Error: ' + (error.error || 'No se pudo eliminar'), 'error');
+                            finalDeleteBtn.disabled = false;
+                            finalDeleteBtn.innerHTML = originalText;
+                        }
+                    } catch (err) {
+                        console.error('Error en fetch:', err);
+                        window.showToast('Error de conexión con el servidor', 'error');
+                    finalDeleteBtn.disabled = false;
+                    finalDeleteBtn.innerHTML = originalText;
+                }
+            });
+        }
+
+        if (statusForm && !statusForm.dataset.handled) {
+            statusForm.dataset.handled = "true";
+            statusForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const btn = statusForm.querySelector('button[type="submit"]');
+                const originalText = btn.innerHTML;
+                btn.disabled = true;
+                btn.innerHTML = 'Guardando...';
+
+                const data = Object.fromEntries(new FormData(statusForm));
+                try {
+                    const response = await fetch(`/api/orders/${id}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(data)
+                    });
+
+                    if (response.ok) {
+                        window.showToast('Cambios guardados con éxito');
+                        setTimeout(() => window.location.reload(), 1500);
+                    } else {
+                        const err = await response.json();
+                        window.showToast('Error: ' + err.error, 'error');
+                        btn.disabled = false;
+                        btn.innerHTML = originalText;
+                    }
+                } catch (err) {
+                    window.showToast('Error de red', 'error');
+                    btn.disabled = false;
+                    btn.innerHTML = originalText;
+                }
+            });
+        }
+    }
+
+    initHandlers();
+    document.addEventListener('astro:page-load', initHandlers);
+    document.addEventListener('astro:after-swap', initHandlers);
+</script>

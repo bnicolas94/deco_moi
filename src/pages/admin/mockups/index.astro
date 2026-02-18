@@ -1,0 +1,110 @@
+---
+import AdminLayout from '@/layouts/AdminLayout.astro';
+import { db } from '@/lib/db/connection';
+import { mockupTemplates, products } from '@/lib/db/schema';
+import { eq } from 'drizzle-orm';
+import { Layers, Plus, Pencil, ExternalLink } from 'lucide-react';
+
+const allTemplates = await db
+    .select({
+        id: mockupTemplates.id,
+        name: mockupTemplates.name,
+        slug: mockupTemplates.slug,
+        productName: products.name,
+        isActive: mockupTemplates.isActive,
+        surfaces: mockupTemplates.surfaces,
+    })
+    .from(mockupTemplates)
+    .leftJoin(products, eq(mockupTemplates.productId, products.id));
+
+---
+
+<AdminLayout title="Mockups & Plantillas">
+    <div class="flex justify-between items-center mb-6">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900">Plantillas de Mockups</h1>
+            <p class="text-gray-500 mt-1">Administra las superficies y configuraciones de visualización 3D.</p>
+        </div>
+        <a 
+            href="/admin/mockups/new" 
+            class="inline-flex items-center px-4 py-2 bg-indigo-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-indigo-700 focus:outline-none focus:border-indigo-900 focus:ring ring-indigo-300 disabled:opacity-25 transition ease-in-out duration-150"
+        >
+            <Plus className="w-4 h-4 mr-2" />
+            Nueva Plantilla
+        </a>
+    </div>
+
+    <!-- Templates Table -->
+     <div class="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Plantilla
+                        </th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Producto Asociado
+                        </th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Superficies
+                        </th>
+                         <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Estado
+                        </th>
+                        <th scope="col" class="relative px-6 py-3">
+                            <span class="sr-only">Acciones</span>
+                        </th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    {allTemplates.length === 0 ? (
+                         <tr>
+                            <td colspan="5" class="px-6 py-10 text-center text-gray-500">
+                                No se encontraron plantillas de mockup.
+                            </td>
+                        </tr>
+                    ) : (
+                        allTemplates.map((template) => (
+                            <tr>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="flex items-center">
+                                        <div class="flex-shrink-0 h-10 w-10 bg-indigo-100 rounded flex items-center justify-center">
+                                            <Layers className="h-5 w-5 text-indigo-600" />
+                                        </div>
+                                        <div class="ml-4">
+                                            <div class="text-sm font-medium text-gray-900">{template.name}</div>
+                                            <div class="text-xs text-gray-500">{template.slug}</div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                    {template.productName || 'Sin asignar'}
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                    {(template.surfaces as any[])?.length || 0} superficies
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <span class={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${template.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                                        {template.isActive ? 'Activo' : 'Inactivo'}
+                                    </span>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                    <div class="flex items-center justify-end gap-2">
+                                        <a href={`/admin/mockups/${template.id}`} class="text-indigo-600 hover:text-indigo-900 p-1 hover:bg-indigo-50 rounded" title="Editar Configuración">
+                                            <Pencil className="w-4 h-4" />
+                                        </a>
+                                        {/* Link to existing editor if available */}
+                                        <a href={`/mockup-editor/${template.id}`} target="_blank" class="text-gray-400 hover:text-gray-600 p-1 hover:bg-gray-50 rounded" title="Abrir Editor Visual">
+                                            <ExternalLink className="w-4 h-4" />
+                                        </a>
+                                    </div>
+                                </td>
+                            </tr>
+                        ))
+                    )}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</AdminLayout>

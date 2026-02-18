@@ -1,0 +1,300 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import ProductGrid from '../components/product/ProductGrid.astro';
+import { getFeaturedProducts } from '@/lib/services/ProductService';
+
+const featuredProducts = await getFeaturedProducts(8);
+---
+
+<BaseLayout>
+  <!-- Hero -->
+  <section class="relative min-h-[70vh] md:min-h-[80vh] flex items-center gradient-hero overflow-hidden">
+    <!-- Elementos decorativos -->
+    <div class="absolute inset-0 overflow-hidden pointer-events-none">
+      <div class="absolute -top-20 -right-20 w-96 h-96 bg-primary/20 rounded-full blur-3xl animate-float"></div>
+      <div class="absolute -bottom-20 -left-20 w-80 h-80 bg-accent/10 rounded-full blur-3xl animate-float" style="animation-delay: 1.5s"></div>
+      <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-rose-gold/5 rounded-full blur-3xl"></div>
+    </div>
+
+    <div class="container relative z-10">
+      <div class="max-w-2xl mx-auto text-center md:text-left md:mx-0">
+        <div class="inline-block mb-4 animate-fade-in">
+          <span class="px-4 py-1.5 bg-white/80 rounded-full text-xs font-heading font-semibold text-secondary tracking-wider uppercase shadow-sm">
+            ✨ Souvenirs & Regalos Personalizados
+          </span>
+        </div>
+
+        <h1 class="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-heading font-bold text-brand-black leading-tight mb-6 animate-slide-up">
+          Momentos que
+          <span class="text-gradient-gold">merecen</span>
+          ser recordados
+        </h1>
+
+        <p class="text-lg md:text-xl text-dark-gray/80 leading-relaxed mb-8 animate-slide-up" style="animation-delay: 0.1s">
+          Creamos souvenirs y regalos únicos, hechos con el cuidado que cada recuerdo merece.
+          Personalizá cada detalle para ese momento especial.
+        </p>
+
+        <div class="flex flex-col sm:flex-row items-center gap-4 animate-slide-up" style="animation-delay: 0.2s">
+          <a href="/productos" class="btn btn-primary btn-lg w-full sm:w-auto">
+            Ver productos
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3" />
+            </svg>
+          </a>
+          <a href="/contacto" class="btn btn-outline btn-lg w-full sm:w-auto">
+            Contactanos
+          </a>
+        </div>
+
+        <!-- Indicadores de confianza -->
+        <div class="flex flex-wrap items-center justify-center md:justify-start gap-6 mt-10 pt-8 border-t border-primary/20 animate-fade-in" style="animation-delay: 0.4s">
+          <div class="flex items-center gap-2">
+            <div class="w-8 h-8 rounded-full bg-success/10 flex items-center justify-center">
+              <svg class="w-4 h-4 text-success" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+            <span class="text-sm text-dark-gray/70">Envíos a todo el país</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <div class="w-8 h-8 rounded-full bg-gold/10 flex items-center justify-center">
+              <svg class="w-4 h-4 text-accent" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+              </svg>
+            </div>
+            <span class="text-sm text-dark-gray/70">4.9 ★ en Google</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <div class="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
+              <svg class="w-4 h-4 text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <span class="text-sm text-dark-gray/70">Producción artesanal</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Categorías -->
+  <section class="section bg-white">
+    <div class="container">
+      <div class="text-center mb-12">
+        <h2 class="section-title">Nuestros souvenirs</h2>
+        <div class="gold-line mt-4 mb-4"></div>
+        <p class="section-subtitle">Hechos con el cuidado que cada recuerdo merece</p>
+      </div>
+
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
+        <!-- Chocolates -->
+        <a href="/productos/chocolates" class="group">
+          <div class="card card-hover relative aspect-category overflow-hidden">
+            <div class="absolute inset-0 bg-gradient-to-t from-brand-black/70 via-brand-black/20 to-transparent z-10"></div>
+            <div class="absolute inset-0 bg-primary/30 flex items-center justify-center">
+              <svg class="w-16 h-16 text-secondary/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z" />
+              </svg>
+            </div>
+            <div class="absolute bottom-0 left-0 right-0 p-4 z-20">
+              <h3 class="font-heading font-bold text-white text-lg group-hover:text-primary transition-colors">Chocolates</h3>
+              <p class="text-white/70 text-sm">Personalizados</p>
+            </div>
+          </div>
+        </a>
+
+        <!-- Presentes -->
+        <a href="/productos/presentes" class="group">
+          <div class="card card-hover relative aspect-category overflow-hidden">
+            <div class="absolute inset-0 bg-gradient-to-t from-brand-black/70 via-brand-black/20 to-transparent z-10"></div>
+            <div class="absolute inset-0 bg-rose-gold/30 flex items-center justify-center">
+              <svg class="w-16 h-16 text-secondary/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" />
+              </svg>
+            </div>
+            <div class="absolute bottom-0 left-0 right-0 p-4 z-20">
+              <h3 class="font-heading font-bold text-white text-lg group-hover:text-primary transition-colors">Presentes</h3>
+              <p class="text-white/70 text-sm">Regalos especiales</p>
+            </div>
+          </div>
+        </a>
+
+        <!-- Tejidos -->
+        <a href="/productos/tejidos" class="group">
+          <div class="card card-hover relative aspect-category overflow-hidden">
+            <div class="absolute inset-0 bg-gradient-to-t from-brand-black/70 via-brand-black/20 to-transparent z-10"></div>
+            <div class="absolute inset-0 bg-accent/20 flex items-center justify-center">
+              <svg class="w-16 h-16 text-secondary/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+              </svg>
+            </div>
+            <div class="absolute bottom-0 left-0 right-0 p-4 z-20">
+              <h3 class="font-heading font-bold text-white text-lg group-hover:text-primary transition-colors">Tejidos</h3>
+              <p class="text-white/70 text-sm">Artesanales</p>
+            </div>
+          </div>
+        </a>
+
+        <!-- Velas -->
+        <a href="/productos/velas" class="group">
+          <div class="card card-hover relative aspect-category overflow-hidden">
+            <div class="absolute inset-0 bg-gradient-to-t from-brand-black/70 via-brand-black/20 to-transparent z-10"></div>
+            <div class="absolute inset-0 bg-gold/10 flex items-center justify-center">
+              <svg class="w-16 h-16 text-secondary/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z" />
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9.879 16.121A3 3 0 1012.015 11L11 14H9c0 .768.293 1.536.879 2.121z" />
+              </svg>
+            </div>
+            <div class="absolute bottom-0 left-0 right-0 p-4 z-20">
+              <h3 class="font-heading font-bold text-white text-lg group-hover:text-primary transition-colors">Velas</h3>
+              <p class="text-white/70 text-sm">Aromáticas</p>
+            </div>
+          </div>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Productos destacados -->
+  <section class="section">
+    <div class="container">
+      <div class="text-center mb-12">
+        <h2 class="section-title">Los más elegidos</h2>
+        <div class="gold-line mt-4 mb-4"></div>
+        <p class="section-subtitle">Descubrí nuestros productos más populares</p>
+      </div>
+
+      <ProductGrid products={featuredProducts} />
+
+      <div class="text-center mt-10">
+        <a href="/productos" class="btn btn-outline">
+          Ver todos los productos
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3" />
+          </svg>
+        </a>
+      </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Testimonios -->
+  <section class="section bg-white">
+    <div class="container">
+      <div class="text-center mb-12">
+        <h2 class="section-title">Nuestros clientes</h2>
+        <div class="gold-line mt-4 mb-4"></div>
+        <p class="section-subtitle">Mirá lo que dicen de nosotros</p>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <!-- Testimonio 1 -->
+        <div class="card p-6 hover:shadow-lg transition-shadow">
+          <div class="flex items-center gap-1 mb-3">
+            {[1,2,3,4,5].map(() => (
+              <svg class="w-4 h-4 text-gold" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+              </svg>
+            ))}
+          </div>
+          <p class="text-sm text-dark-gray leading-relaxed mb-4 italic">
+            "Super delicado todo. Nos encantó. Todo llegó en perfectas condiciones. Muchísimas gracias a todo el equipo. Super recomendables."
+          </p>
+          <div class="flex items-center gap-3 pt-3 border-t border-gray-100">
+            <div class="w-8 h-8 rounded-full bg-primary/30 flex items-center justify-center">
+              <span class="text-xs font-bold text-secondary">CS</span>
+            </div>
+            <div>
+              <p class="text-sm font-heading font-semibold text-brand-black">Cristina Salas</p>
+              <p class="text-xs text-gray-400">Cliente verificada</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Testimonio 2 -->
+        <div class="card p-6 hover:shadow-lg transition-shadow">
+          <div class="flex items-center gap-1 mb-3">
+            {[1,2,3,4,5].map(() => (
+              <svg class="w-4 h-4 text-gold" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+              </svg>
+            ))}
+          </div>
+          <p class="text-sm text-dark-gray leading-relaxed mb-4 italic">
+            "Excelente atención. Cumplieron con los tiempos de entrega, respondieron rápido las consultas y el resultado fue excelente. Muy recomendable."
+          </p>
+          <div class="flex items-center gap-3 pt-3 border-t border-gray-100">
+            <div class="w-8 h-8 rounded-full bg-primary/30 flex items-center justify-center">
+              <span class="text-xs font-bold text-secondary">CG</span>
+            </div>
+            <div>
+              <p class="text-sm font-heading font-semibold text-brand-black">Claudia Valeria González</p>
+              <p class="text-xs text-gray-400">Cliente verificada</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Testimonio 3 -->
+        <div class="card p-6 hover:shadow-lg transition-shadow">
+          <div class="flex items-center gap-1 mb-3">
+            {[1,2,3,4,5].map(() => (
+              <svg class="w-4 h-4 text-gold" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+              </svg>
+            ))}
+          </div>
+          <p class="text-sm text-dark-gray leading-relaxed mb-4 italic">
+            "Excelente atención!! Los chocolates de calidad y la presentación, hermosa!! A partir de una idea, fueron consultándome sobre el diseño hasta que lo consideré adecuado."
+          </p>
+          <div class="flex items-center gap-3 pt-3 border-t border-gray-100">
+            <div class="w-8 h-8 rounded-full bg-primary/30 flex items-center justify-center">
+              <span class="text-xs font-bold text-secondary">SB</span>
+            </div>
+            <div>
+              <p class="text-sm font-heading font-semibold text-brand-black">Sara Binder</p>
+              <p class="text-xs text-gray-400">Cliente verificada</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Puntuación general -->
+      <div class="text-center mt-10 p-6 bg-off-white rounded-2xl max-w-md mx-auto">
+        <div class="flex items-center justify-center gap-1 mb-2">
+          {[1,2,3,4,5].map(() => (
+            <svg class="w-6 h-6 text-gold" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+            </svg>
+          ))}
+        </div>
+        <p class="font-heading font-bold text-2xl text-brand-black">4.9 de 5</p>
+        <p class="text-sm text-gray-400">Basado en 44 reseñas en Google</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Banner CTA -->
+  <section class="py-16 gradient-primary">
+    <div class="container text-center">
+      <h2 class="text-3xl md:text-4xl font-heading font-bold text-brand-black mb-4">
+        ¿Tenés un evento especial?
+      </h2>
+      <p class="text-lg text-dark-gray/80 max-w-xl mx-auto mb-8">
+        Contactanos por WhatsApp y te ayudamos a crear el souvenir perfecto para tu ocasión.
+        Pedidos urgentes y personalización total.
+      </p>
+      <a
+        href={`https://wa.me/${import.meta.env.PUBLIC_WHATSAPP_NUMBER || '5491112345678'}?text=${encodeURIComponent('Hola! Quiero consultar sobre souvenirs personalizados')}`}
+        target="_blank"
+        rel="noopener noreferrer"
+        class="btn btn-whatsapp btn-lg"
+      >
+        <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+        </svg>
+        Escribinos por WhatsApp
+      </a>
+    </div>
+  </section>
+</BaseLayout>

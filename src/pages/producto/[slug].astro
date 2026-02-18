@@ -1,0 +1,576 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import ProductGrid from '../../components/product/ProductGrid.astro';
+import PriceTable from '../../components/product/PriceTable.astro';
+import { getProductBySlug, getRelatedProducts, getProductReviews } from '@/lib/services/ProductService';
+import { formatPrice } from '@/lib/utils/formatters';
+
+import { MockupGenerator } from '@/components/mockup/MockupGenerator';
+
+const { slug } = Astro.params;
+if (!slug) return Astro.redirect('/productos');
+
+const product = await getProductBySlug(slug);
+if (!product) return Astro.redirect('/productos');
+
+const relatedProducts = await getRelatedProducts(product.id, product.categoryId, 4);
+const productReviews = await getProductReviews(product.id);
+
+const basePrice = Number(product.basePrice);
+const finalPrice = product.isOnSale && product.salePrice ? Number(product.salePrice) : basePrice;
+const transferPrice = finalPrice * 0.9;
+const discountPct = product.isOnSale && product.salePrice
+  ? Math.round(((basePrice - Number(product.salePrice)) / basePrice) * 100)
+  : 0;
+
+const specs = product.specifications as Record<string, string> | null;
+const customization = product.customizationOptions as {
+  allowsPersonalization?: boolean;
+  fields?: string[];
+} | null;
+const priceRules = (product as any).priceRules || [];
+const category = (product as any).category;
+const images = product.images || [];
+const avgRating = productReviews.length > 0
+  ? (productReviews.reduce((sum: number, r: any) => sum + r.rating, 0) / productReviews.length).toFixed(1)
+  : null;
+---
+
+<BaseLayout
+  title={`${product.name} — Deco Moi`}
+  description={product.shortDescription || `Comprá ${product.name} en Deco Moi`}
+>
+  <!-- Breadcrumb -->
+  <div class="bg-white border-b border-gray-100">
+    <div class="container py-3">
+      <nav class="flex items-center gap-2 text-sm text-gray-400 flex-wrap" aria-label="Breadcrumb">
+        <a href="/" class="hover:text-brand-black transition-colors">Inicio</a>
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+        </svg>
+        <a href="/productos" class="hover:text-brand-black transition-colors">Productos</a>
+        {category && (
+          <>
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+            </svg>
+            <a href={`/productos/${category.slug}`} class="hover:text-brand-black transition-colors">{category.name}</a>
+          </>
+        )}
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+        </svg>
+        <span class="text-brand-black font-medium">{product.name}</span>
+      </nav>
+    </div>
+  </div>
+
+  <div class="container py-8 md:py-12">
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12">
+      <!-- Galería de imágenes -->
+      <div>
+        <div class="relative aspect-square rounded-2xl overflow-hidden bg-light-gray mb-4">
+          {images.length > 0 ? (
+            <img
+              id="main-image"
+              src={images[0]}
+              alt={product.name}
+              class="w-full h-full object-cover"
+            />
+          ) : (
+            <div class="absolute inset-0 flex items-center justify-center">
+              <div class="text-center p-8">
+                <svg class="w-20 h-20 mx-auto text-gray-300 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                <p class="text-sm text-gray-400">Imagen próximamente</p>
+              </div>
+            </div>
+          )}
+
+          {/* Badges */}
+          <div class="absolute top-4 left-4 flex flex-col gap-2">
+            {product.isOnSale && (
+              <span class="badge badge-sale">-{discountPct}% OFF</span>
+            )}
+            {product.isFeatured && (
+              <span class="badge badge-featured">⭐ Destacado</span>
+            )}
+          </div>
+        </div>
+
+        {/* Thumbnails */}
+        {images.length > 1 && (
+          <div class="flex gap-3 overflow-x-auto pb-2">
+            {images.map((img: string, i: number) => (
+              <button
+                class:list={[
+                  "product-thumb w-20 h-20 rounded-lg overflow-hidden flex-shrink-0 border-2 transition-all",
+                  i === 0 ? "border-primary" : "border-transparent hover:border-primary/50"
+                ]}
+                data-src={img}
+              >
+                <img src={img} alt={`${product.name} ${i + 1}`} class="w-full h-full object-cover" />
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <!-- Info del producto -->
+      <div>
+        <div class="mb-4">
+          {category && (
+            <a href={`/productos/${category.slug}`} class="text-xs text-accent font-heading font-medium uppercase tracking-wider hover:text-secondary transition-colors">
+              {category.name}
+            </a>
+          )}
+          <h1 class="text-2xl md:text-3xl font-heading font-bold text-brand-black mt-1 mb-3">{product.name}</h1>
+
+          {/* Rating */}
+          {avgRating && (
+            <div class="flex items-center gap-2 mb-3">
+              <div class="flex items-center gap-0.5">
+                {[1,2,3,4,5].map((star) => (
+                  <svg
+                    class:list={["w-4 h-4", star <= Math.round(Number(avgRating)) ? "text-gold" : "text-gray-200"]}
+                    fill="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                  </svg>
+                ))}
+              </div>
+              <span class="text-sm text-gray-400">({avgRating}) · {productReviews.length} {productReviews.length === 1 ? 'reseña' : 'reseñas'}</span>
+            </div>
+          )}
+
+          {product.sku && <p class="text-xs text-gray-400">SKU: {product.sku}</p>}
+        </div>
+
+        <!-- Precios -->
+        <div class="bg-off-white rounded-xl p-5 mb-6">
+          <div class="flex items-baseline gap-3 mb-2">
+            {product.isOnSale && product.salePrice ? (
+              <>
+                <span class="price-original text-lg">{formatPrice(basePrice)}</span>
+                <span class="text-3xl font-heading font-bold text-brand-black">{formatPrice(finalPrice)}</span>
+                <span class="badge badge-sale">-{discountPct}%</span>
+              </>
+            ) : (
+              <span class="text-3xl font-heading font-bold text-brand-black">{formatPrice(finalPrice)}</span>
+            )}
+          </div>
+          <p class="text-sm text-success font-medium flex items-center gap-1.5">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            {formatPrice(transferPrice)} con transferencia bancaria (10% off)
+          </p>
+        </div>
+
+        {/* Descripción corta */}
+        {product.shortDescription && (
+          <p class="text-dark-gray mb-6 leading-relaxed">{product.shortDescription}</p>
+        )}
+
+        <!-- Variantes -->
+        {product.variants && product.variants.length > 0 && (
+          <div class="mb-8 p-1">
+            <div class="flex items-center justify-between mb-3">
+              <h3 class="text-sm font-bold text-brand-black uppercase tracking-widest">Opción</h3>
+              <span id="selected-variant-label" class="text-xs font-medium text-accent">{product.variants[0].name}</span>
+            </div>
+            <div class="grid grid-cols-2 sm:grid-cols-3 gap-3" id="variant-selector">
+              {product.variants.map((v, i) => (
+                <button
+                  type="button"
+                  class:list={[
+                    "variant-btn group relative flex flex-col items-center justify-center p-4 rounded-2xl border-2 transition-all duration-300 hover:shadow-lg active:scale-95 overflow-hidden",
+                    i === 0 
+                      ? "border-brand-black bg-primary/5 shadow-md ring-1 ring-brand-black/5" 
+                      : "border-gray-100 bg-white text-gray-400 hover:border-gray-300 hover:bg-gray-50"
+                  ]}
+                  data-variant-id={v.id}
+                  data-variant-name={v.name}
+                  data-variant-sku={v.sku || product.sku}
+                  data-variant-price={v.price ? Number(v.price) : finalPrice}
+                  data-variant-stock={v.stock}
+                >
+                  <span class="text-sm font-semibold mb-0.5 transition-colors group-hover:text-brand-black">
+                    {v.name}
+                  </span>
+                  {v.stock <= 5 && v.stock > 0 && (
+                    <span class="text-[10px] uppercase tracking-tighter text-error font-bold opacity-80">
+                      Últimas {v.stock}
+                    </span>
+                  )}
+                  {v.stock <= 0 && (
+                    <span class="text-[10px] uppercase tracking-tighter text-gray-400 font-bold">
+                      Sin stock
+                    </span>
+                  )}
+                  
+                  {/* Indicador de selección - Sleek Checkmark design */}
+                  <div class:list={[
+                    "absolute top-2 right-2 w-5 h-5 rounded-full flex items-center justify-center transition-all duration-500",
+                    i === 0 ? "bg-brand-black scale-100 opacity-100" : "bg-gray-100 scale-50 opacity-0"
+                  ]}>
+                    <svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <!-- Selector cantidad + agregar carrito -->
+        <div class="flex items-center gap-4 mb-6">
+          <div class="flex items-center border border-gray-200 rounded-lg overflow-hidden">
+            <button
+              id="qty-minus"
+              class="w-10 h-10 flex items-center justify-center text-dark-gray hover:bg-gray-50 transition-colors"
+              aria-label="Disminuir cantidad"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4" />
+              </svg>
+            </button>
+            <input
+              id="qty-input"
+              type="number"
+              value={product.minOrder || 1}
+              min={product.minOrder || 1}
+              class="w-16 h-10 text-center text-sm font-medium border-x border-gray-200 outline-none"
+            />
+            <button
+              id="qty-plus"
+              class="w-10 h-10 flex items-center justify-center text-dark-gray hover:bg-gray-50 transition-colors"
+              aria-label="Aumentar cantidad"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v12m6-6H6" />
+              </svg>
+            </button>
+          </div>
+
+          <button
+            id="add-to-cart-main"
+            class="btn btn-primary flex-1"
+            data-product-id={product.id}
+            data-product-name={product.name}
+            data-product-slug={product.slug}
+            data-product-sku={product.sku}
+            data-product-price={finalPrice}
+            data-product-image={images[0] || ''}
+          >
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+            </svg>
+            Agregar al carrito
+          </button>
+        </div>
+
+        <!-- WhatsApp -->
+        <a
+          href={`https://wa.me/${import.meta.env.PUBLIC_WHATSAPP_NUMBER || '5491112345678'}?text=${encodeURIComponent(`Hola! Me interesa el producto: ${product.name} (${product.sku})`)}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          class="btn btn-whatsapp w-full mb-6"
+        >
+          <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+          </svg>
+          Consultar por WhatsApp
+        </a>
+
+        <!-- Personalización -->
+        {customization?.allowsPersonalization && (
+          <div class="p-4 rounded-xl border border-primary/30 bg-primary/5 mb-6">
+            <h3 class="font-heading font-semibold text-sm text-brand-black mb-2 flex items-center gap-2">
+              <svg class="w-5 h-5 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              </svg>
+              Producto personalizable
+            </h3>
+            <p class="text-sm text-dark-gray mb-2">Este producto se puede personalizar con:</p>
+            <div class="flex flex-wrap gap-2">
+              {customization.fields?.map((field: string) => (
+                <span class="px-3 py-1 rounded-full bg-white text-xs text-dark-gray border border-gray-200 capitalize">
+                  {field.replace('_', ' ')}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+
+    <!-- Generador de Mockups -->
+    {product.mockupTemplate && (
+      <div class="mt-12 mb-12">
+        <MockupGenerator 
+          client:only="react" 
+          mode="client" 
+          template={product.mockupTemplate} 
+          productName={product.name}
+        />
+      </div>
+    )}
+
+    <!-- Tabs: Descripción / Precios / Especificaciones / Reseñas -->
+    <div class="mt-12 border-t border-gray-100 pt-8">
+      <div class="flex gap-1 overflow-x-auto pb-1 mb-6 border-b border-gray-100" role="tablist">
+        <button class="tab-btn active px-5 py-3 text-sm font-heading font-medium text-brand-black border-b-2 border-primary whitespace-nowrap transition-colors" data-tab="descripcion">
+          Descripción
+        </button>
+        {priceRules.length > 0 && (
+          <button class="tab-btn px-5 py-3 text-sm font-heading font-medium text-gray-400 border-b-2 border-transparent hover:text-brand-black whitespace-nowrap transition-colors" data-tab="precios">
+            Precios por cantidad
+          </button>
+        )}
+        {specs && Object.keys(specs).length > 0 && (
+          <button class="tab-btn px-5 py-3 text-sm font-heading font-medium text-gray-400 border-b-2 border-transparent hover:text-brand-black whitespace-nowrap transition-colors" data-tab="especificaciones">
+            Especificaciones
+          </button>
+        )}
+        {productReviews.length > 0 && (
+          <button class="tab-btn px-5 py-3 text-sm font-heading font-medium text-gray-400 border-b-2 border-transparent hover:text-brand-black whitespace-nowrap transition-colors" data-tab="resenas">
+            Reseñas ({productReviews.length})
+          </button>
+        )}
+      </div>
+
+      <!-- Tab: Descripción -->
+      <div class="tab-content" data-tab-content="descripcion">
+        <div class="prose prose-sm max-w-none" set:html={product.description} />
+      </div>
+
+      <!-- Tab: Precios -->
+      {priceRules.length > 0 && (
+        <div class="tab-content hidden" data-tab-content="precios">
+          <div class="max-w-2xl">
+            <h3 class="font-heading font-semibold text-lg text-brand-black mb-4">Precios por cantidad</h3>
+            <p class="text-sm text-gray-500 mb-4">Aprovechá nuestros descuentos por cantidad. Cuanto más pedís, más ahorrás.</p>
+            <PriceTable basePrice={basePrice} priceRules={priceRules} />
+          </div>
+        </div>
+      )}
+
+      <!-- Tab: Especificaciones -->
+      {specs && Object.keys(specs).length > 0 && (
+        <div class="tab-content hidden" data-tab-content="especificaciones">
+          <div class="max-w-xl">
+            <dl class="divide-y divide-gray-100">
+              {Object.entries(specs).map(([key, value]) => (
+                <div class="flex items-center justify-between py-3">
+                  <dt class="text-sm text-gray-500">{key}</dt>
+                  <dd class="text-sm font-medium text-brand-black">{value}</dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+        </div>
+      )}
+
+      <!-- Tab: Reseñas -->
+      {productReviews.length > 0 && (
+        <div class="tab-content hidden" data-tab-content="resenas">
+          <div class="max-w-2xl">
+            {/* Rating promedio */}
+            <div class="flex items-center gap-4 mb-8 p-4 rounded-xl bg-off-white">
+              <div class="text-center">
+                <p class="text-4xl font-heading font-bold text-brand-black">{avgRating}</p>
+                <div class="flex items-center gap-0.5 mt-1">
+                  {[1,2,3,4,5].map((star) => (
+                    <svg class:list={["w-4 h-4", star <= Math.round(Number(avgRating)) ? "text-gold" : "text-gray-200"]} fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                    </svg>
+                  ))}
+                </div>
+                <p class="text-xs text-gray-400 mt-1">{productReviews.length} reseñas</p>
+              </div>
+            </div>
+
+            {/* Lista de reseñas */}
+            <div class="space-y-6">
+              {productReviews.map((review: any) => (
+                <div class="border-b border-gray-100 pb-6">
+                  <div class="flex items-center gap-3 mb-2">
+                    <div class="w-8 h-8 rounded-full bg-primary/30 flex items-center justify-center">
+                      <span class="text-xs font-bold text-secondary">
+                        {review.authorName.split(' ').map((w: string) => w[0]).join('').slice(0, 2)}
+                      </span>
+                    </div>
+                    <div>
+                      <p class="text-sm font-heading font-semibold text-brand-black">{review.authorName}</p>
+                      <div class="flex items-center gap-1">
+                        {[1,2,3,4,5].map((star) => (
+                          <svg class:list={["w-3 h-3", star <= review.rating ? "text-gold" : "text-gray-200"]} fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                          </svg>
+                        ))}
+                        {review.isVerified && <span class="text-2xs text-success ml-1">✓ Verificada</span>}
+                      </div>
+                    </div>
+                  </div>
+                  <p class="text-sm text-dark-gray leading-relaxed italic">"{review.comment}"</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+
+    <!-- Productos relacionados -->
+    {relatedProducts.length > 0 && (
+      <div class="mt-16">
+        <h2 class="section-title text-left mb-2">También te puede interesar</h2>
+        <div class="gold-line-left mb-8"></div>
+        <ProductGrid products={relatedProducts} />
+      </div>
+    )}
+  </div>
+</BaseLayout>
+
+<script>
+  // Tabs
+  document.querySelectorAll('.tab-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const tab = btn.getAttribute('data-tab');
+
+      document.querySelectorAll('.tab-btn').forEach((b) => {
+        b.classList.remove('active', 'text-brand-black', 'border-primary');
+        b.classList.add('text-gray-400', 'border-transparent');
+      });
+      btn.classList.add('active', 'text-brand-black', 'border-primary');
+      btn.classList.remove('text-gray-400', 'border-transparent');
+
+      document.querySelectorAll('.tab-content').forEach((c) => c.classList.add('hidden'));
+      document.querySelector(`[data-tab-content="${tab}"]`)?.classList.remove('hidden');
+    });
+  });
+
+  // Formato de precio helper
+  const formatPrice = (price: number) => {
+    return new Intl.NumberFormat('es-AR', {
+      style: 'currency',
+      currency: 'ARS',
+      minimumFractionDigits: 0
+    }).format(price);
+  };
+
+  // Variantes
+  const variantSelector = document.getElementById('variant-selector');
+  const mainAddToCartBtn = document.getElementById('add-to-cart-main');
+  const priceDisplay = document.querySelector('.text-3xl.font-heading.bold') || document.querySelector('.text-3xl.font-heading.font-bold');
+  const skuDisplay = document.querySelector('.text-xs.text-gray-400:last-of-type');
+  const transferPriceDisplay = document.querySelector('.text-sm.text-success.font-medium');
+
+  variantSelector?.addEventListener('click', (e) => {
+    const btn = (e.target as HTMLElement).closest('button');
+    if (!btn || !btn.classList.contains('variant-btn')) return;
+
+        // Resetear estilos de todos los botones
+        variantSelector.querySelectorAll('.variant-btn').forEach((b) => {
+          b.classList.remove('border-brand-black', 'shadow-md', 'ring-1', 'ring-brand-black/5', 'bg-primary/5');
+          b.classList.add('border-gray-100', 'text-gray-400');
+          // Selection indicator
+          const indicator = b.querySelector('.absolute');
+          if (indicator) {
+            indicator.classList.remove('bg-brand-black', 'scale-100', 'opacity-100');
+            indicator.classList.add('bg-gray-100', 'scale-50', 'opacity-0');
+          }
+        });
+
+        // Aplicar estilos al seleccionado
+        btn.classList.remove('border-gray-100', 'text-gray-400');
+        btn.classList.add('border-brand-black', 'shadow-md', 'ring-1', 'ring-brand-black/5', 'bg-primary/5');
+        const selectedIndicator = btn.querySelector('.absolute');
+        if (selectedIndicator) {
+          selectedIndicator.classList.remove('bg-gray-100', 'scale-50', 'opacity-0');
+          selectedIndicator.classList.add('bg-brand-black', 'scale-100', 'opacity-100');
+        }
+
+    // Label arriba
+    const labelDisplay = document.getElementById('selected-variant-label');
+    if (labelDisplay) labelDisplay.textContent = btn.getAttribute('data-variant-name');
+
+    // Obtener datos de variante
+    const variantId = btn.getAttribute('data-variant-id');
+    const variantName = btn.getAttribute('data-variant-name');
+    const variantSku = btn.getAttribute('data-variant-sku');
+    const variantPrice = parseFloat(btn.getAttribute('data-variant-price') || '0');
+    const variantStock = parseInt(btn.getAttribute('data-variant-stock') || '0');
+
+    // Actualizar atributos del botón de carrito
+    if (mainAddToCartBtn) {
+      mainAddToCartBtn.setAttribute('data-variant-id', variantId || '');
+      mainAddToCartBtn.setAttribute('data-variant-name', variantName || '');
+      mainAddToCartBtn.setAttribute('data-product-price', variantPrice.toString());
+      mainAddToCartBtn.setAttribute('data-product-sku', variantSku || '');
+      
+      // Stock check
+      if (variantStock <= 0) {
+        mainAddToCartBtn.setAttribute('disabled', 'true');
+        mainAddToCartBtn.textContent = 'Sin stock';
+      } else {
+        mainAddToCartBtn.removeAttribute('disabled');
+        mainAddToCartBtn.innerHTML = `
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+          </svg>
+          Agregar al carrito
+        `;
+      }
+    }
+
+    // Actualizar displays de precio y SKU
+    if (priceDisplay) priceDisplay.textContent = formatPrice(variantPrice);
+    if (skuDisplay && variantSku) skuDisplay.textContent = `SKU: ${variantSku}`;
+    if (transferPriceDisplay) {
+      const transferPrice = variantPrice * 0.9;
+      transferPriceDisplay.innerHTML = `
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        ${formatPrice(transferPrice)} con transferencia bancaria (10% off)
+      `;
+    }
+  });
+
+  // Galería de thumbnails
+  document.querySelectorAll('.product-thumb').forEach((thumb) => {
+    thumb.addEventListener('click', () => {
+      const src = thumb.getAttribute('data-src');
+      const mainImage = document.getElementById('main-image') as HTMLImageElement;
+      if (mainImage && src) mainImage.src = src;
+
+      document.querySelectorAll('.product-thumb').forEach((t) => {
+        t.classList.remove('border-primary');
+        t.classList.add('border-transparent');
+      });
+      thumb.classList.add('border-primary');
+      thumb.classList.remove('border-transparent');
+    });
+  });
+
+  // Cantidad
+  const qtyInput = document.getElementById('qty-input') as HTMLInputElement;
+  const qtyMinus = document.getElementById('qty-minus');
+  const qtyPlus = document.getElementById('qty-plus');
+  const minOrder = parseInt(qtyInput?.min || '1');
+
+  qtyMinus?.addEventListener('click', () => {
+    const current = parseInt(qtyInput.value);
+    if (current > minOrder) qtyInput.value = String(current - 1);
+  });
+
+  qtyPlus?.addEventListener('click', () => {
+    const current = parseInt(qtyInput.value);
+    qtyInput.value = String(current + 1);
+  });
+</script>
