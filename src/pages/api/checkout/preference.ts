@@ -17,7 +17,12 @@ export const POST: APIRoute = async (context) => {
         }
 
         // URL base del sitio desde .env (limpiando posibles comillas)
-        const baseUrl = (import.meta.env.PUBLIC_URL || process.env.PUBLIC_URL || 'http://localhost:4321').replace(/"/g, '');
+        let baseUrl = (import.meta.env.PUBLIC_URL || process.env.PUBLIC_URL || 'http://localhost:4321').replace(/"/g, '');
+
+        // Asegurar protocolo
+        if (!baseUrl.startsWith('http')) {
+            baseUrl = `https://${baseUrl}`;
+        }
 
         // Construir los items para Mercado Pago
         const mpItems = items.map((item: any) => {
