@@ -13,10 +13,7 @@ export const POST: APIRoute = async ({ request }) => {
 
         // Solo procesamos pagos
         if (type === 'payment' && id) {
-            if (id === '123456') {
-                console.log('Webhook de prueba recibido. Retornando 200 OK.');
-                return new Response(null, { status: 200 });
-            }
+
 
             try {
                 const payment = new Payment(mpClient);
