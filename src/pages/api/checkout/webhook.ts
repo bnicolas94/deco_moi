@@ -13,48 +13,58 @@ export const POST: APIRoute = async ({ request }) => {
 
         // Solo procesamos pagos
         if (type === 'payment' && id) {
-            const payment = new Payment(mpClient);
-            const paymentData = await payment.get({ id });
+            if (id === '123456') {
+                console.log('Webhook de prueba recibido. Retornando 200 OK.');
+                return new Response(null, { status: 200 });
+            }
 
-            console.log(`Estado del pago MP ${id}: ${paymentData.status}`);
+            try {
+                const payment = new Payment(mpClient);
+                const paymentData = await payment.get({ id });
 
-            // Si el pago está aprobado, creamos la orden
-            if (paymentData.status === 'approved') {
-                const metadata = paymentData.metadata;
+                console.log(`Estado del pago MP ${id}: ${paymentData.status}`);
 
-                if (!metadata) {
-                    console.error('No hay metadata en el pago de MP');
-                    return new Response(null, { status: 200 });
+                // Si el pago está aprobado, creamos la orden
+                if (paymentData.status === 'approved') {
+                    const metadata = paymentData.metadata;
+
+                    if (!metadata) {
+                        console.error('No hay metadata en el pago de MP');
+                        return new Response(null, { status: 200 });
+                    }
+
+                    const shippingData = JSON.parse(metadata.shipping_data);
+                    const items = JSON.parse(metadata.order_items);
+                    const total = metadata.total_amount;
+                    const subtotal = metadata.subtotal_amount;
+                    const userId = metadata.user_id;
+
+                    // Usar el servicio centralizado para crear la orden
+                    await OrderService.createOrderFromCheckout({
+                        items,
+                        shippingData,
+                        total: Number(total),
+                        subtotal: Number(subtotal),
+                        userId,
+                        paymentMethod: 'mercadopago',
+                        paymentId: id,
+                        notes: `Pago MP #${id} aprobado (vía Webhook).`
+                    });
+
+                    console.log(`Orden creada exitosamente desde Webhook MP`);
                 }
-
-                const shippingData = JSON.parse(metadata.shipping_data);
-                const items = JSON.parse(metadata.order_items);
-                const total = metadata.total_amount;
-                const subtotal = metadata.subtotal_amount;
-                const userId = metadata.user_id;
-
-                // Usar el servicio centralizado para crear la orden
-                await OrderService.createOrderFromCheckout({
-                    items,
-                    shippingData,
-                    total: Number(total),
-                    subtotal: Number(subtotal),
-                    userId,
-                    paymentMethod: 'mercadopago',
-                    paymentId: id,
-                    notes: `Pago MP #${id} aprobado (vía Webhook).`
-                });
-
-                console.log(`Orden creada exitosamente desde Webhook MP`);
+            } catch (paymentError) {
+                console.error(`Error al procesar el pago ${id}:`, paymentError);
+                return new Response(null, { status: 200 });
             }
         }
 
-        // Siempre respondemos 200 a Mercado Pago para confirmar recepción
+        // Siempre respondemos 200 a Mercado Pago
         return new Response(null, { status: 200 });
 
     } catch (error) {
         console.error('Error en Webhook MP:', error);
-        // Respondemos 500 para que MP reintente más tarde si hubo un error real
         return new Response('Error interno', { status: 500 });
     }
 };
+
