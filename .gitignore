@@ -21,4 +21,15 @@ pnpm-debug.log*
 .DS_Store
 
 # jetbrains setting folder
-.idea/
+
+# AntiGravity Agent
+.agent/
+
+# Editor
+.vscode/
+
+# Temp
+tmp/
+
+# Logs
+*.log
