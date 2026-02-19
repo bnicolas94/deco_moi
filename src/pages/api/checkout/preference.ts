@@ -4,7 +4,7 @@ import { preference } from '@/lib/mercadopago';
 export const POST: APIRoute = async (context) => {
     try {
         const body = await context.request.json();
-        const { items, shippingData, total, subtotal } = body;
+        const { items, shippingData, total, subtotal, shippingCost, shippingMethod, selectedShipping } = body;
 
         console.log('API: Iniciando creación de preferencia MP con', items.length, 'ítems');
 
@@ -43,6 +43,18 @@ export const POST: APIRoute = async (context) => {
             };
         });
 
+        // Agregar item de envío si corresponde
+        if (shippingCost && Number(shippingCost) > 0) {
+            mpItems.push({
+                id: 'shipping',
+                title: `Envío${selectedShipping?.carrierName ? ` - ${selectedShipping.carrierName}` : ''}`,
+                unit_price: Number(shippingCost),
+                quantity: 1,
+                currency_id: 'ARS',
+                description: selectedShipping?.serviceTypeName || 'Envío a domicilio',
+            });
+        }
+
         // Crear la preferencia
         const preferenceData = {
             body: {
@@ -67,6 +79,8 @@ export const POST: APIRoute = async (context) => {
                     }))),
                     total_amount: total,
                     subtotal_amount: subtotal,
+                    shipping_cost: shippingCost || 0,
+                    shipping_method: shippingMethod || 'pickup',
                     user_id: context.locals.user?.id || null
                 }
             }

@@ -9,11 +9,37 @@ import {
 } from '@/stores/cartStore';
 import type { CheckoutField } from '@/lib/services/ConfigService';
 
-interface Props {
-    fields: CheckoutField[];
+interface ShippingQuoteResult {
+    id: string;
+    serviceType: string;
+    serviceTypeName: string;
+    logisticType: string;
+    logisticTypeName: string;
+    carrierName: string;
+    carrierId: number;
+    price: number;
+    priceInclTax: number;
+    estimatedDelivery: string;
+    deliveryTimeHours: number | null;
 }
 
-export default function CheckoutForm({ fields }: Props) {
+interface ShippingConfig {
+    enabled: boolean;
+    pickupEnabled: boolean;
+    pickupLabel: string;
+    pickupAddress: string;
+    flatRateEnabled: boolean;
+    flatRate: number;
+    freeShippingEnabled: boolean;
+    freeShippingThreshold: number;
+}
+
+interface Props {
+    fields: CheckoutField[];
+    shippingConfig?: ShippingConfig;
+}
+
+export default function CheckoutForm({ fields, shippingConfig }: Props) {
     const items = useStore($cartItems);
     const total = useStore($cartTotal);
     const transferTotal = useStore($cartTransferTotal);
@@ -24,26 +50,138 @@ export default function CheckoutForm({ fields }: Props) {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [orderSuccess, setOrderSuccess] = useState<{ id: string, number: string } | null>(null);
 
+    // Estado de envío
+    const [deliveryMethod, setDeliveryMethod] = useState<'pickup' | 'delivery'>('pickup');
+    const [shippingOptions, setShippingOptions] = useState<ShippingQuoteResult[]>([]);
+    const [selectedShipping, setSelectedShipping] = useState<ShippingQuoteResult | null>(null);
+    const [isQuoting, setIsQuoting] = useState(false);
+    const [quoteError, setQuoteError] = useState<string | null>(null);
+    const [hasQuoted, setHasQuoted] = useState(false);
+
+    // Determinar si el envío está habilitado
+    const shippingEnabled = shippingConfig?.enabled ?? true;
+    const pickupEnabled = shippingConfig?.pickupEnabled ?? true;
+
+    // Calcular costo de envío actual
+    const shippingCost = deliveryMethod === 'delivery' && selectedShipping
+        ? selectedShipping.price
+        : 0;
+
+    // Calcular totales con envío
+    const subtotalForPayment = paymentMethod === 'transfer' ? transferTotal : total;
+    const grandTotal = subtotalForPayment + shippingCost;
+
     const handleInputChange = (id: string, value: string) => {
         setFormData(prev => ({ ...prev, [id]: value }));
     };
 
+    // Cotizar envío cuando se cambia a delivery y hay CP
+    const handleQuoteShipping = async () => {
+        const city = formData.city || '';
+        const state = formData.state || '';
+        const postalCode = formData.postal_code || '';
+
+        if (!postalCode) {
+            setQuoteError('Ingresá tu código postal para cotizar el envío');
+            return;
+        }
+
+        setIsQuoting(true);
+        setQuoteError(null);
+        setShippingOptions([]);
+        setSelectedShipping(null);
+
+        try {
+            const quoteItems = items.map(item => ({
+                sku: item.sku || `SKU-${item.id}`,
+                description: item.name,
+                weight: 0, // Se usan los defaults del servidor
+                height: 0,
+                width: 0,
+                length: 0,
+                quantity: item.quantity,
+            }));
+
+            const res = await fetch('/api/shipping/quote', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    items: quoteItems,
+                    destination: {
+                        city: city,
+                        state: state,
+                        zipcode: postalCode,
+                    },
+                    declaredValue: total,
+                }),
+            });
+
+            if (!res.ok) {
+                throw new Error('No se pudo cotizar el envío');
+            }
+
+            const data = await res.json();
+
+            if (data.results && data.results.length > 0) {
+                setShippingOptions(data.results);
+                setSelectedShipping(data.results[0]); // Seleccionar la primera opción por defecto
+                setHasQuoted(true);
+            } else {
+                setQuoteError('No hay opciones de envío disponibles para tu zona. Probá con retiro en local.');
+            }
+        } catch (err) {
+            console.error(err);
+            setQuoteError('Error al cotizar el envío. Verificá tu dirección e intentá de nuevo.');
+        } finally {
+            setIsQuoting(false);
+        }
+    };
+
+    // Auto-cotizar cuando se selecciona delivery y hay CP
+    useEffect(() => {
+        if (deliveryMethod === 'pickup') {
+            setShippingOptions([]);
+            setSelectedShipping(null);
+            setQuoteError(null);
+            setHasQuoted(false);
+            return;
+        }
+
+        // Cotizar automáticamente cuando hay CP de al menos 4 caracteres
+        const postalCode = formData.postal_code || '';
+        if (deliveryMethod === 'delivery' && postalCode.length >= 4) {
+            const timer = setTimeout(() => {
+                handleQuoteShipping();
+            }, 800); // Debounce de 800ms
+            return () => clearTimeout(timer);
+        }
+    }, [deliveryMethod, formData.postal_code, formData.city, formData.state]);
+
     const handleSubmit = async (e: any) => {
         e.preventDefault();
+
+        // Validar que se haya cotizado si eligió delivery
+        if (deliveryMethod === 'delivery' && !selectedShipping) {
+            alert('Por favor cotizá el envío antes de continuar.');
+            return;
+        }
+
         setIsSubmitting(true);
 
         const orderData = {
             items,
             subtotal: total,
-            total: (paymentMethod === 'transfer' ? transferTotal : total),
+            total: grandTotal,
+            shippingCost: shippingCost,
             shippingData: formData,
+            shippingMethod: deliveryMethod,
+            selectedShipping: selectedShipping || null,
             paymentMethod,
             notes: formData.additional_notes || '',
         };
 
         try {
             if (paymentMethod === 'mercadopago') {
-                // Flujo Mercado Pago: Crear preferencia y redirigir
                 const response = await fetch('/api/checkout/preference', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -53,7 +191,6 @@ export default function CheckoutForm({ fields }: Props) {
                 if (response.ok) {
                     const data = await response.json();
                     if (data.init_point) {
-                        // Limpiar el carrito antes de irnos para que al volver esté vacío
                         clearCart();
                         window.location.href = data.init_point;
                         return;
@@ -63,7 +200,6 @@ export default function CheckoutForm({ fields }: Props) {
                     throw new Error(errData.details || errData.error || 'No se pudo iniciar el pago con Mercado Pago');
                 }
             } else {
-                // Flujo Transferencia: Crear orden directamente (como antes)
                 const response = await fetch('/api/orders', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -93,6 +229,16 @@ export default function CheckoutForm({ fields }: Props) {
             currency: 'ARS',
             minimumFractionDigits: 0,
         }).format(price);
+    };
+
+    const formatDate = (dateStr: string) => {
+        if (!dateStr) return '';
+        try {
+            const date = new Date(dateStr);
+            return date.toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' });
+        } catch {
+            return dateStr;
+        }
     };
 
     if (orderSuccess) {
@@ -132,7 +278,7 @@ export default function CheckoutForm({ fields }: Props) {
                 <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100">
                     <h2 className="text-xl font-heading font-bold text-brand-black mb-6 flex items-center gap-2">
                         <span className="w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center text-sm">1</span>
-                        Datos de Envío y Contacto
+                        Datos de Contacto y Dirección
                     </h2>
 
                     <div className="grid grid-cols-2 gap-4">
@@ -162,9 +308,148 @@ export default function CheckoutForm({ fields }: Props) {
                     </div>
                 </div>
 
+                {/* Método de Entrega */}
                 <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100">
                     <h2 className="text-xl font-heading font-bold text-brand-black mb-6 flex items-center gap-2">
                         <span className="w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center text-sm">2</span>
+                        Método de Entrega
+                    </h2>
+
+                    <div className="space-y-3">
+                        {/* Retiro en local */}
+                        {pickupEnabled && (
+                            <label className={`flex items-center gap-4 p-4 rounded-xl border-2 cursor-pointer transition-all ${deliveryMethod === 'pickup' ? 'border-primary bg-primary/5' : 'border-gray-100 hover:border-gray-200'}`}>
+                                <input
+                                    type="radio"
+                                    name="delivery"
+                                    checked={deliveryMethod === 'pickup'}
+                                    onChange={() => setDeliveryMethod('pickup')}
+                                    className="w-4 h-4 text-primary"
+                                />
+                                <div className="flex-1">
+                                    <p className="font-bold text-brand-black flex items-center gap-2">
+                                        <svg className="w-5 h-5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                                        </svg>
+                                        {shippingConfig?.pickupLabel || 'Retiro en local'}
+                                    </p>
+                                    {shippingConfig?.pickupAddress && (
+                                        <p className="text-xs text-gray-500 mt-1">{shippingConfig.pickupAddress}</p>
+                                    )}
+                                </div>
+                                <span className="text-sm font-bold text-success">GRATIS</span>
+                            </label>
+                        )}
+
+                        {/* Envío a domicilio */}
+                        {shippingEnabled && (
+                            <label className={`flex items-center gap-4 p-4 rounded-xl border-2 cursor-pointer transition-all ${deliveryMethod === 'delivery' ? 'border-primary bg-primary/5' : 'border-gray-100 hover:border-gray-200'}`}>
+                                <input
+                                    type="radio"
+                                    name="delivery"
+                                    checked={deliveryMethod === 'delivery'}
+                                    onChange={() => setDeliveryMethod('delivery')}
+                                    className="w-4 h-4 text-primary"
+                                />
+                                <div className="flex-1">
+                                    <p className="font-bold text-brand-black flex items-center gap-2">
+                                        <svg className="w-5 h-5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0" />
+                                        </svg>
+                                        Envío a domicilio
+                                    </p>
+                                    <p className="text-xs text-gray-500 mt-1">Te lo llevamos a tu puerta</p>
+                                </div>
+                                {selectedShipping ? (
+                                    <span className="text-sm font-bold text-brand-black">{formatPrice(selectedShipping.price)}</span>
+                                ) : (
+                                    <span className="text-xs italic text-gray-400">Cotizar</span>
+                                )}
+                            </label>
+                        )}
+                    </div>
+
+                    {/* Sección de cotización de envío */}
+                    {deliveryMethod === 'delivery' && (
+                        <div className="mt-6 space-y-4">
+                            {/* Spinner de cotización automática */}
+                            {isQuoting && (
+                                <div className="flex items-center gap-3 p-4 bg-blue-50 rounded-xl border border-blue-100">
+                                    <div className="w-5 h-5 border-2 border-primary/30 border-t-primary rounded-full animate-spin"></div>
+                                    <p className="text-sm text-blue-700">Cotizando opciones de envío...</p>
+                                </div>
+                            )}
+
+                            {/* Mensaje si falta CP */}
+                            {!isQuoting && !hasQuoted && !quoteError && !(formData.postal_code && formData.postal_code.length >= 4) && (
+                                <div className="bg-blue-50 p-4 rounded-xl border border-blue-100">
+                                    <p className="text-sm text-blue-700">
+                                        Completá tu código postal arriba para ver las opciones de envío.
+                                    </p>
+                                </div>
+                            )}
+
+                            {quoteError && (
+                                <div className="bg-red-50 p-4 rounded-xl border border-red-100 flex items-center justify-between">
+                                    <p className="text-sm text-red-700">{quoteError}</p>
+                                    <button
+                                        type="button"
+                                        onClick={handleQuoteShipping}
+                                        className="text-xs text-red-600 font-bold hover:underline ml-3 whitespace-nowrap"
+                                    >
+                                        Reintentar
+                                    </button>
+                                </div>
+                            )}
+
+                            {/* Opciones de envío */}
+                            {shippingOptions.length > 0 && (
+                                <div className="space-y-2">
+                                    <p className="text-sm font-semibold text-dark-gray">Opciones de envío disponibles:</p>
+                                    {shippingOptions.map(option => (
+                                        <label
+                                            key={option.id}
+                                            className={`flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition-all ${selectedShipping?.id === option.id ? 'border-primary bg-primary/5' : 'border-gray-100 hover:border-gray-200'}`}
+                                        >
+                                            <input
+                                                type="radio"
+                                                name="shippingOption"
+                                                checked={selectedShipping?.id === option.id}
+                                                onChange={() => setSelectedShipping(option)}
+                                                className="w-4 h-4 text-primary flex-shrink-0"
+                                            />
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-sm font-bold text-brand-black">
+                                                    {option.carrierName} — {option.serviceTypeName}
+                                                </p>
+                                                {option.estimatedDelivery && (
+                                                    <p className="text-xs text-gray-500">
+                                                        Llega el {formatDate(option.estimatedDelivery)}
+                                                    </p>
+                                                )}
+                                            </div>
+                                            <span className="text-sm font-bold text-brand-black whitespace-nowrap">
+                                                {option.price === 0 ? 'GRATIS' : formatPrice(option.price)}
+                                            </span>
+                                        </label>
+                                    ))}
+                                    <button
+                                        type="button"
+                                        onClick={handleQuoteShipping}
+                                        className="text-xs text-primary hover:underline mt-1"
+                                    >
+                                        Volver a cotizar
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
+
+                {/* Método de Pago */}
+                <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100">
+                    <h2 className="text-xl font-heading font-bold text-brand-black mb-6 flex items-center gap-2">
+                        <span className="w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center text-sm">3</span>
                         Método de Pago
                     </h2>
 
@@ -242,18 +527,30 @@ export default function CheckoutForm({ fields }: Props) {
                         )}
                         <div className="flex justify-between text-dark-gray">
                             <span>Envío</span>
-                            <span className="italic text-xs">Calculado luego</span>
+                            {deliveryMethod === 'pickup' ? (
+                                <span className="text-success font-semibold text-sm">Retiro gratis</span>
+                            ) : selectedShipping ? (
+                                <span className="font-semibold">
+                                    {selectedShipping.price === 0 ? (
+                                        <span className="text-success">GRATIS</span>
+                                    ) : (
+                                        formatPrice(selectedShipping.price)
+                                    )}
+                                </span>
+                            ) : (
+                                <span className="italic text-xs text-gray-400">Cotizar arriba</span>
+                            )}
                         </div>
                         <div className="flex justify-between text-xl font-heading font-bold text-brand-black pt-2">
                             <span>Total</span>
-                            <span>{formatPrice(paymentMethod === 'transfer' ? transferTotal : total)}</span>
+                            <span>{formatPrice(grandTotal)}</span>
                         </div>
                     </div>
 
                     <button
                         type="submit"
-                        disabled={isSubmitting}
-                        className="btn btn-primary btn-lg w-full flex items-center justify-center gap-3"
+                        disabled={isSubmitting || (deliveryMethod === 'delivery' && !selectedShipping)}
+                        className="btn btn-primary btn-lg w-full flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         {isSubmitting ? (
                             <div className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
@@ -266,6 +563,12 @@ export default function CheckoutForm({ fields }: Props) {
                             </>
                         )}
                     </button>
+
+                    {deliveryMethod === 'delivery' && !selectedShipping && (
+                        <p className="text-center text-xs text-amber-600 mt-3 font-medium">
+                            ⚠️ Cotizá el envío antes de finalizar
+                        </p>
+                    )}
 
                     {/* Botón de Simulación (Solo Local/Debug) */}
                     {(window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') && (
@@ -281,8 +584,11 @@ export default function CheckoutForm({ fields }: Props) {
                                         body: JSON.stringify({
                                             items,
                                             subtotal: total,
-                                            total: (paymentMethod === 'transfer' ? transferTotal : total),
+                                            total: grandTotal,
+                                            shippingCost: shippingCost,
                                             shippingData: formData,
+                                            shippingMethod: deliveryMethod,
+                                            selectedShipping: selectedShipping || null,
                                             paymentMethod: 'mock_payment',
                                             notes: 'Simulación de pago local'
                                         })

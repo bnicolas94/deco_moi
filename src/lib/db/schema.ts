@@ -41,6 +41,11 @@ export const products = pgTable('products', {
     isOnSale: boolean('is_on_sale').default(false),
     salePrice: decimal('sale_price', { precision: 10, scale: 2 }),
     tags: json('tags').$type<string[]>().default([]),
+    // Dimensiones para envío (opcionales, se usan defaults si no se especifican)
+    weight: integer('weight'), // gramos
+    height: integer('height'), // cm
+    width: integer('width'),   // cm
+    length: integer('length'), // cm
     createdAt: timestamp('created_at').defaultNow(),
     updatedAt: timestamp('updated_at').defaultNow(),
     mockupTemplateId: integer('mockup_template_id'),
@@ -126,6 +131,8 @@ export const orders = pgTable('orders', {
     paymentStatus: varchar('payment_status', { length: 50 }).default('pending'),
     shippingAddressId: integer('shipping_address_id'),
     shippingData: json('shipping_data').$type<Record<string, any>>(),
+    shippingMethod: varchar('shipping_method', { length: 50 }).default('pickup'), // 'pickup' | 'delivery'
+    zipnovaShipmentId: varchar('zipnova_shipment_id', { length: 100 }),
     notes: text('notes'),
     customizationDetails: json('customization_details').$type<Record<string, any>>(),
     createdAt: timestamp('created_at').defaultNow(),

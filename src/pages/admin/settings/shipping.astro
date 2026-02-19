@@ -1,0 +1,220 @@
+---
+import AdminLayout from '@/layouts/AdminLayout.astro';
+import { getShippingConfig } from '@/lib/services/ShippingService';
+
+const config = await getShippingConfig();
+---
+
+<AdminLayout title="Configuración de Envíos">
+    <div class="mb-8">
+        <h1 class="text-2xl font-bold text-gray-900">Configuración de Envíos</h1>
+        <p class="text-gray-500 mt-1">Gestiona las opciones de envío y los costos para tus clientes.</p>
+    </div>
+
+    <form id="shipping-form" class="space-y-8">
+        <!-- Habilitación general -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+            <div class="p-6 border-b border-gray-100">
+                <h2 class="text-lg font-semibold text-gray-800 flex items-center gap-2">
+                    <svg class="w-5 h-5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                    Opciones Generales
+                </h2>
+            </div>
+            <div class="p-6 space-y-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <label class="font-semibold text-gray-800">Habilitar envíos a domicilio</label>
+                        <p class="text-sm text-gray-500">Permite a los clientes elegir envío en el checkout</p>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="enabled" class="sr-only peer" checked={config.enabled} />
+                        <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                    </label>
+                </div>
+
+                <div class="flex items-center justify-between">
+                    <div>
+                        <label class="font-semibold text-gray-800">Habilitar retiro en local</label>
+                        <p class="text-sm text-gray-500">Permite a los clientes elegir retiro gratis</p>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="pickupEnabled" class="sr-only peer" checked={config.pickupEnabled} />
+                        <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                    </label>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-bold text-gray-600 uppercase mb-1">Etiqueta retiro</label>
+                    <input type="text" id="pickupLabel" value={config.pickupLabel} class="input w-full max-w-md" placeholder="Ej: Retiro en local" />
+                </div>
+
+                <div>
+                    <label class="block text-sm font-bold text-gray-600 uppercase mb-1">Dirección de retiro (visible al cliente)</label>
+                    <input type="text" id="pickupAddress" value={config.pickupAddress} class="input w-full" placeholder="Ej: Av. Corrientes 1234, CABA" />
+                </div>
+            </div>
+        </div>
+
+        <!-- Tarifa de envío -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+            <div class="p-6 border-b border-gray-100">
+                <h2 class="text-lg font-semibold text-gray-800 flex items-center gap-2">
+                    <svg class="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    Tarifas de Envío
+                </h2>
+            </div>
+            <div class="p-6 space-y-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <label class="font-semibold text-gray-800">Usar tarifa fija</label>
+                        <p class="text-sm text-gray-500">En vez de cotizar con Zipnova, usar un costo fijo para todos los envíos</p>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="flatRateEnabled" class="sr-only peer" checked={config.flatRateEnabled} />
+                        <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                    </label>
+                </div>
+
+                <div id="flat-rate-fields">
+                    <label class="block text-sm font-bold text-gray-600 uppercase mb-1">Costo fijo de envío ($)</label>
+                    <input type="number" id="flatRate" value={config.flatRate} step="0.01" min="0" class="input w-48" placeholder="0.00" />
+                </div>
+
+                <hr class="border-gray-100" />
+
+                <div class="flex items-center justify-between">
+                    <div>
+                        <label class="font-semibold text-gray-800">Envío gratis a partir de</label>
+                        <p class="text-sm text-gray-500">El envío será gratis si la compra supera este monto</p>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="freeShippingEnabled" class="sr-only peer" checked={config.freeShippingEnabled} />
+                        <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                    </label>
+                </div>
+
+                <div id="free-shipping-fields">
+                    <label class="block text-sm font-bold text-gray-600 uppercase mb-1">Monto mínimo para envío gratis ($)</label>
+                    <input type="number" id="freeShippingThreshold" value={config.freeShippingThreshold} step="1" min="0" class="input w-48" placeholder="0" />
+                </div>
+            </div>
+        </div>
+
+        <!-- Dimensiones por defecto -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+            <div class="p-6 border-b border-gray-100">
+                <h2 class="text-lg font-semibold text-gray-800 flex items-center gap-2">
+                    <svg class="w-5 h-5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+                    Dimensiones por Defecto
+                </h2>
+                <p class="text-sm text-gray-500 mt-1">Se usan para cotizar cuando un producto no tiene dimensiones especificadas</p>
+            </div>
+            <div class="p-6">
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div>
+                        <label class="block text-sm font-bold text-gray-600 uppercase mb-1">Peso (gramos)</label>
+                        <input type="number" id="defaultWeight" value={config.defaultWeight} min="1" class="input w-full" />
+                    </div>
+                    <div>
+                        <label class="block text-sm font-bold text-gray-600 uppercase mb-1">Alto (cm)</label>
+                        <input type="number" id="defaultHeight" value={config.defaultHeight} min="1" class="input w-full" />
+                    </div>
+                    <div>
+                        <label class="block text-sm font-bold text-gray-600 uppercase mb-1">Ancho (cm)</label>
+                        <input type="number" id="defaultWidth" value={config.defaultWidth} min="1" class="input w-full" />
+                    </div>
+                    <div>
+                        <label class="block text-sm font-bold text-gray-600 uppercase mb-1">Largo (cm)</label>
+                        <input type="number" id="defaultLength" value={config.defaultLength} min="1" class="input w-full" />
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Estado de Zipnova -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+            <div class="p-6 border-b border-gray-100">
+                <h2 class="text-lg font-semibold text-gray-800 flex items-center gap-2">
+                    <svg class="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                    Integración Zipnova
+                </h2>
+            </div>
+            <div class="p-6">
+                {import.meta.env.ZIPNOVA_API_TOKEN ? (
+                    <div class="flex items-center gap-3 p-4 bg-green-50 rounded-lg border border-green-200">
+                        <svg class="w-6 h-6 text-green-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        <div>
+                            <p class="font-semibold text-green-800">Credenciales configuradas</p>
+                            <p class="text-sm text-green-600">Las credenciales de API de Zipnova están configuradas en las variables de entorno.</p>
+                        </div>
+                    </div>
+                ) : (
+                    <div class="flex items-center gap-3 p-4 bg-amber-50 rounded-lg border border-amber-200">
+                        <svg class="w-6 h-6 text-amber-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                        <div>
+                            <p class="font-semibold text-amber-800">Credenciales no configuradas</p>
+                            <p class="text-sm text-amber-600">Configurá las variables <code>ZIPNOVA_API_TOKEN</code>, <code>ZIPNOVA_API_SECRET</code>, <code>ZIPNOVA_ACCOUNT_ID</code> y <code>ZIPNOVA_ORIGIN_ID</code> en tu archivo <code>.env</code>.</p>
+                        </div>
+                    </div>
+                )}
+            </div>
+        </div>
+
+        <!-- Botón Guardar -->
+        <div class="flex justify-end">
+            <button type="submit" id="save-btn" class="btn btn-primary px-8 py-3 text-base font-bold">
+                Guardar Configuración
+            </button>
+        </div>
+    </form>
+</AdminLayout>
+
+<script>
+    const form = document.getElementById('shipping-form') as HTMLFormElement;
+
+    form?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const btn = document.getElementById('save-btn') as HTMLButtonElement;
+        const originalText = btn.textContent;
+        btn.textContent = 'Guardando...';
+        btn.disabled = true;
+
+        const getValue = (id: string) => (document.getElementById(id) as HTMLInputElement)?.value;
+        const getChecked = (id: string) => (document.getElementById(id) as HTMLInputElement)?.checked;
+
+        const config = {
+            enabled: getChecked('enabled'),
+            pickupEnabled: getChecked('pickupEnabled'),
+            pickupLabel: getValue('pickupLabel'),
+            pickupAddress: getValue('pickupAddress'),
+            flatRateEnabled: getChecked('flatRateEnabled'),
+            flatRate: parseFloat(getValue('flatRate')) || 0,
+            freeShippingEnabled: getChecked('freeShippingEnabled'),
+            freeShippingThreshold: parseFloat(getValue('freeShippingThreshold')) || 0,
+            defaultWeight: parseInt(getValue('defaultWeight')) || 500,
+            defaultHeight: parseInt(getValue('defaultHeight')) || 10,
+            defaultWidth: parseInt(getValue('defaultWidth')) || 15,
+            defaultLength: parseInt(getValue('defaultLength')) || 20,
+        };
+
+        try {
+            const res = await fetch('/api/admin/config/shipping', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(config),
+            });
+
+            if (res.ok) {
+                alert('Configuración de envíos guardada correctamente');
+            } else {
+                alert('Error al guardar la configuración');
+            }
+        } catch (err) {
+            console.error(err);
+            alert('Error de red al intentar guardar');
+        } finally {
+            btn.textContent = originalText;
+            btn.disabled = false;
+        }
+    });
+</script>

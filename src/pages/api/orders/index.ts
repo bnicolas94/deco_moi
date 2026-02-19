@@ -10,7 +10,7 @@ export const POST: APIRoute = async (context) => {
 
     try {
         const body = await context.request.json();
-        const { items, shippingData, paymentMethod, notes, subtotal, total, discountAmount, shippingCost } = body;
+        const { items, shippingData, paymentMethod, notes, subtotal, total, discountAmount, shippingCost, shippingMethod, selectedShipping } = body;
 
         if (!items || items.length === 0) {
             return new Response(JSON.stringify({ error: 'El carrito está vacío' }), { status: 400 });
@@ -18,6 +18,12 @@ export const POST: APIRoute = async (context) => {
 
         // Generar número de orden aleatorio
         const orderNumber = `DEC-${Math.floor(100000 + Math.random() * 900000)}`;
+
+        // Combinar datos de envío con la opción seleccionada
+        const fullShippingData = {
+            ...shippingData,
+            selectedShipping: selectedShipping || null,
+        };
 
         // 1. Crear la Orden
         const [newOrder] = await db.insert(orders).values({
@@ -31,7 +37,8 @@ export const POST: APIRoute = async (context) => {
             shippingCost: String(shippingCost || 0),
             paymentMethod,
             paymentStatus: PaymentStatus.PENDING,
-            shippingData,
+            shippingData: fullShippingData,
+            shippingMethod: shippingMethod || 'pickup',
             notes,
             createdAt: new Date(),
             updatedAt: new Date(),
