@@ -5,9 +5,39 @@ import { siteConfig } from './lib/db/schema';
 import { eq } from 'drizzle-orm';
 
 export const onRequest = defineMiddleware(async (context, next) => {
-    // --- MANTENIMIENTO MODO START ---
+    // 1. Validar sesión primero
+    const token = context.cookies.get(SESSION_COOKIE_NAME)?.value ?? null;
+    let session = null;
+    let user = null;
+
+    if (token !== null) {
+        const result = await validateSessionToken(token);
+        session = result.session;
+        user = result.user;
+
+        if (session) {
+            context.cookies.set(SESSION_COOKIE_NAME, session.id, {
+                path: '/',
+                httpOnly: true,
+                secure: import.meta.env.PROD,
+                sameSite: 'lax',
+                expires: session.expiresAt,
+            });
+        } else {
+            context.cookies.delete(SESSION_COOKIE_NAME, {
+                path: '/',
+            });
+        }
+    }
+
+    context.locals.session = session;
+    context.locals.user = user;
+
+    const isAdmin = user !== null && user.role === 'admin';
+
+    // 2. Comprobar Modo Mantenimiento
     // Excepciones: Rutas de admin, API, la propia página de mantenimiento,
-    // y assets estáticos (imágenes, fuentes, CSS/JS bundles) nunca son bloqueadas
+    // assets estáticos y administradores logueados nunca son bloqueados
     const pathname = context.url.pathname;
     const isStaticAsset = pathname.startsWith('/_astro') ||
         pathname.startsWith('/images') ||
@@ -27,7 +57,8 @@ export const onRequest = defineMiddleware(async (context, next) => {
     const isMaintenanceExempt = pathname.startsWith('/admin') ||
         pathname.startsWith('/api') ||
         pathname.startsWith('/mantenimiento') ||
-        isStaticAsset;
+        isStaticAsset ||
+        isAdmin;
 
     if (!isMaintenanceExempt) {
         // Obtenemos el cache si existe
@@ -68,47 +99,16 @@ export const onRequest = defineMiddleware(async (context, next) => {
             return context.redirect('/mantenimiento', 302);
         }
     }
-    // --- MANTENIMIENTO MODO END ---
 
-    const token = context.cookies.get(SESSION_COOKIE_NAME)?.value ?? null;
-
-    if (token === null) {
-        context.locals.user = null;
-        context.locals.session = null;
-
-        if (context.url.pathname.startsWith('/admin') && !context.url.pathname.startsWith('/admin/login')) {
-            return context.redirect('/admin/login');
-        }
-
-        return next();
-    }
-
-    const { session, user } = await validateSessionToken(token);
-
-    if (session) {
-        context.cookies.set(SESSION_COOKIE_NAME, session.id, {
-            path: '/',
-            httpOnly: true,
-            secure: import.meta.env.PROD,
-            sameSite: 'lax',
-            expires: session.expiresAt,
-        });
-    } else {
-        context.cookies.delete(SESSION_COOKIE_NAME, {
-            path: '/',
-        });
-    }
-
-    context.locals.session = session;
-    context.locals.user = user;
-
+    // 3. Proteger rutas de admin
     if (context.url.pathname.startsWith('/admin') && !context.url.pathname.startsWith('/admin/login')) {
-        if (!user || user.role !== 'admin') {
+        if (!isAdmin) {
             return context.redirect('/admin/login');
         }
     }
 
-    if (context.url.pathname.startsWith('/admin/login') && user && user.role === 'admin') {
+    // 4. Redirigir admin logueado si entra a login
+    if (context.url.pathname.startsWith('/admin/login') && isAdmin) {
         return context.redirect('/admin');
     }
 
