@@ -3,7 +3,9 @@ import AdminLayout from '@/layouts/AdminLayout.astro';
 import { db } from '@/lib/db/connection';
 import { products, orders, users } from '@/lib/db/schema';
 import { count } from 'drizzle-orm';
-import { Package, ShoppingCart, Users, DollarSign } from 'lucide-react';
+import { Package, ShoppingCart, Users, DollarSign, Settings, ServerCrash, CheckCircle } from 'lucide-react';
+import { eq } from 'drizzle-orm';
+import { siteConfig } from '@/lib/db/schema';
 
 // Obtener estadísticas reales (simple count por ahora)
 const [productCount] = await db.select({ value: count() }).from(products);
@@ -16,6 +18,13 @@ const stats = [
     { title: 'Usuarios', value: userCount.value, icon: Users, color: 'text-purple-600', bg: 'bg-purple-100' },
     { title: 'Ingresos', value: '$0.00', icon: DollarSign, color: 'text-emerald-600', bg: 'bg-emerald-100' }, // TODO: Calcular real
 ];
+
+// Obtener estado actual del modo mantenimiento
+const maintenanceResult = await db.select().from(siteConfig).where(eq(siteConfig.key, 'maintenance_mode')).limit(1);
+let initialMaintenanceMode = false;
+if (maintenanceResult.length > 0 && maintenanceResult[0].value !== null) {
+    initialMaintenanceMode = maintenanceResult[0].value === true || maintenanceResult[0].value === 'true';
+}
 ---
 
 <AdminLayout title="Dashboard">
@@ -104,5 +113,153 @@ const stats = [
                 </a>
             </div>
         </div>
+        
+        <!-- Configuración Rápida / Mantenimiento -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden lg:col-span-2">
+            <div class="p-6 border-b border-gray-100 flex items-center gap-2">
+                <Settings className="w-5 h-5 text-gray-500" />
+                <h2 class="text-lg font-bold text-gray-900">Configuración Rápida</h2>
+            </div>
+            <div class="p-6">
+                <!-- Maintenance Mode Toggle -->
+                <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between p-5 bg-gray-50 border border-gray-200 rounded-xl">
+                    <div class="mb-4 sm:mb-0">
+                        <h3 class="text-base font-semibold text-gray-900 mb-1">Modo Mantenimiento</h3>
+                        <p class="text-sm text-gray-600 max-w-md">
+                            Cuando está activo, todos los visitantes son redirigidos a la página de renovación. Usa esto para ocultar la tienda mientras haces cambios grandes.
+                        </p>
+                    </div>
+                    
+                    <div class="flex items-center gap-4">
+                        <div id="maintenance-status-badge" class={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${initialMaintenanceMode ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                            {initialMaintenanceMode ? <ServerCrash className="w-4 h-4" id="m-icon-on"/> : <CheckCircle className="w-4 h-4" id="m-icon-off"/>}
+                            <span id="maintenance-status-text">
+                                {initialMaintenanceMode ? 'Mantenimiento activo — tienda oculta' : 'Tienda online y visible'}
+                            </span>
+                        </div>
+                        
+                        <!-- Toggle Switch -->
+                        <button 
+                            type="button" 
+                            id="maintenance-toggle"
+                            class={`relative inline-flex h-7 w-14 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:ring-offset-2 ${initialMaintenanceMode ? 'bg-amber-500' : 'bg-emerald-500'}`}
+                            role="switch" 
+                            aria-checked={initialMaintenanceMode ? 'true' : 'false'}
+                            data-active={initialMaintenanceMode ? 'true' : 'false'}
+                        >
+                            <span class="sr-only">Activar modo mantenimiento</span>
+                            <span 
+                                id="maintenance-toggle-knob"
+                                class={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${initialMaintenanceMode ? 'translate-x-7' : 'translate-x-0'}`}
+                            ></span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 </AdminLayout>
+
+<script>
+    // Logica para el toggle del Mantenimiento
+    document.addEventListener('DOMContentLoaded', () => {
+        const toggleBtn = document.getElementById('maintenance-toggle');
+        const toggleKnob = document.getElementById('maintenance-toggle-knob');
+        const statusBadge = document.getElementById('maintenance-status-badge');
+        const statusText = document.getElementById('maintenance-status-text');
+        
+        if (!toggleBtn) return;
+
+        let isUpdating = false;
+
+        toggleBtn.addEventListener('click', async () => {
+            if (isUpdating) return;
+            
+            const currentState = toggleBtn.getAttribute('data-active') === 'true';
+            const newState = !currentState;
+            isUpdating = true;
+            
+            // UI Optimistic update (simulando que el toast/notificación existe, creamos uno simple)
+            toggleBtn.style.opacity = '0.5';
+
+            try {
+                const res = await fetch('/api/admin/maintenance', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ active: newState })
+                });
+
+                if (!res.ok) throw new Error('Error al cambiar el estado');
+
+                const data = await res.json();
+                
+                // Update UI attributes
+                toggleBtn.setAttribute('data-active', data.active ? 'true' : 'false');
+                toggleBtn.setAttribute('aria-checked', data.active ? 'true' : 'false');
+                
+                // Update styling
+                if (data.active) {
+                    toggleBtn.classList.replace('bg-emerald-500', 'bg-amber-500');
+                    toggleKnob.classList.replace('translate-x-0', 'translate-x-7');
+                    
+                    statusBadge.classList.replace('bg-emerald-100', 'bg-amber-100');
+                    statusBadge.classList.replace('text-emerald-700', 'text-amber-700');
+                    statusText.textContent = 'Mantenimiento activo — tienda oculta';
+                    
+                    // Simple toast fallback
+                    showToast('Modo mantenimiento activado. La tienda ya no es visible para los visitantes.', 'warning');
+                } else {
+                    toggleBtn.classList.replace('bg-amber-500', 'bg-emerald-500');
+                    toggleKnob.classList.replace('translate-x-7', 'translate-x-0');
+                    
+                    statusBadge.classList.replace('bg-amber-100', 'bg-emerald-100');
+                    statusBadge.classList.replace('text-amber-700', 'text-emerald-700');
+                    statusText.textContent = 'Tienda online y visible';
+                    
+                    // Simple toast fallback
+                    showToast('Modo mantenimiento desactivado. La tienda está visible nuevamente.', 'success');
+                }
+                
+                // Necesitamos refrescar los iconos dinámicamente si quisiéramos, pero por simplicidad solo texto/colores actualizados aquí bastan, o recargar.
+                // Sin embargo vamos a cambiar el innerHTML para los iconos de lucide
+                const iconContainer = statusBadge.querySelector('svg');
+                if (iconContainer) {
+                    if (data.active) {
+                        iconContainer.outerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-server-crash w-4 h-4"><path d="M6 10H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-2"/><path d="M6 14H4a2 2 0 0 0-2 2v4a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-4a2 2 0 0 0-2-2h-2"/><path d="M6 6h.01"/><path d="M6 18h.01"/><path d="m13 6-4 6h6l-4 6"/></svg>`;
+                    } else {
+                        iconContainer.outerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-check-circle w-4 h-4"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m9 11 3 3L22 4"/></svg>`;
+                    }
+                }
+                
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Hubo un error al guardar el estado del portal. Inténtalo de nuevo.');
+            } finally {
+                isUpdating = false;
+                toggleBtn.style.opacity = '1';
+            }
+        });
+        
+        // Función simple para Toast
+        function showToast(message, type) {
+            const toast = document.createElement('div');
+            toast.className = `fixed bottom-4 right-4 px-6 py-3 rounded-lg shadow-lg text-white font-medium z-50 transition-all duration-300 transform translate-y-10 opacity-0 ${type === 'success' ? 'bg-emerald-600' : 'bg-amber-600'}`;
+            toast.textContent = message;
+            
+            document.body.appendChild(toast);
+            
+            // Animar entrada
+            requestAnimationFrame(() => {
+                toast.classList.remove('translate-y-10', 'opacity-0');
+            });
+            
+            // Remover despues de 3 segundos
+            setTimeout(() => {
+                toast.classList.add('translate-y-10', 'opacity-0');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+    });
+</script>

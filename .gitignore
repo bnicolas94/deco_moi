@@ -33,3 +33,6 @@ tmp/
 
 # Logs
 *.log
+
+#WooCommerce Old
+.old/

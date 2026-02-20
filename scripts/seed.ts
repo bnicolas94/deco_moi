@@ -538,11 +538,12 @@ async function seed() {
             { key: 'social_facebook', value: JSON.stringify('https://www.facebook.com/decomoi'), description: 'Página de Facebook' },
             { key: 'promo_banner', value: JSON.stringify('10% descuento por transferencia | Pedidos urgentes por WhatsApp'), description: 'Texto del banner promocional' },
             { key: 'free_shipping_threshold', value: JSON.stringify(50000), description: 'Monto mínimo para envío gratis' },
+            { key: 'maintenance_mode', value: JSON.stringify(false), description: 'Activa o desactiva el modo mantenimiento del sitio' },
         ];
 
         for (const config of configData) {
             await client.query(
-                `INSERT INTO site_config (key, value, description) VALUES ($1, $2, $3)`,
+                `INSERT INTO site_config (key, value, description) VALUES ($1, $2, $3) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, description = EXCLUDED.description`,
                 [config.key, config.value, config.description]
             );
         }
