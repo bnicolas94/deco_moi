@@ -153,6 +153,48 @@ const canonicalURL = new URL(Astro.url.pathname, Astro.site || 'https://decomoi.
         });
       }
 
+      // Botón "Comprar" en detalle de producto (agrega y redirige a checkout)
+      const buyNowBtn = document.getElementById('buy-now-btn');
+      if (buyNowBtn) {
+        buyNowBtn.addEventListener('click', (e) => {
+          e.preventDefault();
+          const el = buyNowBtn as HTMLElement;
+          const qtyInput = document.getElementById('qty-input') as HTMLInputElement;
+          const qty = qtyInput ? parseInt(qtyInput.value) : 1;
+
+          // Obtener variante seleccionada del DOM (la btn activa del selector)
+          const variantSelector = document.getElementById('variant-selector');
+          let variantId: number | undefined;
+          let variantName: string | undefined;
+          let variantSku = el.dataset.productSku || '';
+          let variantPrice = parseFloat(el.dataset.productPrice || '0');
+
+          if (variantSelector) {
+            const activeVariant = variantSelector.querySelector('.variant-btn.border-brand-black') as HTMLElement;
+            if (activeVariant) {
+              variantId = activeVariant.dataset.variantId ? parseInt(activeVariant.dataset.variantId) : undefined;
+              variantName = activeVariant.dataset.variantName || undefined;
+              variantSku = activeVariant.dataset.variantSku || variantSku;
+              variantPrice = activeVariant.dataset.variantPrice ? parseFloat(activeVariant.dataset.variantPrice) : variantPrice;
+            }
+          }
+
+          addToCart({
+            id: parseInt(el.dataset.productId || '0'),
+            name: el.dataset.productName || '',
+            slug: el.dataset.productSlug || '',
+            sku: variantSku,
+            price: variantPrice,
+            image: el.dataset.productImage || '',
+            variantId,
+            variantName,
+          }, qty, false); // false = no abrir sidebar, redirigimos directamente
+
+          // Redirigir al checkout (el sidebar NO se abre)
+          window.location.href = '/checkout';
+        });
+      }
+
       // Botón carrito en header
       const cartToggle = document.getElementById('cart-toggle');
       cartToggle?.addEventListener('click', () => toggleCart());

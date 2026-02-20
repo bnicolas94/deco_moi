@@ -31,7 +31,7 @@ export const $cartTransferTotal = computed($cartTotal, (total) =>
 );
 
 // Acciones
-export function addToCart(item: Omit<CartItem, 'quantity'>, quantity = 1) {
+export function addToCart(item: Omit<CartItem, 'quantity'>, quantity = 1, openCart = true) {
     const current = $cartItems.get();
     const existingIndex = current.findIndex((i) =>
         i.id === item.id &&
@@ -51,7 +51,7 @@ export function addToCart(item: Omit<CartItem, 'quantity'>, quantity = 1) {
     }
 
     saveToLocalStorage();
-    $isCartOpen.set(true);
+    if (openCart) $isCartOpen.set(true);
 }
 
 // Generar una clave única para cada item (Producto + Variante + Personalización)
