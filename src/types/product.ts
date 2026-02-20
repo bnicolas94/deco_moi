@@ -17,6 +17,7 @@ export interface ProductVariant {
     name: string;
     sku: string | null;
     price: number | null;
+    image: string | null;
     stock: number;
     isActive: boolean;
 }
@@ -43,6 +44,7 @@ export interface Product {
     tags: string[];
     category?: Category;
     priceRules?: PriceRule[];
+    productionTimeRules?: ProductionTimeRule[];
     variants?: ProductVariant[];
 }
 
@@ -53,6 +55,14 @@ export interface PriceRule {
     maxQuantity: number | null;
     discountPercentage: number | null;
     fixedPrice: number | null;
+}
+
+export interface ProductionTimeRule {
+    id: number;
+    productId: number;
+    minQuantity: number;
+    maxQuantity: number | null;
+    productionTime: string;
 }
 
 export interface ProductFilters {

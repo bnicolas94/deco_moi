@@ -40,6 +40,24 @@ export const POST: APIRoute = async (context) => {
         }
     }
 
+    // Helper to upload variant images
+    async function uploadVariantImage(fieldName: string): Promise<string | null> {
+        const file = formData.get(fieldName) as File | null;
+        if (!file || file.size <= 0 || !file.name) return null;
+        try {
+            const buffer = await file.arrayBuffer();
+            const ext = file.name.split('.').pop();
+            const fileName = `variant-${randomUUID()}.${ext}`;
+            const uploadDir = join(process.cwd(), 'public', 'uploads', 'products');
+            await mkdir(uploadDir, { recursive: true });
+            await writeFile(join(uploadDir, fileName), new Uint8Array(buffer));
+            return `/uploads/products/${fileName}`;
+        } catch (err) {
+            console.error('Error saving variant image:', err);
+            return null;
+        }
+    }
+
     try {
         const result = await db.transaction(async (tx) => {
             const [newProduct] = await tx.insert(products).values({
@@ -62,15 +80,21 @@ export const POST: APIRoute = async (context) => {
             if (variantsData) {
                 const variants = JSON.parse(variantsData.toString());
                 if (variants.length > 0) {
-                    await tx.insert(productVariants).values(
-                        variants.map((v: any) => ({
+                    for (const v of variants) {
+                        let variantImage: string | null = v.existingImage || null;
+                        if (v.hasNewImage && v.imageFieldName) {
+                            const uploadedUrl = await uploadVariantImage(v.imageFieldName);
+                            if (uploadedUrl) variantImage = uploadedUrl;
+                        }
+                        await tx.insert(productVariants).values({
                             productId: newProduct.id,
                             name: v.name,
                             sku: v.sku,
                             price: v.price ? v.price.toString() : null,
                             stock: v.stock,
-                        }))
-                    );
+                            image: variantImage,
+                        });
+                    }
                 }
             }
 
@@ -83,3 +107,4 @@ export const POST: APIRoute = async (context) => {
         return new Response('Error al crear producto', { status: 500 });
     }
 };
+

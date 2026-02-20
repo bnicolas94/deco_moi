@@ -1,0 +1,258 @@
+---
+import AdminLayout from '@/layouts/AdminLayout.astro';
+import { db } from '@/lib/db/connection';
+import { categories } from '@/lib/db/schema';
+import { eq, asc, ne } from 'drizzle-orm';
+import { Save, ArrowLeft, Image as ImageIcon, Trash2 } from 'lucide-react';
+
+const { id } = Astro.params;
+const isNew = id === 'new';
+
+let category = null;
+if (!isNew && id) {
+    const result = await db.select().from(categories).where(eq(categories.id, parseInt(id)));
+    category = result[0] || null;
+    if (!category) return Astro.redirect('/admin/categories');
+}
+
+// Get all categories for parent dropdown (exclude self and children)
+const allCategories = await db.select().from(categories).orderBy(asc(categories.order), asc(categories.name));
+
+// Filter out self and descendants for parent dropdown
+function getDescendantIds(catId: number): number[] {
+    const ids: number[] = [catId];
+    const children = allCategories.filter(c => c.parentId === catId);
+    for (const child of children) {
+        ids.push(...getDescendantIds(child.id));
+    }
+    return ids;
+}
+
+const excludeIds = !isNew ? getDescendantIds(parseInt(id!)) : [];
+const parentOptions = allCategories.filter(c => !excludeIds.includes(c.id));
+
+// Build depth map for indentation in dropdown
+function getDepth(catId: number | null): number {
+    if (!catId) return 0;
+    const cat = allCategories.find(c => c.id === catId);
+    if (!cat) return 0;
+    return 1 + getDepth(cat.parentId);
+}
+---
+
+<AdminLayout title={isNew ? 'Nueva Categoría' : `Editar: ${category?.name}`}>
+    <div class="mb-8">
+        <a href="/admin/categories" class="inline-flex items-center text-sm text-gray-500 hover:text-indigo-600 transition-colors mb-4 group">
+            <ArrowLeft className="w-4 h-4 mr-1.5 group-hover:-translate-x-0.5 transition-transform" />
+            Volver a Categorías
+        </a>
+        <h1 class="text-3xl font-bold text-gray-900">{isNew ? 'Nueva Categoría' : `Editar: ${category?.name}`}</h1>
+    </div>
+
+    <form id="category-form" class="max-w-2xl space-y-8">
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+            <div class="p-6 border-b border-gray-50">
+                <h2 class="text-lg font-bold text-gray-900 flex items-center gap-2.5">
+                    <span class="w-2 h-6 bg-indigo-500 rounded-full"></span>
+                    Información de la Categoría
+                </h2>
+            </div>
+
+            <div class="p-6 space-y-6">
+                <div class="space-y-2">
+                    <label class="block text-sm font-bold text-gray-700">Nombre *</label>
+                    <input 
+                        type="text" 
+                        name="name" 
+                        id="name"
+                        value={category?.name} 
+                        placeholder="Ej: Tazas Personalizadas"
+                        class="block w-full rounded-xl border-gray-200 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm h-11 border px-4"
+                        required
+                    />
+                </div>
+
+                <div class="space-y-2">
+                    <label class="block text-sm font-bold text-gray-700">Slug *</label>
+                    <div class="relative">
+                        <input 
+                            type="text" 
+                            name="slug" 
+                            id="slug"
+                            value={category?.slug} 
+                            placeholder="tazas-personalizadas"
+                            class="block w-full rounded-xl border-gray-200 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm h-11 border px-4 pr-24"
+                            required
+                        />
+                        <span id="slug-status" class="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold"></span>
+                    </div>
+                    <p class="text-[10px] text-gray-400 italic">Se genera automáticamente desde el nombre. Debe ser único.</p>
+                </div>
+
+                <div class="space-y-2">
+                    <label class="block text-sm font-bold text-gray-700">Categoría Padre</label>
+                    <select 
+                        name="parentId" 
+                        id="parentId"
+                        class="block w-full rounded-xl border-gray-200 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm h-11 border px-4"
+                    >
+                        <option value="">— Sin padre (raíz) —</option>
+                        {parentOptions.map((p) => {
+                            const depth = getDepth(p.parentId);
+                            const prefix = '—'.repeat(depth + 1) + ' ';
+                            return (
+                                <option value={p.id} selected={category?.parentId === p.id}>
+                                    {prefix}{p.name}
+                                </option>
+                            );
+                        })}
+                    </select>
+                </div>
+
+                <div class="space-y-2">
+                    <label class="block text-sm font-bold text-gray-700">Imagen</label>
+                    <div class="flex items-center gap-4">
+                        {category?.image ? (
+                            <img src={category.image} id="category-image-preview" class="w-20 h-20 rounded-xl object-cover border border-gray-200" alt={category.name} />
+                        ) : (
+                            <div id="category-image-preview" class="w-20 h-20 rounded-xl border-2 border-dashed border-gray-200 flex items-center justify-center">
+                                <ImageIcon className="w-6 h-6 text-gray-300" />
+                            </div>
+                        )}
+                        <label class="cursor-pointer">
+                            <span class="inline-flex items-center px-4 py-2 bg-gray-50 text-sm font-medium text-gray-700 rounded-lg border border-gray-200 hover:bg-gray-100 transition-colors">
+                                {category?.image ? 'Cambiar imagen' : 'Subir imagen'}
+                            </span>
+                            <input type="file" accept="image/*" name="image" id="image-input" class="hidden" />
+                        </label>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-3 p-4 bg-gray-50/50 rounded-xl border border-gray-100">
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" name="isActive" id="isActive" class="sr-only peer" checked={isNew ? true : category?.isActive} />
+                        <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-indigo-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                    </label>
+                    <div>
+                        <p class="text-sm font-bold text-gray-700">Categoría Activa</p>
+                        <p class="text-[10px] text-gray-400">Las categorías inactivas no se muestran en la tienda.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="flex items-center justify-between">
+            <a href="/admin/categories" class="text-sm text-gray-500 hover:text-gray-700 transition-colors">Cancelar</a>
+            <button type="submit" class="inline-flex items-center px-6 py-2.5 bg-indigo-600 text-white text-sm font-bold rounded-xl hover:bg-indigo-700 transition-colors shadow-sm">
+                <Save className="w-4 h-4 mr-2" />
+                {isNew ? 'Crear Categoría' : 'Guardar Cambios'}
+            </button>
+        </div>
+    </form>
+</AdminLayout>
+
+<script is:inline define:vars={{ isNew, categoryId: category?.id, currentSlug: category?.slug || '' }}>
+    // Auto-generate slug from name
+    const nameInput = document.getElementById('name');
+    const slugInput = document.getElementById('slug');
+    const slugStatus = document.getElementById('slug-status');
+    let slugTimeout = null;
+
+    nameInput?.addEventListener('input', (e) => {
+        if (isNew || !slugInput.dataset.manuallyEdited) {
+            const slug = e.target.value
+                .toLowerCase()
+                .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+                .replace(/[^a-z0-9\s-]/g, '')
+                .trim()
+                .replace(/\s+/g, '-');
+            slugInput.value = slug;
+            checkSlugAvailability(slug);
+        }
+    });
+
+    slugInput?.addEventListener('input', () => {
+        slugInput.dataset.manuallyEdited = 'true';
+        checkSlugAvailability(slugInput.value);
+    });
+
+    function checkSlugAvailability(slug) {
+        if (slugTimeout) clearTimeout(slugTimeout);
+        if (!slug) {
+            slugStatus.textContent = '';
+            return;
+        }
+        slugStatus.textContent = '...';
+        slugStatus.className = 'absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-gray-400';
+
+        slugTimeout = setTimeout(async () => {
+            try {
+                const url = `/api/categories/check-slug?slug=${encodeURIComponent(slug)}${!isNew ? `&excludeId=${categoryId}` : ''}`;
+                const resp = await fetch(url);
+                const data = await resp.json();
+                if (data.available) {
+                    slugStatus.textContent = '✓ Disponible';
+                    slugStatus.className = 'absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-emerald-500';
+                } else {
+                    slugStatus.textContent = '✗ Ya existe';
+                    slugStatus.className = 'absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-rose-500';
+                }
+            } catch (e) {
+                slugStatus.textContent = '';
+            }
+        }, 400);
+    }
+
+    // Image preview
+    const imageInput = document.getElementById('image-input');
+    imageInput?.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onloadend = () => {
+            const preview = document.getElementById('category-image-preview');
+            if (preview.tagName === 'IMG') {
+                preview.src = reader.result;
+            } else {
+                const img = document.createElement('img');
+                img.src = reader.result;
+                img.className = 'w-20 h-20 rounded-xl object-cover border border-gray-200';
+                img.id = 'category-image-preview';
+                preview.replaceWith(img);
+            }
+        };
+        reader.readAsDataURL(file);
+    });
+
+    // Form submit
+    const form = document.getElementById('category-form');
+    form?.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const formData = new FormData(form);
+        
+        // Handle checkbox
+        const isActiveEl = document.getElementById('isActive');
+        formData.set('isActive', isActiveEl.checked ? 'true' : 'false');
+
+        const method = isNew ? 'POST' : 'PUT';
+        const url = isNew ? '/api/categories' : `/api/categories/${categoryId}`;
+
+        try {
+            const resp = await fetch(url, { method, body: formData });
+            if (resp.ok) {
+                alert(isNew ? 'Categoría creada correctamente' : 'Categoría actualizada correctamente');
+                const data = await resp.json();
+                if (isNew && data.id) {
+                    window.location.href = `/admin/categories/${data.id}`;
+                } else {
+                    window.location.reload();
+                }
+            } else {
+                const data = await resp.json().catch(() => ({}));
+                alert('Error: ' + (data.error || 'Error al guardar'));
+            }
+        } catch (e) {
+            alert('Error de red');
+        }
+    });
+</script>

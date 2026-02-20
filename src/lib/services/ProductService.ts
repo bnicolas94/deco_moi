@@ -1,7 +1,7 @@
 import { db } from '../db/connection';
-import { products, categories, priceRules, reviews, mockupTemplates, productVariants } from '../db/schema';
+import { products, categories, priceRules, productionTimeRules, reviews, mockupTemplates, productVariants } from '../db/schema';
 import { eq, and, gte, lte, like, desc, asc, sql, or, inArray } from 'drizzle-orm';
-import type { Product, Category, PriceRule, ProductFilters, ProductVariant } from '@/types/product';
+import type { Product, Category, PriceRule, ProductionTimeRule, ProductFilters, ProductVariant } from '@/types/product';
 import type { MockupTemplate } from '@/types/mockup';
 
 // ============================================
@@ -201,10 +201,18 @@ export async function getProductBySlug(slug: string): Promise<(Product & { mocku
         mockupTemplate = template[0] || null;
     }
 
+    // Obtener reglas de tiempo de producción
+    const timeRules = await db
+        .select()
+        .from(productionTimeRules)
+        .where(eq(productionTimeRules.productId, result[0].id))
+        .orderBy(asc(productionTimeRules.minQuantity));
+
     return {
         ...result[0],
         variants: variants as ProductVariant[],
         priceRules: rules as PriceRule[],
+        productionTimeRules: timeRules as ProductionTimeRule[],
         category: category[0] as Category,
         mockupTemplate: mockupTemplate as MockupTemplate | null,
     } as Product & { mockupTemplate?: MockupTemplate | null };
@@ -289,4 +297,27 @@ export async function getProductReviews(productId: number) {
         .orderBy(desc(reviews.createdAt));
 
     return result;
+}
+
+// ============================================
+// TIEMPO DE PRODUCCIÓN
+// ============================================
+
+export function getProductionTimeForQuantity(
+    rules: ProductionTimeRule[],
+    quantity: number,
+    fallback: string | null
+): string {
+    const applicableRule = rules
+        .filter(rule =>
+            quantity >= rule.minQuantity &&
+            (rule.maxQuantity === null || quantity <= rule.maxQuantity)
+        )
+        .sort((a, b) => b.minQuantity - a.minQuantity)[0];
+
+    if (applicableRule) {
+        return applicableRule.productionTime;
+    }
+
+    return fallback || 'A consultar';
 }

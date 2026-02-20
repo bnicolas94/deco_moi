@@ -29,11 +29,18 @@ const customization = product.customizationOptions as {
   fields?: string[];
 } | null;
 const priceRules = (product as any).priceRules || [];
+const productionTimeRules = (product as any).productionTimeRules || [];
 const category = (product as any).category;
 const images = product.images || [];
 const avgRating = productReviews.length > 0
   ? (productReviews.reduce((sum: number, r: any) => sum + r.rating, 0) / productReviews.length).toFixed(1)
   : null;
+
+// Compute initial production time
+const initialQty = product.minOrder || 1;
+const initialProductionTime = productionTimeRules.length > 0
+  ? (productionTimeRules.find((r: any) => initialQty >= r.minQuantity && (r.maxQuantity === null || initialQty <= r.maxQuantity))?.productionTime || product.productionTime || 'A consultar')
+  : (product.productionTime || null);
 ---
 
 <BaseLayout
@@ -78,7 +85,7 @@ const avgRating = productReviews.length > 0
               class="w-full h-full object-cover"
             />
           ) : (
-            <div class="absolute inset-0 flex items-center justify-center">
+            <div id="main-image-placeholder" class="absolute inset-0 flex items-center justify-center">
               <div class="text-center p-8">
                 <svg class="w-20 h-20 mx-auto text-gray-300 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -179,23 +186,21 @@ const avgRating = productReviews.length > 0
           <div class="mb-8 p-1">
             <div class="flex items-center justify-between mb-3">
               <h3 class="text-sm font-bold text-brand-black uppercase tracking-widest">Opción</h3>
-              <span id="selected-variant-label" class="text-xs font-medium text-accent">{product.variants[0].name}</span>
+              <span id="selected-variant-label" class="text-xs font-medium text-gray-400">Seleccionar opción</span>
             </div>
             <div class="grid grid-cols-2 sm:grid-cols-3 gap-3" id="variant-selector">
               {product.variants.map((v, i) => (
                 <button
                   type="button"
                   class:list={[
-                    "variant-btn group relative flex flex-col items-center justify-center p-4 rounded-2xl border-2 transition-all duration-300 hover:shadow-lg active:scale-95 overflow-hidden",
-                    i === 0 
-                      ? "border-brand-black bg-primary/5 shadow-md ring-1 ring-brand-black/5" 
-                      : "border-gray-100 bg-white text-gray-400 hover:border-gray-300 hover:bg-gray-50"
+                    "variant-btn group relative flex flex-col items-center justify-center p-4 rounded-2xl border-2 transition-all duration-300 hover:shadow-lg active:scale-95 overflow-hidden border-gray-100 bg-white text-gray-400 hover:border-gray-300 hover:bg-gray-50"
                   ]}
                   data-variant-id={v.id}
                   data-variant-name={v.name}
                   data-variant-sku={v.sku || product.sku}
                   data-variant-price={v.price ? Number(v.price) : finalPrice}
                   data-variant-stock={v.stock}
+                  data-variant-image={v.image || ''}
                 >
                   <span class="text-sm font-semibold mb-0.5 transition-colors group-hover:text-brand-black">
                     {v.name}
@@ -212,10 +217,7 @@ const avgRating = productReviews.length > 0
                   )}
                   
                   {/* Indicador de selección - Sleek Checkmark design */}
-                  <div class:list={[
-                    "absolute top-2 right-2 w-5 h-5 rounded-full flex items-center justify-center transition-all duration-500",
-                    i === 0 ? "bg-brand-black scale-100 opacity-100" : "bg-gray-100 scale-50 opacity-0"
-                  ]}>
+                  <div class="absolute top-2 right-2 w-5 h-5 rounded-full flex items-center justify-center transition-all duration-500 bg-gray-100 scale-50 opacity-0">
                     <svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" />
                     </svg>
@@ -259,36 +261,50 @@ const avgRating = productReviews.length > 0
           <!-- Botón Comprar: agrega al carrito y redirige a /checkout -->
           <button
             id="buy-now-btn"
-            class="btn btn-primary flex-1 text-base"
+            class="btn btn-primary flex-1 text-base disabled:opacity-50 disabled:cursor-not-allowed"
             data-product-id={product.id}
             data-product-name={product.name}
             data-product-slug={product.slug}
             data-product-sku={product.sku}
             data-product-price={finalPrice}
             data-product-image={images[0] || ''}
+            disabled={product.variants && product.variants.length > 0}
           >
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-            </svg>
-            Comprar
+            {product.variants && product.variants.length > 0 ? (
+              'Seleccionar opción'
+            ) : (
+              <>
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+                Comprar
+              </>
+            )}
           </button>
         </div>
 
         <!-- Botón Agregar al carrito (acción secundaria) -->
         <button
           id="add-to-cart-main"
-          class="btn btn-outline w-full mb-6"
+          class="btn btn-outline w-full mb-6 disabled:opacity-50 disabled:cursor-not-allowed"
           data-product-id={product.id}
           data-product-name={product.name}
           data-product-slug={product.slug}
           data-product-sku={product.sku}
           data-product-price={finalPrice}
           data-product-image={images[0] || ''}
+          disabled={product.variants && product.variants.length > 0}
         >
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
-          </svg>
-          Agregar al carrito
+          {product.variants && product.variants.length > 0 ? (
+            'Seleccionar opción'
+          ) : (
+            <>
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+              </svg>
+              Agregar al carrito
+            </>
+          )}
         </button>
 
         <!-- Personalización -->
@@ -308,6 +324,18 @@ const avgRating = productReviews.length > 0
                 </span>
               ))}
             </div>
+          </div>
+        )}
+
+        {/* Tiempo de producción */}
+        {initialProductionTime && (
+          <div class="flex items-center gap-2 mb-6 p-3 bg-amber-50 rounded-xl border border-amber-100" id="production-time-container">
+            <svg class="w-5 h-5 text-amber-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span class="text-sm text-amber-800 font-medium">
+              Tiempo de producción: <strong id="production-time-display">{initialProductionTime}</strong>
+            </span>
           </div>
         )}
       </div>
@@ -511,6 +539,31 @@ const avgRating = productReviews.length > 0
     const variantSku = btn.getAttribute('data-variant-sku');
     const variantPrice = parseFloat(btn.getAttribute('data-variant-price') || '0');
     const variantStock = parseInt(btn.getAttribute('data-variant-stock') || '0');
+    const variantImage = btn.getAttribute('data-variant-image');
+
+    // Swap main image if variant has an image
+    const mainImage = document.getElementById('main-image') as HTMLImageElement;
+    const placeholder = document.getElementById('main-image-placeholder');
+    
+    if (variantImage) {
+      if (mainImage) {
+        mainImage.src = variantImage;
+      } else if (placeholder) {
+        // Create an img element to replace the placeholder
+        const img = document.createElement('img');
+        img.id = 'main-image';
+        img.src = variantImage;
+        img.alt = variantName || 'Variante';
+        img.className = 'w-full h-full object-cover';
+        placeholder.replaceWith(img);
+      }
+      
+      // Update thumbnail active states
+      document.querySelectorAll('.product-thumb').forEach((t) => {
+        t.classList.remove('border-primary');
+        t.classList.add('border-transparent');
+      });
+    }
 
     // Actualizar atributos del botón de carrito
     if (mainAddToCartBtn) {
@@ -591,5 +644,45 @@ const avgRating = productReviews.length > 0
   qtyPlus?.addEventListener('click', () => {
     const current = parseInt(qtyInput.value);
     qtyInput.value = String(current + 1);
+    updateProductionTime();
   });
+
+  qtyMinus?.addEventListener('click', () => {
+    const current = parseInt(qtyInput.value);
+    if (current > minOrder) {
+      qtyInput.value = String(current - 1);
+      updateProductionTime();
+    }
+  });
+
+  qtyInput?.addEventListener('change', () => {
+    updateProductionTime();
+  });
+
+  // Production time dynamic update
+  function updateProductionTime() {
+    const display = document.getElementById('production-time-display');
+    const container = document.getElementById('production-time-container');
+    if (!display) return;
+    
+    const qty = parseInt(qtyInput?.value || '1');
+    const rules = (window as any).__productionTimeRules || [];
+    const fallback = (window as any).__productionTimeFallback || null;
+    
+    if (rules.length === 0 && !fallback) return;
+    
+    const applicableRule = rules
+      .filter((r: any) => qty >= r.minQuantity && (r.maxQuantity === null || qty <= r.maxQuantity))
+      .sort((a: any, b: any) => b.minQuantity - a.minQuantity)[0];
+    
+    const time = applicableRule ? applicableRule.productionTime : (fallback || 'A consultar');
+    display.textContent = time;
+    if (container) container.style.display = '';
+  }
+</script>
+
+<script is:inline define:vars={{ productionTimeRules: JSON.stringify(productionTimeRules), productionTimeFallback: product.productionTime || '' }}>
+  // Make production time data available to the main script
+  window.__productionTimeRules = JSON.parse(productionTimeRules);
+  window.__productionTimeFallback = productionTimeFallback || null;
 </script>

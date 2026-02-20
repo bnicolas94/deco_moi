@@ -1,9 +1,9 @@
 ---
 import AdminLayout from '@/layouts/AdminLayout.astro';
 import { db } from '@/lib/db/connection';
-import { products, categories, mockupTemplates } from '@/lib/db/schema';
-import { eq } from 'drizzle-orm';
-import { Save, ArrowLeft, Image as ImageIcon, Trash2, Star, Plus } from 'lucide-react';
+import { products, categories, mockupTemplates, productionTimeRules } from '@/lib/db/schema';
+import { eq, asc } from 'drizzle-orm';
+import { Save, ArrowLeft, Image as ImageIcon, Trash2, Star, Plus, Clock } from 'lucide-react';
 
 const { id } = Astro.params;
 const isNew = id === 'new';
@@ -11,6 +11,7 @@ const isNew = id === 'new';
 // Fetch initial data
 let product = null;
 let variants = [];
+let timeRules = [];
 if (!isNew && id) {
     const result = await db.query.products.findFirst({
         where: eq(products.id, parseInt(id)),
@@ -24,6 +25,11 @@ if (!isNew && id) {
     if (!product) {
         return Astro.redirect('/admin/products');
     }
+
+    // Load production time rules
+    timeRules = await db.select().from(productionTimeRules)
+        .where(eq(productionTimeRules.productId, parseInt(id)))
+        .orderBy(asc(productionTimeRules.minQuantity));
 }
 
 const allCategories = await db.select().from(categories).orderBy(categories.name);
@@ -185,14 +191,15 @@ const currentImages = product?.images || [];
 
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-gray-50">
                             <div class="space-y-2">
-                                <label class="block text-sm font-bold text-gray-700">Tiempo de Producción</label>
+                                <label class="block text-sm font-bold text-gray-700">Tiempo de Producción (fallback)</label>
                                 <input 
                                     type="text" 
                                     name="productionTime" 
                                     value={product?.productionTime} 
-                                    placeholder="Ej: 3-5 días hábiles"
+                                    placeholder="Ej: 3-5 días hábiles (se usa si no hay rangos)"
                                     class="block w-full rounded-xl border-gray-200 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm h-11 border px-4"
                                 />
+                                <p class="text-[10px] text-gray-400 italic">Se muestra si la cantidad no cae en ningún rango configurado abajo.</p>
                             </div>
                             <div class="space-y-2">
                                 <label class="block text-sm font-bold text-gray-700">Pedido Mínimo</label>
@@ -200,9 +207,63 @@ const currentImages = product?.images || [];
                                     type="number" 
                                     name="minOrder" 
                                     value={product?.minOrder || 1} 
-                                    class="block w-full rounded-xl border-gray-200 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm h-11 border px-4"
+                                    class="block w-full rounded-xl border-gray-200 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm h-11 border px-4 transition-all"
                                 />
                             </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2b. Production Time Rules -->
+                <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                    <div class="p-6 border-b border-gray-50 flex items-center justify-between">
+                        <h2 class="text-lg font-bold text-gray-900 flex items-center gap-2.5">
+                            <span class="w-2 h-6 bg-amber-500 rounded-full"></span>
+                            Tiempos de Producción por Cantidad
+                        </h2>
+                        <button 
+                            type="button" 
+                            id="add-time-rule-btn"
+                            class="inline-flex items-center px-3 py-1.5 bg-amber-50 text-amber-600 text-xs font-bold rounded-lg hover:bg-amber-100 transition-colors border border-amber-100"
+                        >
+                            <Plus className="w-3.5 h-3.5 mr-1" />
+                            Agregar Rango
+                        </button>
+                    </div>
+
+                    <div class="p-6">
+                        <p class="text-xs text-gray-500 mb-6 bg-gray-50 p-3 rounded-xl border border-gray-100 italic">
+                            Define tiempos de producción según la cantidad del pedido. Si el usuario introduce una cantidad que no cae en ningún rango, se muestra el valor de fallback.
+                        </p>
+
+                        <div id="time-rules-container" class="space-y-4">
+                            {timeRules.length === 0 ? (
+                                <div id="no-time-rules-msg" class="text-center py-8 border-2 border-dashed border-gray-100 rounded-2xl">
+                                    <p class="text-sm text-gray-400">No hay rangos definidos. Se usará el tiempo de producción de fallback.</p>
+                                </div>
+                            ) : (
+                                timeRules.map((rule, idx) => (
+                                    <div class="time-rule-item grid grid-cols-1 md:grid-cols-12 gap-4 p-4 bg-amber-50/30 rounded-2xl border border-amber-100/50 relative group animate-in fade-in slide-in-from-top-2">
+                                        <div class="md:col-span-3">
+                                            <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Cantidad Mínima</label>
+                                            <input type="number" name={`time_rule_min_${idx}`} value={rule.minQuantity} min="1" placeholder="1" class="w-full rounded-lg border-gray-200 text-sm h-10 border px-3 focus:ring-amber-500" required />
+                                        </div>
+                                        <div class="md:col-span-3">
+                                            <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Cantidad Máxima</label>
+                                            <input type="number" name={`time_rule_max_${idx}`} value={rule.maxQuantity} placeholder="Sin límite" class="w-full rounded-lg border-gray-200 text-sm h-10 border px-3 focus:ring-amber-500" />
+                                        </div>
+                                        <div class="md:col-span-5">
+                                            <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Tiempo de Producción</label>
+                                            <input type="text" name={`time_rule_time_${idx}`} value={rule.productionTime} placeholder="Ej: 5-7 días hábiles" class="w-full rounded-lg border-gray-200 text-sm h-10 border px-3 focus:ring-amber-500" required />
+                                        </div>
+                                        <div class="md:col-span-1 flex items-end justify-center pb-1">
+                                            <button type="button" class="remove-time-rule-btn p-2 text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors">
+                                                <Trash2 className="w-4 h-4" />
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))
+                            )}
                         </div>
                     </div>
                 </div>
@@ -240,11 +301,12 @@ const currentImages = product?.images || [];
                                 variants.map((v, idx) => (
                                     <div class="variant-item grid grid-cols-1 md:grid-cols-12 gap-4 p-4 bg-gray-50/50 rounded-2xl border border-gray-100 relative group animate-in fade-in slide-in-from-top-2">
                                         <input type="hidden" name={`variant_id_${idx}`} value={v.id} />
-                                        <div class="md:col-span-4">
+                                        <input type="hidden" name={`variant_existing_image_${idx}`} value={v.image || ''} />
+                                        <div class="md:col-span-3">
                                             <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Nombre / Atributos</label>
                                             <input type="text" name={`variant_name_${idx}`} value={v.name} placeholder="Ej: Rojo / XL" class="w-full rounded-lg border-gray-200 text-sm h-10 border px-3 focus:ring-indigo-500" required />
                                         </div>
-                                        <div class="md:col-span-3">
+                                        <div class="md:col-span-2">
                                             <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">SKU</label>
                                             <input type="text" name={`variant_sku_${idx}`} value={v.sku} placeholder="SKU Único" class="w-full rounded-lg border-gray-200 text-sm h-10 border px-3 focus:ring-indigo-500" />
                                         </div>
@@ -252,9 +314,25 @@ const currentImages = product?.images || [];
                                             <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Precio Opc.</label>
                                             <input type="number" step="0.01" name={`variant_price_${idx}`} value={v.price} placeholder="Base" class="w-full rounded-lg border-gray-200 text-sm h-10 border px-3 focus:ring-indigo-500" />
                                         </div>
-                                        <div class="md:col-span-2">
+                                        <div class="md:col-span-1">
                                             <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Stock</label>
                                             <input type="number" name={`variant_stock_${idx}`} value={v.stock} class="w-full rounded-lg border-gray-200 text-sm h-10 border px-3 focus:ring-indigo-500" required />
+                                        </div>
+                                        <div class="md:col-span-3">
+                                            <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Imagen Opc.</label>
+                                            <div class="flex items-center gap-2">
+                                                {v.image ? (
+                                                    <img src={v.image} class="w-10 h-10 object-cover rounded-lg border border-gray-200" alt={v.name} />
+                                                ) : (
+                                                    <div class="w-10 h-10 rounded-lg border-2 border-dashed border-gray-200 flex items-center justify-center">
+                                                        <ImageIcon className="w-4 h-4 text-gray-300" />
+                                                    </div>
+                                                )}
+                                                <label class="flex-1 cursor-pointer">
+                                                    <span class="text-[10px] text-indigo-500 font-bold hover:text-indigo-700 transition-colors">{v.image ? 'Cambiar' : 'Subir'}</span>
+                                                    <input type="file" accept="image/*" name={`variant_image_${idx}`} class="hidden variant-image-input" />
+                                                </label>
+                                            </div>
                                         </div>
                                         <div class="md:col-span-1 flex items-end justify-center pb-1">
                                             <button type="button" class="remove-variant-btn p-2 text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors">
@@ -354,6 +432,7 @@ const currentImages = product?.images || [];
                     <div id="existing-images" class="grid grid-cols-2 gap-3 min-h-[100px]">
                         {currentImages.map((img, idx) => (
                             <div 
+                                id={`img-${idx}`}
                                 class="existing-image-item relative group rounded-xl overflow-hidden border border-gray-100 shadow-sm cursor-move transition-all active:scale-95 active:rotate-2 hover:shadow-md h-24"
                                 draggable="true"
                             >
@@ -531,11 +610,12 @@ const currentImages = product?.images || [];
             const div = document.createElement('div');
             div.className = 'variant-item grid grid-cols-1 md:grid-cols-12 gap-4 p-4 bg-gray-50/50 rounded-2xl border border-gray-100 relative group animate-in fade-in slide-in-from-top-2';
             div.innerHTML = `
-                <div class="md:col-span-4">
+                <input type="hidden" name="variant_existing_image_${variantIdx}" value="" />
+                <div class="md:col-span-3">
                     <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Nombre / Atributos</label>
                     <input type="text" name="variant_name_${variantIdx}" placeholder="Ej: Rojo / XL" class="w-full rounded-lg border-gray-200 text-sm h-10 border px-3 focus:ring-indigo-500" required />
                 </div>
-                <div class="md:col-span-3">
+                <div class="md:col-span-2">
                     <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">SKU</label>
                     <input type="text" name="variant_sku_${variantIdx}" placeholder="SKU Único" class="w-full rounded-lg border-gray-200 text-sm h-10 border px-3 focus:ring-indigo-500" />
                 </div>
@@ -543,9 +623,21 @@ const currentImages = product?.images || [];
                     <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Precio Opc.</label>
                     <input type="number" step="0.01" name="variant_price_${variantIdx}" placeholder="Base" class="w-full rounded-lg border-gray-200 text-sm h-10 border px-3 focus:ring-indigo-500" />
                 </div>
-                <div class="md:col-span-2">
+                <div class="md:col-span-1">
                     <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Stock</label>
                     <input type="number" name="variant_stock_${variantIdx}" value="0" class="w-full rounded-lg border-gray-200 text-sm h-10 border px-3 focus:ring-indigo-500" required />
+                </div>
+                <div class="md:col-span-3">
+                    <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Imagen Opc.</label>
+                    <div class="flex items-center gap-2">
+                        <div class="variant-img-preview w-10 h-10 rounded-lg border-2 border-dashed border-gray-200 flex items-center justify-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-gray-300"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
+                        </div>
+                        <label class="flex-1 cursor-pointer">
+                            <span class="text-[10px] text-indigo-500 font-bold hover:text-indigo-700 transition-colors">Subir</span>
+                            <input type="file" accept="image/*" name="variant_image_${variantIdx}" class="hidden variant-image-input" />
+                        </label>
+                    </div>
                 </div>
                 <div class="md:col-span-1 flex items-end justify-center pb-1">
                     <button type="button" class="remove-variant-btn p-2 text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors">
@@ -553,6 +645,8 @@ const currentImages = product?.images || [];
                     </button>
                 </div>`;
             variantsContainer.appendChild(div);
+            // Attach image preview listener
+            attachVariantImagePreview(div.querySelector('.variant-image-input'));
         });
 
         variantsContainer?.addEventListener('click', (e) => {
@@ -564,7 +658,81 @@ const currentImages = product?.images || [];
                 }
             }
         });
+
+        // Variant image preview for existing inputs
+        document.querySelectorAll('.variant-image-input').forEach(input => {
+            attachVariantImagePreview(input);
+        });
+
+        // ========================================
+        // Production Time Rules Logic
+        // ========================================
+        const addTimeRuleBtn = document.getElementById('add-time-rule-btn');
+        const timeRulesContainer = document.getElementById('time-rules-container');
+        const noTimeRulesMsg = document.getElementById('no-time-rules-msg');
+        let timeRuleCount = document.querySelectorAll('.time-rule-item').length;
+
+        addTimeRuleBtn?.addEventListener('click', () => {
+            if (noTimeRulesMsg) noTimeRulesMsg.remove();
+            const ruleIdx = timeRuleCount++;
+            const div = document.createElement('div');
+            div.className = 'time-rule-item grid grid-cols-1 md:grid-cols-12 gap-4 p-4 bg-amber-50/30 rounded-2xl border border-amber-100/50 relative group animate-in fade-in slide-in-from-top-2';
+            div.innerHTML = `
+                <div class="md:col-span-3">
+                    <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Cantidad Mínima</label>
+                    <input type="number" name="time_rule_min_${ruleIdx}" min="1" placeholder="1" class="w-full rounded-lg border-gray-200 text-sm h-10 border px-3 focus:ring-amber-500" required />
+                </div>
+                <div class="md:col-span-3">
+                    <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Cantidad Máxima</label>
+                    <input type="number" name="time_rule_max_${ruleIdx}" placeholder="Sin límite" class="w-full rounded-lg border-gray-200 text-sm h-10 border px-3 focus:ring-amber-500" />
+                </div>
+                <div class="md:col-span-5">
+                    <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Tiempo de Producción</label>
+                    <input type="text" name="time_rule_time_${ruleIdx}" placeholder="Ej: 5-7 días hábiles" class="w-full rounded-lg border-gray-200 text-sm h-10 border px-3 focus:ring-amber-500" required />
+                </div>
+                <div class="md:col-span-1 flex items-end justify-center pb-1">
+                    <button type="button" class="remove-time-rule-btn p-2 text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-trash-2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>
+                    </button>
+                </div>`;
+            timeRulesContainer.appendChild(div);
+        });
+
+        timeRulesContainer?.addEventListener('click', (e) => {
+            const btn = e.target.closest('.remove-time-rule-btn');
+            if (btn) {
+                btn.closest('.time-rule-item').remove();
+                if (document.querySelectorAll('.time-rule-item').length === 0) {
+                    timeRulesContainer.innerHTML = `<div id="no-time-rules-msg" class="text-center py-8 border-2 border-dashed border-gray-100 rounded-2xl"><p class="text-sm text-gray-400">No hay rangos definidos. Se usará el tiempo de producción de fallback.</p></div>`;
+                }
+            }
+        });
     });
+
+    function attachVariantImagePreview(input) {
+        if (!input) return;
+        input.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                const container = input.closest('.flex');
+                const preview = container.querySelector('.variant-img-preview, img');
+                if (preview && preview.tagName === 'IMG') {
+                    preview.src = reader.result;
+                } else if (preview) {
+                    const img = document.createElement('img');
+                    img.src = reader.result;
+                    img.className = 'w-10 h-10 object-cover rounded-lg border border-gray-200';
+                    preview.replaceWith(img);
+                }
+                // Update label text
+                const label = container.querySelector('span');
+                if (label) label.textContent = 'Cambiar';
+            };
+            reader.readAsDataURL(file);
+        });
+    }
 
     function removeNewImage(id) {
          const el = document.getElementById(id);
@@ -603,6 +771,8 @@ const currentImages = product?.images || [];
         event.preventDefault();
         const form = event.target;
         const formData = new FormData(form);
+        
+        // Collect variants
         const variants = [];
         document.querySelectorAll('.variant-item').forEach((item, index) => {
             const id = item.querySelector(`input[name^="variant_id_"]`)?.value;
@@ -610,11 +780,29 @@ const currentImages = product?.images || [];
             const sku = item.querySelector(`input[name^="variant_sku_"]`)?.value;
             const price = item.querySelector(`input[name^="variant_price_"]`)?.value;
             const stock = item.querySelector(`input[name^="variant_stock_"]`)?.value;
+            const existingImage = item.querySelector(`input[name^="variant_existing_image_"]`)?.value;
+            const imageInput = item.querySelector(`input[name^="variant_image_"]`);
+            const hasNewImage = imageInput && imageInput.files && imageInput.files.length > 0;
+            
             if (name) {
-                variants.push({ id: id || null, name, sku: sku || null, price: price ? parseFloat(price) : null, stock: parseInt(stock) || 0 });
+                variants.push({ 
+                    id: id || null, 
+                    name, 
+                    sku: sku || null, 
+                    price: price ? parseFloat(price) : null, 
+                    stock: parseInt(stock) || 0,
+                    existingImage: existingImage || null,
+                    hasNewImage: hasNewImage,
+                    imageFieldName: hasNewImage ? `variant_image_file_${index}` : null 
+                });
+                // Add the image file to formData with a predictable name
+                if (hasNewImage) {
+                    formData.append(`variant_image_file_${index}`, imageInput.files[0]);
+                }
             }
         });
         formData.append('variants_json', JSON.stringify(variants));
+        
         const isActiveEl = document.getElementById('isActive');
         const isFeaturedEl = document.getElementById('isFeatured');
         if (isActiveEl) formData.set('isActive', isActiveEl.checked ? 'true' : 'false');
@@ -627,9 +815,42 @@ const currentImages = product?.images || [];
             const response = await fetch(url, { method: method, body: formData });
             if (response.ok) {
                 const data = await response.json();
-                alert('Producto guardado correctamente');
-                if (isNew && data.id) window.location.href = `/admin/products/${data.id}`;
-                else window.location.reload();
+                const productId = isNew ? data.id : id;
+
+                // Save production time rules as a separate call
+                const timeRules = [];
+                document.querySelectorAll('.time-rule-item').forEach((item) => {
+                    const minQ = item.querySelector(`input[name^="time_rule_min_"]`)?.value;
+                    const maxQ = item.querySelector(`input[name^="time_rule_max_"]`)?.value;
+                    const time = item.querySelector(`input[name^="time_rule_time_"]`)?.value;
+                    if (minQ && time) {
+                        timeRules.push({
+                            minQuantity: parseInt(minQ),
+                            maxQuantity: maxQ ? parseInt(maxQ) : null,
+                            productionTime: time,
+                        });
+                    }
+                });
+
+                const timeResp = await fetch(`/api/products/${productId}/production-time-rules`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ rules: timeRules }),
+                });
+
+                if (!timeResp.ok) {
+                    const errData = await timeResp.json().catch(() => ({}));
+                    if(window.showToast) window.showToast('Producto guardado, pero error en reglas de tiempo: ' + (errData.error || 'Error desconocido'), 'error');
+                    else alert('Producto guardado, pero error en reglas de tiempo: ' + (errData.error || 'Error desconocido'));
+                } else {
+                    if(window.showToast) window.showToast('Producto guardado correctamente', 'success');
+                    else alert('Producto guardado correctamente');
+                }
+
+                setTimeout(() => {
+                    if (isNew && data.id) window.location.href = `/admin/products/${data.id}`;
+                    else window.location.reload();
+                }, 1000);
             } else {
                 const text = await response.text();
                 alert('Error al guardar: ' + text);
@@ -639,3 +860,4 @@ const currentImages = product?.images || [];
         }
     }
 </script>
+

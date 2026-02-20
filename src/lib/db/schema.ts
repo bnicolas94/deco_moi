@@ -66,6 +66,18 @@ export const priceRules = pgTable('price_rules', {
 });
 
 // ============================================
+// REGLAS DE TIEMPO DE PRODUCCIÓN POR CANTIDAD
+// ============================================
+export const productionTimeRules = pgTable('production_time_rules', {
+    id: serial('id').primaryKey(),
+    productId: integer('product_id').notNull(),
+    minQuantity: integer('min_quantity').notNull(),
+    maxQuantity: integer('max_quantity'),
+    productionTime: varchar('production_time', { length: 100 }).notNull(),
+    createdAt: timestamp('created_at').defaultNow(),
+});
+
+// ============================================
 // VARIANTES DE PRODUCTO (Tallas, Colores, etc.)
 // ============================================
 export const productVariants = pgTable('product_variants', {
@@ -74,6 +86,7 @@ export const productVariants = pgTable('product_variants', {
     name: varchar('name', { length: 100 }).notNull(), // Ej: "Rojo / XL"
     sku: varchar('sku', { length: 50 }).unique(),
     price: decimal('price', { precision: 10, scale: 2 }), // Opcional, si difiere del base
+    image: varchar('image', { length: 500 }), // Imagen opcional de la variante
     stock: integer('stock').default(0),
     isActive: boolean('is_active').default(true),
     createdAt: timestamp('created_at').defaultNow(),
@@ -153,6 +166,7 @@ export const orderItems = pgTable('order_items', {
     subtotal: decimal('subtotal', { precision: 10, scale: 2 }).notNull(),
     customization: json('customization').$type<Record<string, any>>(),
     variantId: integer('variant_id'), // Referencia a la variante, nullable si no tiene
+    productionTime: varchar('production_time', { length: 100 }), // Snapshot del tiempo de producción al crear la orden
     createdAt: timestamp('created_at').defaultNow(),
 });
 
@@ -247,11 +261,19 @@ export const productsRelations = relations(products, ({ one, many }) => ({
         references: [categories.id],
     }),
     priceRules: many(priceRules),
+    productionTimeRules: many(productionTimeRules),
     reviews: many(reviews),
     variants: many(productVariants),
     mockupTemplate: one(mockupTemplates, {
         fields: [products.mockupTemplateId],
         references: [mockupTemplates.id],
+    }),
+}));
+
+export const productionTimeRulesRelations = relations(productionTimeRules, ({ one }) => ({
+    product: one(products, {
+        fields: [productionTimeRules.productId],
+        references: [products.id],
     }),
 }));
 

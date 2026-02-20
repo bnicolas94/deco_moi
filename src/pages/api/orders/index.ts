@@ -54,7 +54,8 @@ export const POST: APIRoute = async (context) => {
             unitPrice: String(item.price),
             subtotal: String(item.price * item.quantity),
             customization: item.customization ? { text: item.customization } : null,
-            variantId: item.variantId || null, // AQUÍ SE GUARDA EL ID DE LA VARIANTE
+            variantId: item.variantId || null,
+            productionTime: item.productionTime || null,
         }));
 
         await db.insert(orderItems).values(itemsToInsert);

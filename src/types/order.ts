@@ -26,6 +26,7 @@ export interface OrderItem {
     subtotal: number;
     customization: Record<string, any> | null;
     variantId?: number | null;
+    productionTime?: string | null;
 }
 
 export interface ShippingData {
