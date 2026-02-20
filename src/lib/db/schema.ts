@@ -436,3 +436,20 @@ export const orderItemCostsRelations = relations(orderItemCosts, ({ one }) => ({
         references: [orderItems.id],
     }),
 }));
+
+// ============================================
+// EMAIL QUEUE (Reintentos fallidos)
+// ============================================
+export const emailQueue = pgTable('email_queue', {
+    id: serial('id').primaryKey(),
+    orderId: uuid('order_id').notNull(),
+    recipientRole: varchar('recipient_role', { length: 20 }).notNull(), // 'client' | 'admin'
+    recipientEmail: varchar('recipient_email', { length: 255 }).notNull(),
+    subject: varchar('subject', { length: 255 }).notNull(),
+    htmlBody: text('html_body').notNull(),
+    status: varchar('status', { length: 50 }).default('failed'), // 'failed', 'retrying', 'sent'
+    errorLog: text('error_log'),
+    attempts: integer('attempts').default(0),
+    createdAt: timestamp('created_at').defaultNow(),
+    updatedAt: timestamp('updated_at').defaultNow(),
+});

@@ -2,6 +2,7 @@ import type { APIRoute } from 'astro';
 import { db } from '@/lib/db/connection';
 import { orders, orderItems } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
+import { EmailService } from '@/lib/services/EmailService';
 
 export const PUT: APIRoute = async (context) => {
     if (!context.locals.user || context.locals.user.role !== 'admin') {
@@ -12,6 +13,10 @@ export const PUT: APIRoute = async (context) => {
     const body = await context.request.json();
 
     try {
+        const currentOrderResult = await db.select().from(orders).where(eq(orders.id, id));
+        if (!currentOrderResult.length) return new Response(JSON.stringify({ error: 'Orden no encontrada' }), { status: 404 });
+        const currentOrder = currentOrderResult[0];
+
         await db.update(orders)
             .set({
                 status: body.status,
@@ -19,6 +24,13 @@ export const PUT: APIRoute = async (context) => {
                 updatedAt: new Date()
             })
             .where(eq(orders.id, id));
+
+        // Si el estado de pago cambió a 'approved' manualmente, enviar emails
+        if (currentOrder.paymentStatus !== 'approved' && body.paymentStatus === 'approved') {
+            EmailService.sendOrderConfirmationEmails(id).catch(err => {
+                console.error('Error al iniciar envío de emails tras confirmación manual:', err);
+            });
+        }
 
         return new Response(JSON.stringify({ success: true, message: 'Orden actualizada correctamente' }), { status: 200 });
     } catch (e) {

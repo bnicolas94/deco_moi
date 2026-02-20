@@ -1,0 +1,170 @@
+import nodemailer from 'nodemailer';
+import { db } from '@/lib/db/connection';
+import { orders, orderItems, emailQueue, users, siteConfig, addresses } from '@/lib/db/schema';
+import { eq } from 'drizzle-orm';
+import { ClientOrderConfirmationTemplate } from '@/emails/ClientOrderConfirmation';
+import { AdminOrderConfirmationTemplate } from '@/emails/AdminOrderConfirmation';
+
+export class EmailService {
+    private static getTransporter() {
+        return nodemailer.createTransport({
+            host: 'smtp.resend.com',
+            port: 465,
+            secure: true,
+            auth: {
+                user: 'resend',
+                pass: process.env.RESEND_API_KEY || import.meta.env.RESEND_API_KEY,
+            },
+        });
+    }
+
+    private static async getAdminEmail() {
+        const adminEmailEnv = process.env.ADMIN_EMAIL || import.meta.env.ADMIN_EMAIL;
+        if (adminEmailEnv) {
+            return adminEmailEnv;
+        }
+
+        const config = await db.select().from(siteConfig).where(eq(siteConfig.key, 'admin_email'));
+        if (config && config.length > 0) {
+            return config[0].value.email; // assuming value is JSON { email: '...' }
+        }
+        return 'info@decomoi.com.ar'; // default fallback
+    }
+
+    private static async sendWithRetry(
+        orderId: string,
+        recipientRole: 'client' | 'admin',
+        to: string,
+        subject: string,
+        htmlBody: string,
+        replyTo?: string
+    ) {
+        const transporter = this.getTransporter();
+        const mailOptions = {
+            from: '"Deco Moi" <info@decomoi.com.ar>',
+            to,
+            subject,
+            html: htmlBody,
+            replyTo: replyTo || undefined,
+        };
+
+        const maxRetries = 3;
+        let attempt = 0;
+        let lastError = null;
+
+        while (attempt < maxRetries) {
+            try {
+                attempt++;
+                await transporter.sendMail(mailOptions);
+                console.log(`Email sent successfully to ${to} (Role: ${recipientRole}) on attempt ${attempt}`);
+                return true;
+            } catch (error: any) {
+                lastError = error;
+                console.error(`Attempt ${attempt} to send email failed for ${to}:`, error);
+
+                if (attempt < maxRetries) {
+                    // Exponential backoff
+                    const delay = Math.pow(2, attempt) * 1000;
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                }
+            }
+        }
+
+        console.error(`Failed to send email to ${to} after ${maxRetries} attempts. Queueing into database.`);
+
+        // Log to database on final failure
+        await db.insert(emailQueue).values({
+            orderId,
+            recipientRole,
+            recipientEmail: to,
+            subject,
+            htmlBody,
+            errorLog: lastError?.message || 'Unknown error',
+            attempts: maxRetries,
+            status: 'failed'
+        });
+
+        return false;
+    }
+
+    public static async sendOrderConfirmationEmails(orderId: string) {
+        try {
+            // 1. Fetch Order Details
+            const orderData = await db.select().from(orders).where(eq(orders.id, orderId));
+            if (!orderData || orderData.length === 0) {
+                console.error(`EmailService: Order ${orderId} not found.`);
+                return;
+            }
+            const order = orderData[0];
+
+            // 2. Fetch Items
+            const items = await db.select().from(orderItems).where(eq(orderItems.orderId, orderId));
+
+            // 3. Fetch Customer
+            let customer = { name: '', email: '', phone: '' };
+
+            // Prioritize checkout form data (shippingData)
+            if (order.shippingData) {
+                customer.email = order.shippingData.email || '';
+                customer.name = order.shippingData.full_name || order.shippingData.name || '';
+                customer.phone = order.shippingData.phone || '';
+            }
+
+            // Fallback to user account data if any field is missing
+            if ((!customer.email || !customer.name || !customer.phone) && order.userId) {
+                const userData = await db.select().from(users).where(eq(users.id, order.userId));
+                if (userData && userData.length > 0) {
+                    customer.name = customer.name || userData[0].name || '';
+                    customer.email = customer.email || userData[0].email || '';
+                    customer.phone = customer.phone || userData[0].phone || '';
+                }
+            }
+
+            const adminEmail = await this.getAdminEmail();
+
+            const templateData = { order, items, customer };
+
+            // 4. Generate HTML payloads
+            const clientSubject = `¡Tu pedido está confirmado! Orden #${order.orderNumber}`;
+            const clientHtml = ClientOrderConfirmationTemplate(templateData);
+
+            const adminSubject = `🛍️ Nueva venta confirmada — Orden #${order.orderNumber} — $${Number(order.total).toLocaleString('es-AR')} ARS`;
+            const adminHtml = AdminOrderConfirmationTemplate(templateData);
+
+            // 5. Send in parallel
+            const dispatchPromises: Promise<any>[] = [];
+
+            // Client Email
+            if (customer.email) {
+                dispatchPromises.push(
+                    this.sendWithRetry(
+                        orderId,
+                        'client',
+                        customer.email,
+                        clientSubject,
+                        clientHtml,
+                        adminEmail // ReplyTo admin for client
+                    )
+                );
+            } else {
+                console.warn(`EmailService: No customer email found for order ${orderId}`);
+            }
+
+            // Admin Email
+            dispatchPromises.push(
+                this.sendWithRetry(
+                    orderId,
+                    'admin',
+                    adminEmail,
+                    adminSubject,
+                    adminHtml
+                )
+            );
+
+            await Promise.allSettled(dispatchPromises);
+
+        } catch (error) {
+            console.error(`EmailService: Fatal error processing emails for order ${orderId}`, error);
+        }
+    }
+}
