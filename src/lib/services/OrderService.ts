@@ -1,5 +1,5 @@
 import { db } from '@/lib/db/connection';
-import { orders, orderItems, costItems, productCostItems, orderItemCosts } from '@/lib/db/schema';
+import { orders, orderItems, costItems, productCostItems, orderItemCosts, payments } from '@/lib/db/schema';
 import { OrderStatus, PaymentStatus } from '@/types/order';
 import { inArray, eq, and } from 'drizzle-orm';
 
@@ -107,6 +107,18 @@ export class OrderService {
             if (costsToInsert.length > 0) {
                 await db.insert(orderItemCosts).values(costsToInsert);
             }
+        }
+
+        // 4. Registrar Pago (para idempotencia)
+        if (paymentId) {
+            await db.insert(payments).values({
+                orderId: newOrder.id,
+                method: paymentMethod,
+                status: PaymentStatus.APPROVED,
+                amount: String(total),
+                transactionId: paymentId,
+                metadata: { notes }
+            });
         }
 
         return {

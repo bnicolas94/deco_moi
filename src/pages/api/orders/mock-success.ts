@@ -18,6 +18,7 @@ export const POST: APIRoute = async (context) => {
             subtotal,
             userId: context.locals.user?.id || null,
             paymentMethod: paymentMethod || 'mock_payment',
+            paymentId: `MOCK-${Date.now()}`,
             notes: notes || 'PAGO SIMULADO (Local Debug)'
         });
 
