@@ -1,7 +1,8 @@
 import type { APIRoute } from 'astro';
 import { db } from '@/lib/db/connection';
-import { orders, orderItems } from '@/lib/db/schema';
+import { orders, orderItems, costItems, productCostItems, orderItemCosts } from '@/lib/db/schema';
 import { OrderStatus, PaymentStatus } from '@/types/order';
+import { inArray, eq, and } from 'drizzle-orm';
 
 export const POST: APIRoute = async (context) => {
     // En este proyecto parece que se permiten pedidos como invitado o usuario logueado
@@ -58,7 +59,66 @@ export const POST: APIRoute = async (context) => {
             productionTime: item.productionTime || null,
         }));
 
-        await db.insert(orderItems).values(itemsToInsert);
+        const insertedItems = await db.insert(orderItems).values(itemsToInsert).returning();
+
+        // 3. Capturar Costos de Productos (Análisis de Rentabilidad)
+        const productIds = itemsToInsert.map((i: any) => i.productId);
+        if (productIds.length > 0) {
+            const activeCosts = await db.select({
+                productId: productCostItems.productId,
+                name: costItems.name,
+                type: costItems.type,
+                value: costItems.value,
+                isActive: costItems.isActive
+            })
+                .from(productCostItems)
+                .innerJoin(costItems, eq(productCostItems.costItemId, costItems.id))
+                .where(inArray(productCostItems.productId, productIds));
+
+            const globalCosts = await db.select().from(costItems).where(
+                and(
+                    eq(costItems.isActive, true),
+                    eq(costItems.isGlobal, true)
+                )
+            );
+
+            const costsToInsert: any[] = [];
+            for (const oi of insertedItems) {
+                // Solo items activos
+                const linkedPcosts = activeCosts.filter(c => c.productId === oi.productId && c.isActive).map(c => ({ name: c.name, type: c.type, value: c.value }));
+                const gCosts = globalCosts.map(g => ({ name: g.name, type: g.type, value: g.value }));
+
+                // Combinar ambos removiendo duplicados si por error asignaron uno global manualmente al producto
+                const allPcosts = [...linkedPcosts];
+                gCosts.forEach(gc => {
+                    if (!allPcosts.some(p => p.name === gc.name)) {
+                        allPcosts.push(gc);
+                    }
+                });
+
+                for (const pc of allPcosts) {
+                    const configuredValue = Number(pc.value);
+                    let calculatedAmount = 0;
+                    if (pc.type === 'percentage') {
+                        // Porcentaje sobre el precio unitario x cantidad
+                        calculatedAmount = Number(oi.unitPrice) * (configuredValue / 100) * oi.quantity;
+                    } else {
+                        // Monto fijo x cantidad
+                        calculatedAmount = configuredValue * oi.quantity;
+                    }
+                    costsToInsert.push({
+                        orderItemId: oi.id,
+                        costItemName: pc.name,
+                        costItemType: pc.type,
+                        configuredValue: String(configuredValue),
+                        calculatedAmount: String(calculatedAmount)
+                    });
+                }
+            }
+            if (costsToInsert.length > 0) {
+                await db.insert(orderItemCosts).values(costsToInsert);
+            }
+        }
 
         return new Response(JSON.stringify({
             success: true,

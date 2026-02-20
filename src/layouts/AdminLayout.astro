@@ -7,7 +7,9 @@ import {
     LogOut,
     Settings,
     Truck,
-    FolderTree
+    FolderTree,
+    TrendingUp,
+    Calculator
 } from 'lucide-react';
 import Toast from '@/components/layout/Toast.astro';
 
@@ -24,6 +26,8 @@ const navItems = [
     { href: '/admin/categories', label: 'Categorías', icon: FolderTree },
     { href: '/admin/orders', label: 'Órdenes', icon: ShoppingCart },
     { href: '/admin/users', label: 'Usuarios', icon: Users },
+    { href: '/admin/costs/dashboard', label: 'Rentabilidad', icon: TrendingUp },
+    { href: '/admin/costs/config', label: 'Config Costos', icon: Calculator },
     { href: '/admin/settings/shipping', label: 'Envíos', icon: Truck },
     { href: '/admin/settings/checkout', label: 'Config. Checkout', icon: Settings },
 ];

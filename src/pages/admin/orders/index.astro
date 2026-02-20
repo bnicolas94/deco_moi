@@ -3,7 +3,7 @@ import AdminLayout from '@/layouts/AdminLayout.astro';
 import { db } from '@/lib/db/connection';
 import { orders, users } from '@/lib/db/schema';
 import { eq, desc } from 'drizzle-orm';
-import { Eye, Search, Filter } from 'lucide-react';
+import { Eye, Search, Filter, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 
 const allOrders = await db.query.orders.findMany({
     with: {
@@ -179,17 +179,57 @@ const statusIcons = {
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-bold">
                                          ${parseFloat(order.total).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                                     </td>
-                                    <td class="px-6 py-4 whitespace-nowrap">
-                                        <span class={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border ${statusColors[order.status] || 'bg-gray-100 text-gray-800 border-gray-200'}`}>
-                                            <StatusIcon className="w-3 h-3 mr-1.5" />
-                                            {order.status === 'confirmed' ? 'Confirmada' : 
-                                             order.status === 'processing' ? 'Procesando' : 
-                                             order.status === 'shipped' ? 'Enviado' : 
-                                             order.status === 'delivered' ? 'Entregado' : 
-                                             order.status === 'cancelled' ? 'Cancelado' : 
-                                             order.status === 'pending' ? 'Pendiente' : 
-                                             order.status}
-                                        </span>
+                                    <td class="px-6 py-4 whitespace-nowrap" data-order-id={order.id} data-payment-status={order.paymentStatus}>
+                                        {order.status === 'cancelled' ? (
+                                            <span class={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border ${statusColors[order.status]}`}>
+                                                <XCircle className="w-3 h-3 mr-1.5" />
+                                                Cancelado
+                                            </span>
+                                        ) : (
+                                            <div class="relative inline-flex items-center group/status leading-none">
+                                                <button 
+                                                    type="button" 
+                                                    class={`p-1 rounded-full text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors focus:outline-none ${order.status === 'pending' ? 'invisible pointer-events-none' : ''} btn-status-prev`}
+                                                    title="Retroceder estado"
+                                                >
+                                                    <ChevronLeft className="w-4 h-4" />
+                                                </button>
+                                                
+                                                <span class={`mx-1 relative inline-flex items-center px-2.5 py-1.5 rounded-full text-xs font-medium border transition-colors duration-200 status-badge ${statusColors[order.status] || 'bg-gray-100 text-gray-800 border-gray-200'}`}>
+                                                    <Clock className={`w-3 h-3 mr-1.5 status-icon-pending ${order.status !== 'pending' ? 'hidden' : ''}`} />
+                                                    <CheckCircle className={`w-3 h-3 mr-1.5 status-icon-confirmed ${order.status !== 'confirmed' ? 'hidden' : ''}`} />
+                                                    <Package className={`w-3 h-3 mr-1.5 status-icon-processing ${order.status !== 'processing' ? 'hidden' : ''}`} />
+                                                    <Truck className={`w-3 h-3 mr-1.5 status-icon-shipped ${order.status !== 'shipped' ? 'hidden' : ''}`} />
+                                                    <CheckCircle className={`w-3 h-3 mr-1.5 status-icon-delivered ${order.status !== 'delivered' ? 'hidden' : ''}`} />
+
+                                                    <span class="status-label">
+                                                        {order.status === 'confirmed' ? 'Confirmada' : 
+                                                         order.status === 'processing' ? 'Procesando' : 
+                                                         order.status === 'shipped' ? 'Enviado' : 
+                                                         order.status === 'delivered' ? 'Entregado' : 
+                                                         order.status === 'pending' ? 'Pendiente' : 
+                                                         order.status}
+                                                    </span>
+                                                </span>
+
+                                                <button 
+                                                    type="button" 
+                                                    class={`p-1 rounded-full text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors focus:outline-none ${order.status === 'delivered' ? 'invisible pointer-events-none' : ''} btn-status-next`}
+                                                    title="Avanzar estado"
+                                                >
+                                                    <ChevronRight className="w-4 h-4" />
+                                                </button>
+
+                                                <!-- Confirm box for backward navigation -->
+                                                <div class="absolute left-1/2 -bottom-14 -translate-x-1/2 bg-white shadow-[0_4px_20px_-4px_rgba(0,0,0,0.1)] border border-gray-100 rounded-xl p-2 hidden z-20 flex-col items-center gap-2 min-w-[max-content] confirm-status-box">
+                                                    <span class="text-[11px] font-bold text-gray-600 text-center whitespace-nowrap confirm-status-text uppercase tracking-wide">¿Retroceder a Pendiente?</span>
+                                                    <div class="flex gap-2 w-full justify-center">
+                                                        <button type="button" class="px-4 py-1.5 bg-indigo-600 text-white text-xs font-semibold rounded-lg shadow-sm hover:bg-indigo-700 transition-colors confirm-status-yes">Sí</button>
+                                                        <button type="button" class="px-4 py-1.5 bg-gray-50 text-gray-700 text-xs font-medium rounded-lg border border-gray-200 hover:bg-gray-100 transition-colors confirm-status-no">No</button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap">
                                         <span class={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border ${paymentStatusColors[order.paymentStatus] || 'bg-gray-100 text-gray-800 border-gray-200'}`}>
@@ -216,30 +256,211 @@ const statusIcons = {
     </div>
 
     <script is:inline>
-        const searchInput = document.getElementById('search-input');
-        const statusFilter = document.getElementById('status-filter');
-        const rows = document.querySelectorAll('.order-row');
+        function initOrderList() {
+            const searchInput = document.getElementById('search-input');
+            const statusFilter = document.getElementById('status-filter');
+            const rows = document.querySelectorAll('.order-row');
 
-        function filterOrders() {
-            const searchTerm = searchInput.value.toLowerCase();
-            const statusTerm = statusFilter.value;
+            function filterOrders() {
+                const searchTerm = searchInput?.value.toLowerCase() || '';
+                const statusTerm = statusFilter?.value || '';
+
+                rows.forEach(row => {
+                    const searchData = row.getAttribute('data-search') || '';
+                    const statusData = row.getAttribute('data-status') || '';
+                    
+                    const matchesSearch = searchData.includes(searchTerm);
+                    const matchesStatus = statusTerm === '' || statusData === statusTerm;
+
+                    if (matchesSearch && matchesStatus) {
+                        row.classList.remove('hidden');
+                    } else {
+                        row.classList.add('hidden');
+                    }
+                });
+            }
+
+            if (searchInput && !searchInput.dataset.initialized) {
+                searchInput.dataset.initialized = "true";
+                searchInput.addEventListener('input', filterOrders);
+            }
+            if (statusFilter && !statusFilter.dataset.initialized) {
+                statusFilter.dataset.initialized = "true";
+                statusFilter.addEventListener('change', filterOrders);
+            }
+
+            // --- Inline Status Control Logic ---
+            const statusFlow = ['pending', 'confirmed', 'processing', 'shipped', 'delivered'];
+            const statusTranslations = {
+                'pending': 'Pendiente',
+                'confirmed': 'Confirmada',
+                'processing': 'Procesando',
+                'shipped': 'Enviado',
+                'delivered': 'Entregado'
+            };
+            const statusColorsConfig = {
+                'pending': 'bg-amber-100 text-amber-800 border-amber-200',
+                'confirmed': 'bg-emerald-100 text-emerald-800 border-emerald-200',
+                'processing': 'bg-blue-100 text-blue-800 border-blue-200',
+                'shipped': 'bg-indigo-100 text-indigo-800 border-indigo-200',
+                'delivered': 'bg-emerald-100 text-emerald-800 border-emerald-200'
+            };
+
+            const updateStatusUI = (row, newStatus) => {
+                row.setAttribute('data-status', newStatus);
+                const container = row.querySelector('.group\\/status');
+                if (!container) return; // if it was cancelled
+
+                const prevBtn = container.querySelector('.btn-status-prev');
+                const nextBtn = container.querySelector('.btn-status-next');
+                const badge = container.querySelector('.status-badge');
+                const label = container.querySelector('.status-label');
+
+                if (badge) {
+                    Object.values(statusColorsConfig).forEach(cls => {
+                        cls.split(' ').forEach(c => badge.classList.remove(c));
+                    });
+                    statusColorsConfig[newStatus].split(' ').forEach(c => badge.classList.add(c));
+                }
+
+                if (label) label.textContent = statusTranslations[newStatus];
+
+                const icons = ['pending', 'confirmed', 'processing', 'shipped', 'delivered'];
+                icons.forEach(ic => {
+                    const iconSvg = container.querySelector(`.status-icon-${ic}`);
+                    if (iconSvg) {
+                        if (ic === newStatus) iconSvg.classList.remove('hidden');
+                        else iconSvg.classList.add('hidden');
+                    }
+                });
+
+                const currentIndex = statusFlow.indexOf(newStatus);
+                if (currentIndex <= 0) {
+                    prevBtn?.classList.add('invisible', 'pointer-events-none');
+                } else {
+                    prevBtn?.classList.remove('invisible', 'pointer-events-none');
+                }
+
+                if (currentIndex >= statusFlow.length - 1) {
+                    nextBtn?.classList.add('invisible', 'pointer-events-none');
+                } else {
+                    nextBtn?.classList.remove('invisible', 'pointer-events-none');
+                }
+                
+                filterOrders(); // apply filters if it no longer matches the current selection
+            };
+
+            const changeStatus = async (row, orderId, newStatus, paymentStatus, spinnerBtnElement) => {
+                const originalIconDisplay = spinnerBtnElement ? spinnerBtnElement.innerHTML : '';
+                if (spinnerBtnElement) {
+                    spinnerBtnElement.innerHTML = '<svg class="w-4 h-4 animate-spin text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>';
+                    spinnerBtnElement.disabled = true;
+                }
+
+                try {
+                    const response = await fetch(`/api/orders/${orderId}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ status: newStatus, paymentStatus: paymentStatus })
+                    });
+
+                    if (response.ok) {
+                        updateStatusUI(row, newStatus);
+                        if (window.showToast) window.showToast('Estado actualizado a ' + statusTranslations[newStatus]);
+                    } else {
+                        const err = await response.json();
+                        if (window.showToast) window.showToast('Error: ' + err.error, 'error');
+                    }
+                } catch (err) {
+                    if (window.showToast) window.showToast('Error de red', 'error');
+                } finally {
+                    if (spinnerBtnElement) {
+                        spinnerBtnElement.innerHTML = originalIconDisplay;
+                        spinnerBtnElement.disabled = false;
+                    }
+                }
+            };
 
             rows.forEach(row => {
-                const searchData = row.getAttribute('data-search');
-                const statusData = row.getAttribute('data-status');
-                
-                const matchesSearch = searchData.includes(searchTerm);
-                const matchesStatus = statusTerm === '' || statusData === statusTerm;
+                if (row.dataset.eventsInitialized) return;
+                row.dataset.eventsInitialized = "true";
 
-                if (matchesSearch && matchesStatus) {
-                    row.classList.remove('hidden');
-                } else {
-                    row.classList.add('hidden');
-                }
+                const nextBtn = row.querySelector('.btn-status-next');
+                const prevBtn = row.querySelector('.btn-status-prev');
+                const confirmBox = row.querySelector('.confirm-status-box');
+                if (!nextBtn || !prevBtn || !confirmBox) return;
+
+                const tdData = row.querySelector('td[data-order-id]');
+                const orderId = tdData?.getAttribute('data-order-id');
+                const paymentStatus = tdData?.getAttribute('data-payment-status');
+
+                if (!orderId) return;
+
+                nextBtn.addEventListener('click', () => {
+                    const currentStatus = row.getAttribute('data-status');
+                    const currentIndex = statusFlow.indexOf(currentStatus);
+                    if (currentIndex >= 0 && currentIndex < statusFlow.length - 1) {
+                        const nextStatus = statusFlow[currentIndex + 1];
+                        changeStatus(row, orderId, nextStatus, paymentStatus, nextBtn);
+                    }
+                });
+
+                prevBtn.addEventListener('click', (e) => {
+                    const currentStatus = row.getAttribute('data-status');
+                    const currentIndex = statusFlow.indexOf(currentStatus);
+                    if (currentIndex > 0) {
+                        const prevStatus = statusFlow[currentIndex - 1];
+                        const confirmText = confirmBox.querySelector('.confirm-status-text');
+                        if (confirmText) confirmText.textContent = `¿Retroceder a ${statusTranslations[prevStatus]}?`;
+                        
+                        document.querySelectorAll('.confirm-status-box').forEach(b => {
+                            b.classList.add('hidden');
+                            b.classList.remove('flex');
+                        });
+
+                        confirmBox.classList.remove('hidden');
+                        confirmBox.classList.add('flex');
+
+                        const btnYes = confirmBox.querySelector('.confirm-status-yes');
+                        const btnNo = confirmBox.querySelector('.confirm-status-no');
+
+                        if (btnYes && btnNo) {
+                            const newBtnYes = btnYes.cloneNode(true);
+                            const newBtnNo = btnNo.cloneNode(true);
+                            btnYes.parentNode.replaceChild(newBtnYes, btnYes);
+                            btnNo.parentNode.replaceChild(newBtnNo, btnNo);
+
+                            newBtnYes.addEventListener('click', () => {
+                                confirmBox.classList.add('hidden');
+                                confirmBox.classList.remove('flex');
+                                changeStatus(row, orderId, prevStatus, paymentStatus, prevBtn);
+                            });
+                            newBtnNo.addEventListener('click', () => {
+                                confirmBox.classList.add('hidden');
+                                confirmBox.classList.remove('flex');
+                            });
+                        }
+                    }
+                });
             });
         }
 
-        searchInput?.addEventListener('input', filterOrders);
-        statusFilter?.addEventListener('change', filterOrders);
+        initOrderList();
+        
+        if (!window.__orderEventsHooked) {
+            window.__orderEventsHooked = true;
+            document.addEventListener('astro:page-load', initOrderList);
+            document.addEventListener('astro:after-swap', initOrderList);
+
+            // Global watcher for clicking outside confirmation dialogs
+            document.addEventListener('click', (e) => {
+                if (!e.target.closest('.group\\/status')) {
+                    document.querySelectorAll('.confirm-status-box').forEach(b => {
+                        b.classList.add('hidden');
+                        b.classList.remove('flex');
+                    });
+                }
+            });
+        }
     </script>
 </AdminLayout>

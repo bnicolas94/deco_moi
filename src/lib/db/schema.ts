@@ -268,6 +268,7 @@ export const productsRelations = relations(products, ({ one, many }) => ({
         fields: [products.mockupTemplateId],
         references: [mockupTemplates.id],
     }),
+    costItems: many(productCostItems),
 }));
 
 export const productionTimeRulesRelations = relations(productionTimeRules, ({ one }) => ({
@@ -325,7 +326,7 @@ export const ordersRelations = relations(orders, ({ one, many }) => ({
     }),
 }));
 
-export const orderItemsRelations = relations(orderItems, ({ one }) => ({
+export const orderItemsRelations = relations(orderItems, ({ one, many }) => ({
     order: one(orders, {
         fields: [orderItems.orderId],
         references: [orders.id],
@@ -338,6 +339,7 @@ export const orderItemsRelations = relations(orderItems, ({ one }) => ({
         fields: [orderItems.variantId],
         references: [productVariants.id],
     }),
+    costs: many(orderItemCosts),
 }));
 
 export const paymentsRelations = relations(payments, ({ one }) => ({
@@ -371,5 +373,66 @@ export const sessionsRelations = relations(sessions, ({ one }) => ({
     user: one(users, {
         fields: [sessions.userId],
         references: [users.id],
+    }),
+}));
+
+// ============================================
+// ANALISIS DE COSTOS
+// ============================================
+export const costItems = pgTable('cost_items', {
+    id: serial('id').primaryKey(),
+    name: varchar('name', { length: 255 }).notNull(),
+    type: varchar('type', { length: 50 }).notNull(), // 'percentage' | 'fixed'
+    value: decimal('value', { precision: 10, scale: 2 }).notNull(),
+    isGlobal: boolean('is_global').default(false),
+    isActive: boolean('is_active').default(true),
+    createdAt: timestamp('created_at').defaultNow(),
+    updatedAt: timestamp('updated_at').defaultNow(),
+});
+
+export const productCostItems = pgTable('product_cost_items', {
+    id: serial('id').primaryKey(),
+    productId: integer('product_id').notNull().references(() => products.id, { onDelete: 'cascade' }),
+    costItemId: integer('cost_item_id').notNull().references(() => costItems.id, { onDelete: 'cascade' }),
+    createdAt: timestamp('created_at').defaultNow(),
+});
+
+export const shippingRealCosts = pgTable('shipping_real_costs', {
+    id: serial('id').primaryKey(),
+    zone: varchar('zone', { length: 150 }).notNull().unique(), // Ej: 'CABA', 'GBA', 'Centro'
+    realCost: decimal('real_cost', { precision: 10, scale: 2 }).notNull().default('0'),
+    updatedAt: timestamp('updated_at').defaultNow(),
+});
+
+export const orderItemCosts = pgTable('order_item_costs', {
+    id: serial('id').primaryKey(),
+    orderItemId: integer('order_item_id').notNull().references(() => orderItems.id, { onDelete: 'cascade' }),
+    costItemName: varchar('cost_item_name', { length: 255 }).notNull(),
+    costItemType: varchar('cost_item_type', { length: 50 }).notNull(), // 'percentage' | 'fixed'
+    configuredValue: decimal('configured_value', { precision: 10, scale: 2 }).notNull(),
+    calculatedAmount: decimal('calculated_amount', { precision: 10, scale: 2 }).notNull(), // valor en ARS calculado en este momento
+    createdAt: timestamp('created_at').defaultNow(),
+});
+
+// Relaciones Adicionales
+export const costItemsRelations = relations(costItems, ({ many }) => ({
+    productCostItems: many(productCostItems),
+}));
+
+export const productCostItemsRelations = relations(productCostItems, ({ one }) => ({
+    product: one(products, {
+        fields: [productCostItems.productId],
+        references: [products.id],
+    }),
+    costItem: one(costItems, {
+        fields: [productCostItems.costItemId],
+        references: [costItems.id],
+    }),
+}));
+
+export const orderItemCostsRelations = relations(orderItemCosts, ({ one }) => ({
+    orderItem: one(orderItems, {
+        fields: [orderItemCosts.orderItemId],
+        references: [orderItems.id],
     }),
 }));
