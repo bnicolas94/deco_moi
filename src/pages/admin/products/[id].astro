@@ -1,7 +1,7 @@
 ---
 import AdminLayout from '@/layouts/AdminLayout.astro';
 import { db } from '@/lib/db/connection';
-import { products, categories, mockupTemplates, productionTimeRules } from '@/lib/db/schema';
+import { products, categories, mockupTemplates, productionTimeRules, meliItemLinks } from '@/lib/db/schema';
 import { eq, asc } from 'drizzle-orm';
 import { Save, ArrowLeft, Image as ImageIcon, Trash2, Star, Plus, Clock } from 'lucide-react';
 
@@ -12,6 +12,7 @@ const isNew = id === 'new';
 let product = null;
 let variants = [];
 let timeRules = [];
+let meliLinkId = '';
 if (!isNew && id) {
     const result = await db.query.products.findFirst({
         where: eq(products.id, parseInt(id)),
@@ -30,6 +31,10 @@ if (!isNew && id) {
     timeRules = await db.select().from(productionTimeRules)
         .where(eq(productionTimeRules.productId, parseInt(id)))
         .orderBy(asc(productionTimeRules.minQuantity));
+        
+    // Cargar link de MercadoLibre
+    const mlLink = await db.select().from(meliItemLinks).where(eq(meliItemLinks.productId, parseInt(id))).limit(1);
+    if(mlLink.length > 0) meliLinkId = mlLink[0].meliItemId;
 }
 
 const allCategories = await db.select().from(categories).orderBy(categories.name);
@@ -186,6 +191,21 @@ const currentImages = product?.images || [];
                                     placeholder="PRD-001"
                                     class="block w-full rounded-xl border-gray-200 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm h-11 border px-4"
                                 />
+                            </div>
+                            <div class="space-y-2">
+                                <label class="block text-sm font-bold text-indigo-700 flex items-center gap-1.5">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-link"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+                                    Meli Item ID
+                                </label>
+                                <input 
+                                    type="text" 
+                                    name="meliItemId" 
+                                    id="meliItemId"
+                                    value={meliLinkId} 
+                                    placeholder="Ej: MLA123456789 (Opcional)"
+                                    class="block w-full rounded-xl border-indigo-100 bg-indigo-50/50 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm h-11 border px-4 transition-all placeholder:text-indigo-300"
+                                />
+                                <p class="text-[10px] text-gray-400 italic">Vincula este producto con MercadoLibre para sincronizar su precio y stock.</p>
                             </div>
                         </div>
 
@@ -807,6 +827,9 @@ const currentImages = product?.images || [];
         const isFeaturedEl = document.getElementById('isFeatured');
         if (isActiveEl) formData.set('isActive', isActiveEl.checked ? 'true' : 'false');
         if (isFeaturedEl) formData.set('isFeatured', isFeaturedEl.checked ? 'true' : 'false');
+        
+        const meliIdVal = document.getElementById('meliItemId')?.value;
+        if(meliIdVal) formData.set('meliItemId', meliIdVal);
 
         const method = isNew ? 'POST' : 'PUT';
         const url = isNew ? '/api/products' : `/api/products/${id}`;

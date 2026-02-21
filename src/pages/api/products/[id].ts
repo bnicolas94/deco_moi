@@ -1,6 +1,6 @@
 import type { APIRoute } from 'astro';
 import { db } from '@/lib/db/connection';
-import { products, productVariants } from '@/lib/db/schema';
+import { products, productVariants, meliItemLinks } from '@/lib/db/schema';
 import { eq, and, notInArray } from 'drizzle-orm';
 import { writeFile, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -163,6 +163,23 @@ export const PUT: APIRoute = async (context) => {
                     // If empty list sent, delete all variants for this product
                     await tx.delete(productVariants).where(eq(productVariants.productId, id));
                 }
+            }
+
+            // 3. Handle MercadoLibre Link
+            const meliItemId = formData.get('meliItemId')?.toString();
+            if (meliItemId) {
+                // Upsert: Borrar el que hubiera y colocar el nuevo
+                await tx.delete(meliItemLinks).where(eq(meliItemLinks.productId, id));
+                await tx.insert(meliItemLinks).values({
+                    productId: id,
+                    meliItemId: meliItemId,
+                    syncEnabled: true,
+                    lastSyncedPrice: price.toString(),
+                    lastSyncedStock: stock
+                });
+            } else {
+                // Si lo mandan vacío, desvinculamos
+                await tx.delete(meliItemLinks).where(eq(meliItemLinks.productId, id));
             }
         });
 

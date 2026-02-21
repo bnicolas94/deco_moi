@@ -1,6 +1,6 @@
 import type { APIRoute } from 'astro';
 import { db } from '@/lib/db/connection';
-import { products, productVariants } from '@/lib/db/schema';
+import { products, productVariants, meliItemLinks } from '@/lib/db/schema';
 import { writeFile, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
@@ -96,6 +96,18 @@ export const POST: APIRoute = async (context) => {
                         });
                     }
                 }
+            }
+
+            // Integración MercadoLibre para Nuevos Productos
+            const meliItemId = formData.get('meliItemId')?.toString();
+            if (meliItemId) {
+                await tx.insert(meliItemLinks).values({
+                    productId: newProduct.id,
+                    meliItemId: meliItemId,
+                    syncEnabled: true,
+                    lastSyncedPrice: price.toString(),
+                    lastSyncedStock: stock
+                });
             }
 
             return newProduct;
