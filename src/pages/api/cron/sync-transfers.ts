@@ -128,9 +128,8 @@ export const GET: APIRoute = async ({ request }) => {
                     metadata: { notes: `Auto-detectado de MP: DNI ${senderDni}` }
                 });
 
-                // Enviar email de actualización (Si se requiere, o el de confirmación ya se envió? No, ahora cambia de pending a approved)
-                // En email service se loguea/envia solo al crear. Quizá necesitemos un PaymentReceived email, 
-                // pero por ahora sólo confirmamos la orden.
+                // Enviar email de confirmación de pago
+                EmailService.sendPaymentConfirmedEmail(matchedOrder.id).catch(err => console.error(err));
 
                 stats.matched++;
             } else {

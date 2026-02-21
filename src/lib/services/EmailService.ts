@@ -201,4 +201,47 @@ export class EmailService {
             console.error('EmailService: Error enviando alerta de transferencia no matcheada', e);
         }
     }
+
+    public static async sendPaymentConfirmedEmail(orderId: string) {
+        try {
+            const orderData = await db.select().from(orders).where(eq(orders.id, orderId));
+            if (!orderData || orderData.length === 0) return;
+            const order = orderData[0];
+
+            const customerEmail = order.shippingData?.email;
+            if (!customerEmail) return;
+
+            const subject = `✅ ¡Pago confirmado! — Orden #${order.orderNumber}`;
+            const html = `
+                <div style="font-family: sans-serif; max-width: 600px; margin: 20px auto; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
+                    <div style="text-align: center; margin-bottom: 20px;">
+                        <h1 style="color: #000; margin: 0;">Deco Moi</h1>
+                    </div>
+                    <h2 style="color: #2e7d32; text-align: center;">¡Tu pago ha sido confirmado!</h2>
+                    <p>Hola <strong>${order.shippingData?.full_name || 'Cliente'}</strong>,</p>
+                    <p>Te informamos que hemos recibido y validado correctamente tu transferencia bancaria para la orden <strong>#${order.orderNumber}</strong>.</p>
+                    <p>Tu pedido ya se encuentra en estado <strong>Aprobado</strong> y estamos trabajando en su preparación.</p>
+                    
+                    <div style="background: #f9f9f9; padding: 15px; border-radius: 8px; margin: 20px 0;">
+                        <p style="margin: 0;"><strong>Resumen del pago:</strong></p>
+                        <p style="margin: 5px 0 0 0;">Monto: $${Number(order.total).toLocaleString('es-AR')} ARS</p>
+                        <p style="margin: 5px 0 0 0;">Método: Transferencia Bancaria</p>
+                    </div>
+
+                    <p>Te avisaremos por esta misma vía cuando tu pedido sea despachado.</p>
+                    
+                    <hr style="border: 0; border-top: 1px solid #eee; margin: 30px 0;" />
+                    <p style="font-size: 12px; color: #666; text-align: center;">
+                        Este es un mensaje automático, por favor no lo respondas.<br>
+                        Deco Moi — Objetos con amor para tu hogar.
+                    </p>
+                </div>
+            `;
+
+            await this.sendWithRetry(orderId, 'client', customerEmail, subject, html);
+            console.log(`Email de confirmación de pago enviado para orden ${order.orderNumber}`);
+        } catch (e) {
+            console.error('EmailService: Error enviando email de pago confirmado', e);
+        }
+    }
 }

@@ -95,6 +95,10 @@ export const POST: APIRoute = async ({ request }) => {
                                         transactionId: id,
                                         metadata: { notes: `Auto-detectado de MP (Webhook): DNI ${senderDni}` }
                                     });
+
+                                    // Enviar email de confirmación de pago
+                                    EmailService.sendPaymentConfirmedEmail(matchedOrder.id).catch(err => console.error(err));
+
                                     console.log(`Webhook: Transferencia matcheada con orden ${matchedOrder.orderNumber}`);
                                 } else {
                                     // Guardar como no matcheada
