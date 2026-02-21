@@ -453,3 +453,18 @@ export const emailQueue = pgTable('email_queue', {
     createdAt: timestamp('created_at').defaultNow(),
     updatedAt: timestamp('updated_at').defaultNow(),
 });
+
+// ============================================
+// UNMATCHED TRANSFERS
+// ============================================
+export const unmatchedTransfers = pgTable('unmatched_transfers', {
+    id: serial('id').primaryKey(),
+    amount: decimal('amount', { precision: 10, scale: 2 }).notNull(),
+    senderDni: varchar('sender_dni', { length: 50 }),
+    mpPaymentId: varchar('mp_payment_id', { length: 255 }).unique(),
+    paymentDate: timestamp('payment_date'),
+    rawMetadata: json('raw_metadata').$type<Record<string, any>>(),
+    status: varchar('status', { length: 50 }).default('pending_review'), // 'pending_review', 'resolved'
+    createdAt: timestamp('created_at').defaultNow(),
+    updatedAt: timestamp('updated_at').defaultNow(),
+});

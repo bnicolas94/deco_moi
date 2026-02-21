@@ -1,11 +1,12 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
 import CheckoutForm from '../components/checkout/CheckoutForm';
-import { getCheckoutFields } from '@/lib/services/ConfigService';
+import { getCheckoutFields, getBankTransferConfig } from '@/lib/services/ConfigService';
 import { getShippingConfig } from '@/lib/services/ShippingService';
 
 const fields = await getCheckoutFields();
 const shippingConfig = await getShippingConfig();
+const bankConfig = await getBankTransferConfig();
 const pageTitle = "Finalizar Compra | Deco Moi";
 ---
 
@@ -25,7 +26,7 @@ const pageTitle = "Finalizar Compra | Deco Moi";
                 </h1>
             </header>
 
-            <CheckoutForm client:only="preact" fields={fields} shippingConfig={shippingConfig} />
+            <CheckoutForm client:only="preact" fields={fields} shippingConfig={shippingConfig} bankConfig={bankConfig} />
         </div>
     </section>
 </BaseLayout>

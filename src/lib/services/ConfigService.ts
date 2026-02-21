@@ -51,3 +51,26 @@ export async function updateCheckoutFields(fields: CheckoutField[]) {
             .where(eq(siteConfig.key, 'checkout_form_fields'));
     }
 }
+
+export interface BankTransferConfig {
+    holder: string;
+    cvu: string;
+    discount: number;
+}
+
+export async function getBankTransferConfig(): Promise<BankTransferConfig> {
+    const defaultData = { holder: 'No configurado', cvu: 'No configurado', discount: 10 };
+    try {
+        const holderRow = await db.select().from(siteConfig).where(eq(siteConfig.key, 'bank_transfer_holder')).limit(1);
+        const cvuRow = await db.select().from(siteConfig).where(eq(siteConfig.key, 'bank_transfer_cvu')).limit(1);
+        const discountRow = await db.select().from(siteConfig).where(eq(siteConfig.key, 'bank_transfer_discount')).limit(1);
+
+        return {
+            holder: holderRow.length > 0 ? (holderRow[0].value as string) : defaultData.holder,
+            cvu: cvuRow.length > 0 ? (cvuRow[0].value as string) : defaultData.cvu,
+            discount: discountRow.length > 0 ? Number(discountRow[0].value) : defaultData.discount,
+        };
+    } catch (e) {
+        return defaultData;
+    }
+}

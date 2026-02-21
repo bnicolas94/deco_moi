@@ -22,6 +22,8 @@ export class OrderService {
         const orderNumber = `DEC-${Math.floor(100000 + Math.random() * 900000)}`;
 
         // 1. Crear la Orden
+        const initialPaymentStatus = paymentMethod === 'bank_transfer' ? PaymentStatus.PENDING_TRANSFER : PaymentStatus.APPROVED;
+
         const [newOrder] = await db.insert(orders).values({
             id: crypto.randomUUID(),
             orderNumber,
@@ -32,7 +34,7 @@ export class OrderService {
             discountAmount: "0",
             shippingCost: "0",
             paymentMethod: paymentMethod as any,
-            paymentStatus: PaymentStatus.APPROVED,
+            paymentStatus: initialPaymentStatus,
             shippingData,
             notes: notes || `Pago ${paymentMethod} ${paymentId ? '#' + paymentId : ''} procesado.`,
             createdAt: new Date(),

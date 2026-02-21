@@ -120,6 +120,12 @@ export const POST: APIRoute = async (context) => {
             }
         }
 
+        if (paymentMethod === 'transfer') {
+            import('@/lib/services/EmailService').then(({ EmailService }) => {
+                EmailService.sendOrderConfirmationEmails(newOrder.id).catch(err => console.error(err));
+            });
+        }
+
         return new Response(JSON.stringify({
             success: true,
             orderId: newOrder.id,

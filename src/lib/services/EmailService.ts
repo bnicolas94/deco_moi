@@ -122,13 +122,20 @@ export class EmailService {
 
             const adminEmail = await this.getAdminEmail();
 
-            const templateData = { order, items, customer };
+            // Dynamic import ConfigService to avoid circular dependencies if any
+            const { getBankTransferConfig } = await import('@/lib/services/ConfigService');
+            const bankConfig = await getBankTransferConfig();
+
+            const templateData = { order, items, customer, bankConfig };
 
             // 4. Generate HTML payloads
-            const clientSubject = `¡Tu pedido está confirmado! Orden #${order.orderNumber}`;
+            const clientSubject = order.paymentMethod === 'transfer'
+                ? `¡Tu pedido ya casi está! Orden #${order.orderNumber}`
+                : `¡Tu pedido está confirmado! Orden #${order.orderNumber}`;
+
             const clientHtml = ClientOrderConfirmationTemplate(templateData);
 
-            const adminSubject = `🛍️ Nueva venta confirmada — Orden #${order.orderNumber} — $${Number(order.total).toLocaleString('es-AR')} ARS`;
+            const adminSubject = `🛍️ Nueva venta registrada — Orden #${order.orderNumber} — $${Number(order.total).toLocaleString('es-AR')} ARS`;
             const adminHtml = AdminOrderConfirmationTemplate(templateData);
 
             // 5. Send in parallel
@@ -165,6 +172,33 @@ export class EmailService {
 
         } catch (error) {
             console.error(`EmailService: Fatal error processing emails for order ${orderId}`, error);
+        }
+    }
+
+    public static async sendUnmatchedTransferAlert(amount: number, senderDni: string, mpPaymentId: string) {
+        try {
+            const adminEmail = await this.getAdminEmail();
+            const subject = `⚠️ Transferencia No Asociada — $${amount.toLocaleString('es-AR')} ARS`;
+            const htmlBody = `
+                <h2>Atención: Transferencia no asociada a ninguna orden</h2>
+                <p>El sistema ha detectado un ingreso por transferencia bancaria en Mercado Pago que no pudo ser matcheado automáticamente con ninguna orden pendiente.</p>
+                <ul>
+                    <li><strong>Monto:</strong> $${amount.toLocaleString('es-AR')} ARS</li>
+                    <li><strong>DNI del Emisor:</strong> ${senderDni}</li>
+                    <li><strong>ID de Pago (MP):</strong> ${mpPaymentId}</li>
+                </ul>
+                <p>Por favor, revisá los movimientos en Mercado Pago y las órdenes en el panel de administración manual.</p>
+            `;
+
+            await this.sendWithRetry(
+                'unmatched-' + mpPaymentId,
+                'admin',
+                adminEmail,
+                subject,
+                htmlBody
+            );
+        } catch (e) {
+            console.error('EmailService: Error enviando alerta de transferencia no matcheada', e);
         }
     }
 }

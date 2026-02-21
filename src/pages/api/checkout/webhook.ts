@@ -33,15 +33,74 @@ export const POST: APIRoute = async ({ request }) => {
 
                 console.log(`Estado del pago MP ${id}: ${paymentData.status}`);
 
-                // Si el pago está aprobado, creamos la orden
+                // Si el pago está aprobado, creamos la orden o matcheamos transferencia
                 if (paymentData.status === 'approved') {
                     const metadata = paymentData.metadata;
 
                     if (!metadata) {
-                        console.error('No hay metadata en el pago de MP');
+                        // Verifica si es una transferencia entrante directa (sin metadata de preference)
+                        const isTransfer = paymentData.payment_type_id === 'bank_transfer' || paymentData.operation_type === 'account_fund';
+
+                        if (isTransfer) {
+                            const senderDni = paymentData.payer?.identification?.number;
+                            const amount = Number(paymentData.transaction_amount);
+
+                            if (senderDni) {
+                                const { orders, unmatchedTransfers } = await import('@/lib/db/schema');
+                                const { PaymentStatus } = await import('@/types/order');
+                                const minAmount = amount - 1;
+                                const maxAmount = amount + 1;
+
+                                const pendingOrders = await db.select().from(orders).where(eq(orders.paymentStatus, PaymentStatus.PENDING_TRANSFER));
+
+                                let matchedOrder = null;
+                                for (const order of pendingOrders) {
+                                    const orderTotal = Number(order.total);
+                                    if (orderTotal >= minAmount && orderTotal <= maxAmount) {
+                                        const checkoutDni = order.shippingData?.transfer_dni;
+                                        if (checkoutDni && checkoutDni.toString() === senderDni.toString()) {
+                                            matchedOrder = order;
+                                            break;
+                                        }
+                                    }
+                                }
+
+                                if (matchedOrder) {
+                                    await db.update(orders)
+                                        .set({ paymentStatus: PaymentStatus.APPROVED, updatedAt: new Date() })
+                                        .where(eq(orders.id, matchedOrder.id));
+
+                                    await db.insert(payments).values({
+                                        orderId: matchedOrder.id,
+                                        method: 'mercadopago_transfer',
+                                        status: PaymentStatus.APPROVED,
+                                        amount: String(amount),
+                                        transactionId: id,
+                                        metadata: { notes: `Auto-detectado de MP (Webhook): DNI ${senderDni}` }
+                                    });
+                                    console.log(`Webhook: Transferencia matcheada con orden ${matchedOrder.orderNumber}`);
+                                } else {
+                                    // Guardar como no matcheada
+                                    await db.insert(unmatchedTransfers).values({
+                                        amount: String(amount),
+                                        senderDni: senderDni,
+                                        mpPaymentId: String(id),
+                                        paymentDate: new Date(paymentData.date_created || Date.now()),
+                                        rawMetadata: paymentData,
+                                        status: 'pending_review'
+                                    });
+                                    EmailService.sendUnmatchedTransferAlert(amount, senderDni, String(id)).catch(err => console.error(err));
+                                    console.log(`Webhook: Transferencia NO matcheada guardada. DNI ${senderDni}`);
+                                }
+                            }
+                        } else {
+                            console.error('No hay metadata en el pago de MP y no es transferencia.');
+                        }
+
                         return new Response(null, { status: 200 });
                     }
 
+                    // Flujo normal con preferences
                     const shippingData = JSON.parse(metadata.shipping_data);
                     const items = JSON.parse(metadata.order_items);
                     const total = metadata.total_amount;

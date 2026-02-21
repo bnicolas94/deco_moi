@@ -49,8 +49,17 @@ export const ClientOrderConfirmationTemplate = (data: any) => {
             
             <div class="greeting">
                 <h1>¡Gracias por tu compra, ${customer.name || 'amigo/a'}!</h1>
-                <p>Tu pedido <strong>#${order.orderNumber}</strong> está confirmado y ya estamos trabajando en él. 🎉</p>
+                <p>Tu pedido <strong>#${order.orderNumber}</strong> ${order.paymentMethod === 'transfer' ? 'está registrado y esperando tu pago.' : 'está confirmado y ya estamos trabajando en él. 🎉'}</p>
             </div>
+
+            ${order.paymentMethod === 'transfer' ? `
+            <div style="background-color: #fdfaf6; padding: 20px; border-radius: 6px; margin-bottom: 25px; border: 1px solid #E8C4A6;">
+                <h2 style="font-size: 18px; color: #8B7355; margin-top: 0;">Realizá tu transferencia por $${Number(order.total).toLocaleString('es-AR')}</h2>
+                <p style="margin: 5px 0;"><strong>Titular:</strong> ${data.bankConfig?.holder || 'No configurado'}</p>
+                <p style="margin: 5px 0;"><strong>CVU / Alias:</strong> ${data.bankConfig?.cvu || 'No configurado'}</p>
+                <p style="margin-top: 15px; font-size: 13px; color: #666; line-height: 1.4;">⚠️ <strong>Atención:</strong> Por favor, asegurate de transferir desde la cuenta a nombre del DNI que ingresaste en la compra. Nuestro sistema detectará el ingreso automáticamente. Si preferís asegurar, envíanos el comprobante al WhatsApp.</p>
+            </div>
+            ` : ''}
 
             <div class="order-info">
                 <strong>Número de orden:</strong> #${order.orderNumber}<br>

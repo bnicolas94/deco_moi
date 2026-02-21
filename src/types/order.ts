@@ -56,6 +56,7 @@ export enum OrderStatus {
 
 export enum PaymentStatus {
     PENDING = 'pending',
+    PENDING_TRANSFER = 'pending_transfer',
     APPROVED = 'approved',
     REJECTED = 'rejected',
     REFUNDED = 'refunded',
