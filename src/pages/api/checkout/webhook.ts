@@ -42,10 +42,15 @@ export const POST: APIRoute = async ({ request }) => {
                         const isTransfer = paymentData.payment_type_id === 'bank_transfer' || paymentData.operation_type === 'account_fund';
 
                         if (isTransfer) {
-                            const senderDni = paymentData.payer?.identification?.number;
+                            let senderDni = paymentData.payer?.identification?.number;
                             const amount = Number(paymentData.transaction_amount);
 
                             if (senderDni) {
+                                // Limpieza de CUIL a DNI
+                                if (senderDni.length === 11) {
+                                    senderDni = senderDni.substring(2, 10);
+                                }
+
                                 const { orders, unmatchedTransfers } = await import('@/lib/db/schema');
                                 const { PaymentStatus } = await import('@/types/order');
                                 const minAmount = amount - 1;

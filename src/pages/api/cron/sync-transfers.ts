@@ -47,9 +47,15 @@ export const GET: APIRoute = async ({ request }) => {
 
             const mpPaymentId = String(p.id);
             const amount = Number(p.transaction_amount);
-            const senderDni = p.payer?.identification?.number || null;
+            let senderDni = p.payer?.identification?.number || null;
 
             if (!senderDni) continue; // Si no hay DNI, no podemos matchear
+
+            // Mercado Pago a veces devuelve el CUIL en lugar del DNI de la cuenta. 
+            // Si tiene 11 dígitos, asumimos que es CUIL y limpiamos los primeros 2 y el último 1.
+            if (senderDni.length === 11) {
+                senderDni = senderDni.substring(2, 10);
+            }
 
             // 1. Verificar idempotencia
             const existingPayment = await db.query.payments.findFirst({
