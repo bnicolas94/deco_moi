@@ -8,6 +8,8 @@ export interface MeliPricingConfigType {
     fixedCostAmount3?: string | number | null;
     extraMarginPct?: string | number | null;
     installmentsCostPct?: string | number | null;
+    freeShippingThreshold?: string | number | null;
+    freeShippingCost?: string | number | null;
     roundingStrategy?: string | null;
 }
 
@@ -51,6 +53,14 @@ export function calculateMeliPrice(basePrice: number, config: MeliPricingConfigT
 
     let finalPrice = (basePrice + fixedCost) / (1 - totalDeductionRate);
 
+    // Apply Free Shipping logic if price hits threshold
+    const freeShippingThreshold = Number(config.freeShippingThreshold || 0);
+    const freeShippingCost = Number(config.freeShippingCost || 0);
+
+    if (freeShippingThreshold > 0 && freeShippingCost > 0 && finalPrice >= freeShippingThreshold) {
+        finalPrice = (basePrice + fixedCost + freeShippingCost) / (1 - totalDeductionRate);
+    }
+
     const strategy = config.roundingStrategy || 'round';
     if (strategy === 'ceil') {
         return Math.ceil(finalPrice);
@@ -65,10 +75,13 @@ export function calculateNetReceived(meliPrice: number, config: MeliPricingConfi
     const commissionPct = Number(config.commissionPct || 0) / 100;
     const installmentsCostPct = Number(config.installmentsCostPct || 0) / 100;
 
-    // Total deducciones ML reales (no incluimos nuestro extraMargin aquí porque queremos calcular el NETO real recibido de ML)
     const totalMlCommission = meliPrice * (commissionPct + installmentsCostPct);
 
-    return meliPrice - totalMlCommission - fixedCost;
+    const freeShippingThreshold = Number(config.freeShippingThreshold || 0);
+    const freeShippingCost = Number(config.freeShippingCost || 0);
+    const appliedShippingCost = (freeShippingThreshold > 0 && freeShippingCost > 0 && meliPrice >= freeShippingThreshold) ? freeShippingCost : 0;
+
+    return meliPrice - totalMlCommission - fixedCost - appliedShippingCost;
 }
 
 export function getPriceBreakdown(basePrice: number, config: MeliPricingConfigType) {
@@ -87,9 +100,14 @@ export function getPriceBreakdown(basePrice: number, config: MeliPricingConfigTy
 
     const effectiveMarginPct = basePrice > 0 ? ((netReceived - basePrice) / basePrice) * 100 : 0;
 
+    const freeShippingThreshold = Number(config.freeShippingThreshold || 0);
+    const freeShippingCost = Number(config.freeShippingCost || 0);
+    const appliedShippingCost = (freeShippingThreshold > 0 && freeShippingCost > 0 && meliPrice >= freeShippingThreshold) ? freeShippingCost : 0;
+
     return {
         basePrice,
         fixedCost: Number(fixedCost.toFixed(2)),
+        appliedShippingCost: Number(appliedShippingCost.toFixed(2)),
         mlCommissionAmount: Number(mlCommissionAmount.toFixed(2)),
         extraMarginAmount: Number(extraMarginAmount.toFixed(2)),
         installmentsCostAmount: Number(installmentsCostAmount.toFixed(2)),

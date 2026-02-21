@@ -502,6 +502,8 @@ export const meliPricingConfig = pgTable('meli_pricing_config', {
     fixedCostAmount2: decimal('fixed_cost_amount2', { precision: 10, scale: 2 }).default('2300'),
     fixedCostThreshold3: decimal('fixed_cost_threshold3', { precision: 10, scale: 2 }).default('33000'),
     fixedCostAmount3: decimal('fixed_cost_amount3', { precision: 10, scale: 2 }).default('2810'),
+    freeShippingThreshold: decimal('free_shipping_threshold', { precision: 10, scale: 2 }).default('30000'),
+    freeShippingCost: decimal('free_shipping_cost', { precision: 10, scale: 2 }).default('5000'),
     extraMarginPct: decimal('extra_margin_pct', { precision: 5, scale: 2 }).default('0'),
     installmentsCostPct: decimal('installments_cost_pct', { precision: 5, scale: 2 }).default('0'),
     roundingStrategy: varchar('rounding_strategy', { length: 20 }).default('round'), // 'round' | 'ceil' | 'floor'

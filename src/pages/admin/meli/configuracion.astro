@@ -26,8 +26,9 @@ if (Astro.request.method === 'POST') {
         fixedCostAmount1: data.get('amount1')?.toString() || '1115',
         fixedCostThreshold2: data.get('threshold2')?.toString() || '25000',
         fixedCostAmount2: data.get('amount2')?.toString() || '2300',
-        fixedCostThreshold3: data.get('threshold3')?.toString() || '33000',
         fixedCostAmount3: data.get('amount3')?.toString() || '2810',
+        freeShippingThreshold: data.get('freeShippingThreshold')?.toString() || '0',
+        freeShippingCost: data.get('freeShippingCost')?.toString() || '0',
         roundingStrategy: data.get('roundingStrategy')?.toString() || 'round',
         updatedAt: new Date()
       })
@@ -124,6 +125,18 @@ const successParam = new URL(Astro.request.url).searchParams.get('success');
               </div>
             </div>
 
+            <h3 class="font-semibold text-slate-800 dark:text-slate-100 mt-6 mb-3">Costos de Envío Gratis Obligatorio (ARS)</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+              <div>
+                <label class="block text-sm font-medium mb-1">A partir de (Umbral ML) ($)</label>
+                <input type="number" step="0.01" name="freeShippingThreshold" class="form-input w-full" value={cf.freeShippingThreshold} placeholder="Ej: 30000" />
+              </div>
+              <div>
+                <label class="block text-sm font-medium mb-1">Costo de Envío a sumar ($)</label>
+                <input type="number" step="0.01" name="freeShippingCost" class="form-input w-full" value={cf.freeShippingCost} placeholder="Ej: 5000" />
+              </div>
+            </div>
+
             <div class="mt-6 border-t border-slate-200 dark:border-slate-700 pt-5">
               <button type="submit" class="btn bg-indigo-500 hover:bg-indigo-600 text-white">Guardar Configuración</button>
             </div>
@@ -144,8 +157,9 @@ const successParam = new URL(Astro.request.url).searchParams.get('success');
           </div>
           <button type="button" id="btnSimular" class="btn bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 w-full mb-4">Simular</button>
           
-          <div id="simResult" class="hidden bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-3 rounded text-sm">
+             <div id="simResult" class="hidden bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-3 rounded text-sm">
              <div class="flex justify-between mb-1"><span>Costo Fijo ML:</span> <span class="font-medium text-rose-500" id="simFijo"></span></div>
+             <div class="flex justify-between mb-1"><span>Costo Envío ML:</span> <span class="font-medium text-rose-500" id="simEnvio"></span></div>
              <div class="flex justify-between mb-1"><span>Comisión ML:</span> <span class="font-medium text-rose-500" id="simCom"></span></div>
              <div class="flex justify-between mb-2"><span>Margen Extra:</span> <span class="font-medium text-emerald-500" id="simMargen"></span></div>
              <div class="flex justify-between font-bold text-lg pt-2 border-t border-slate-200 dark:border-slate-700">
@@ -199,6 +213,8 @@ const successParam = new URL(Astro.request.url).searchParams.get('success');
          amount2: document.querySelector('input[name="amount2"]').value,
          threshold3: document.querySelector('input[name="threshold3"]').value,
          amount3: document.querySelector('input[name="amount3"]').value,
+         freeShippingThreshold: document.querySelector('input[name="freeShippingThreshold"]').value,
+         freeShippingCost: document.querySelector('input[name="freeShippingCost"]').value,
          roundingStrategy: document.querySelector('select[name="roundingStrategy"]').value
       };
 
@@ -217,6 +233,13 @@ const successParam = new URL(Astro.request.url).searchParams.get('success');
         }
 
         let finalPrice = (basePrice + fixedCost) / (1 - totalDeductionRate);
+        
+        let appliedShippingCost = 0;
+        if(Number(configObj.freeShippingThreshold) > 0 && Number(configObj.freeShippingCost) > 0 && finalPrice >= Number(configObj.freeShippingThreshold)) {
+            appliedShippingCost = Number(configObj.freeShippingCost);
+            finalPrice = (basePrice + fixedCost + appliedShippingCost) / (1 - totalDeductionRate);
+        }
+
         if(configObj.roundingStrategy === 'ceil') finalPrice = Math.ceil(finalPrice);
         else if(configObj.roundingStrategy === 'floor') finalPrice = Math.floor(finalPrice);
         else finalPrice = Math.round(finalPrice);
@@ -224,9 +247,10 @@ const successParam = new URL(Astro.request.url).searchParams.get('success');
         const mlCommissionAmount = finalPrice * (Number(configObj.commissionPct)/100);
         const extraMarginAmount = finalPrice * (Number(configObj.extraMarginPct)/100);
         
-        const netReceived = finalPrice - (finalPrice * ((Number(configObj.commissionPct) + Number(configObj.installmentsCostPct))/100)) - fixedCost;
+        const netReceived = finalPrice - (finalPrice * ((Number(configObj.commissionPct) + Number(configObj.installmentsCostPct))/100)) - fixedCost - appliedShippingCost;
 
         document.getElementById('simFijo').innerText = '$' + fixedCost.toFixed(2);
+        document.getElementById('simEnvio').innerText = '$' + appliedShippingCost.toFixed(2);
         document.getElementById('simCom').innerText = '$' + mlCommissionAmount.toFixed(2);
         document.getElementById('simMargen').innerText = '$' + extraMarginAmount.toFixed(2);
         document.getElementById('simPriceResult').innerText = '$' + finalPrice.toFixed(0);
