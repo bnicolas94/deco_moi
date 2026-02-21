@@ -14,12 +14,15 @@ const allOrders = await db.query.orders.findMany({
 });
 
 // Adaptar datos para el resto del componente si es necesario
-const mappedOrders = allOrders.map(o => ({
-    ...o,
-    customerName: o.user?.name,
-    customerEmail: o.user?.email,
-    date: o.createdAt
-}));
+const mappedOrders = allOrders.map(o => {
+    const shipping = o.shippingData as any;
+    return {
+        ...o,
+        customerName: shipping?.full_name || o.user?.name || 'Invitado',
+        customerEmail: shipping?.email || o.user?.email || 'N/A',
+        date: o.createdAt
+    };
+});
 
 // Calculate simple stats
 const totalOrders = mappedOrders.length;
@@ -152,7 +155,7 @@ const statusIcons = {
                             return (
                                 <tr class="hover:bg-gray-50/50 transition-colors group order-row" 
                                     data-status={order.status} 
-                                    data-search={`${order.orderNumber} ${order.customerName || 'Administrador'} ${order.customerEmail || 'admin@decomoi.com'} ${order.items.map((i: any) => i.productName).join(' ')}`.toLowerCase()}
+                                    data-search={`${order.orderNumber} ${order.customerName} ${order.customerEmail} ${order.items.map((i: any) => i.productName).join(' ')}`.toLowerCase()}
                                 >
                                     <td class="px-6 py-4 whitespace-nowrap">
                                         <div class="flex items-center">
@@ -163,8 +166,8 @@ const statusIcons = {
                                         </div>
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm">
-                                        <div class="font-medium text-gray-900">{order.customerName || 'Administrador'}</div>
-                                        <div class="text-gray-500 text-xs">{order.customerEmail || 'admin@decomoi.com'}</div>
+                                        <div class="font-medium text-gray-900">{order.customerName}</div>
+                                        <div class="text-gray-500 text-xs">{order.customerEmail}</div>
                                         <div class="mt-1 flex flex-wrap gap-1">
                                             {order.items.map((item: any) => (
                                                 <span class="inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-medium bg-gray-100 text-gray-600 border border-gray-200">

@@ -47,7 +47,12 @@ const paymentStatusOptions = [
 ];
 
 // Procesar shippingData fuera del template para evitar errores de compilación
+const shipping = order.shippingData as any;
 const shippingDataEntries = order.shippingData ? Object.entries(order.shippingData as Record<string, any>) : [];
+
+const customerDisplayName = shipping?.full_name || order.user?.name || 'Invitado';
+const customerDisplayEmail = shipping?.email || order.user?.email || 'N/A';
+const customerDisplayPhone = shipping?.phone || order.user?.phone || '-';
 ---
 
 <AdminLayout title={`Orden #${order.orderNumber}`}>
@@ -203,15 +208,15 @@ const shippingDataEntries = order.shippingData ? Object.entries(order.shippingDa
                 <div class="space-y-3 text-sm">
                     <div>
                         <span class="block text-gray-500 text-xs text-uppercase font-bold mb-1">Nombre</span>
-                        <span class="font-medium text-gray-900">{order.user?.name || 'Administrador'}</span>
+                        <span class="font-medium text-gray-900">{customerDisplayName}</span>
                     </div>
                     <div>
                         <span class="block text-gray-500 text-xs text-uppercase font-bold mb-1">Email</span>
-                        <span class="font-medium text-gray-900">{order.user?.email || 'admin@decomoi.com'}</span>
+                        <span class="font-medium text-gray-900">{customerDisplayEmail}</span>
                     </div>
                     <div>
                         <span class="block text-gray-500 text-xs text-uppercase font-bold mb-1">Teléfono</span>
-                        <span class="font-medium text-gray-900">{order.user?.phone || '-'}</span>
+                        <span class="font-medium text-gray-900">{customerDisplayPhone}</span>
                     </div>
                 </div>
             </div>
