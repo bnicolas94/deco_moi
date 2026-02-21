@@ -41,8 +41,8 @@ export const GET: APIRoute = async ({ request }) => {
             if (p.status !== 'approved') continue;
 
             // Evaluamos si es transferencia pasiva o a CVU
-            // Nota: las transferencias a CVU suelen tener payment_type_id: 'bank_transfer' o tener operation_type: 'account_fund'
-            const isTransfer = p.payment_type_id === 'bank_transfer' || p.operation_type === 'account_fund';
+            // Nota: las transferencias a CVU suelen tener payment_type_id: 'bank_transfer' o tener operation_type: 'account_fund' o 'money_transfer'
+            const isTransfer = p.payment_type_id === 'bank_transfer' || p.operation_type === 'account_fund' || p.operation_type === 'money_transfer';
             if (!isTransfer) continue;
 
             const mpPaymentId = String(p.id);

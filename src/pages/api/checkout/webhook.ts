@@ -39,7 +39,7 @@ export const POST: APIRoute = async ({ request }) => {
 
                     if (!metadata) {
                         // Verifica si es una transferencia entrante directa (sin metadata de preference)
-                        const isTransfer = paymentData.payment_type_id === 'bank_transfer' || paymentData.operation_type === 'account_fund';
+                        const isTransfer = paymentData.payment_type_id === 'bank_transfer' || paymentData.operation_type === 'account_fund' || paymentData.operation_type === 'money_transfer';
 
                         if (isTransfer) {
                             let senderDni = paymentData.payer?.identification?.number;
