@@ -14,15 +14,17 @@ export interface MLTokenResponse {
 }
 
 export async function getAuthUrl(): Promise<string> {
-    const appId = process.env.MELI_APP_ID || import.meta.env.MELI_APP_ID;
-    const redirectUri = process.env.MELI_REDIRECT_URI || import.meta.env.MELI_REDIRECT_URI;
+    const appId = import.meta.env.MELI_APP_ID || process.env.MELI_APP_ID;
+    const redirectUri = import.meta.env.MELI_REDIRECT_URI || process.env.MELI_REDIRECT_URI;
     return `${AUTH_BASE}?response_type=code&client_id=${appId}&redirect_uri=${redirectUri}`;
 }
 
 export async function exchangeCodeForToken(code: string): Promise<MLTokenResponse> {
-    const appId = process.env.MELI_APP_ID || import.meta.env.MELI_APP_ID;
-    const appSecret = process.env.MELI_APP_SECRET || import.meta.env.MELI_APP_SECRET;
-    const redirectUri = process.env.MELI_REDIRECT_URI || import.meta.env.MELI_REDIRECT_URI;
+    const appId = import.meta.env.MELI_APP_ID || process.env.MELI_APP_ID;
+    const appSecret = import.meta.env.MELI_APP_SECRET || process.env.MELI_APP_SECRET;
+    const redirectUri = import.meta.env.MELI_REDIRECT_URI || process.env.MELI_REDIRECT_URI;
+
+    console.log('[MeliAuth] Intercambiando código con App ID:', appId, 'Redirect:', redirectUri);
 
     const url = `${API_BASE}/oauth/token`;
     const body = new URLSearchParams({

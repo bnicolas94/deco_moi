@@ -20,6 +20,6 @@ export const GET: APIRoute = async ({ request, redirect }) => {
         return redirect('/admin/meli?success=auth_ok');
     } catch (err: any) {
         console.error('[Meli API] Error en callback OAuth', err);
-        return redirect('/admin/meli?error=auth_exception');
+        return redirect(`/admin/meli?error=${encodeURIComponent(err.message || 'auth_exception')}`);
     }
 };

@@ -27,7 +27,7 @@ export class MeliService {
         const tzOffset = new Date().getTimezoneOffset() * 60000;
         const expiresAt = new Date(Date.now() + tokens.expires_in * 1000 - tzOffset); // basic calc
 
-        const appId = process.env.MELI_APP_ID || import.meta.env.MELI_APP_ID;
+        const appId = import.meta.env.MELI_APP_ID || process.env.MELI_APP_ID;
 
         // Desactivamos anteriores
         await db.update(meliCredentials).set({ isActive: false });
