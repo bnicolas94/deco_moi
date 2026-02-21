@@ -97,6 +97,11 @@ export async function getValidAccessToken(): Promise<string> {
     const timeUntilExpiration = credential.expiresAt.getTime() - now.getTime();
 
     if (timeUntilExpiration < 1800000) {
+        if (credential.refreshToken === 'no_refresh_token_provided') {
+            console.log('[MeliAuth] Skipping token refresh for Test User without refresh_token.');
+            return credential.accessToken;
+        }
+
         console.log('[MeliAuth] Refreshing token...');
         try {
             const refreshed = await refreshToken(credential.refreshToken);
@@ -105,7 +110,7 @@ export async function getValidAccessToken(): Promise<string> {
             await db.update(meliCredentials)
                 .set({
                     accessToken: refreshed.access_token,
-                    refreshToken: refreshed.refresh_token,
+                    refreshToken: refreshed.refresh_token || credential.refreshToken,
                     expiresAt: newExpiresAt,
                     updatedAt: new Date()
                 })

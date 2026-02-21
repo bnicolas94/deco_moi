@@ -32,11 +32,11 @@ export class MeliService {
         // Desactivamos anteriores
         await db.update(meliCredentials).set({ isActive: false });
 
-        // Insertamos la nueva (en una app real accessToken y refreshToken deberian ser encriptados)
+        // Insertamos la nueva (manejo de Test Users sin refresh_token)
         await db.insert(meliCredentials).values({
             mlUserId: String(tokens.user_id),
             accessToken: tokens.access_token,
-            refreshToken: tokens.refresh_token,
+            refreshToken: tokens.refresh_token || 'no_refresh_token_provided',
             expiresAt: expiresAt,
             appId: appId as string,
             isActive: true
