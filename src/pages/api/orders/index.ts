@@ -27,6 +27,8 @@ export const POST: APIRoute = async (context) => {
         };
 
         // 1. Crear la Orden
+        const initialPaymentStatus = paymentMethod === 'transfer' ? PaymentStatus.PENDING_TRANSFER : PaymentStatus.PENDING;
+
         const [newOrder] = await db.insert(orders).values({
             id: crypto.randomUUID(),
             orderNumber,
@@ -37,7 +39,7 @@ export const POST: APIRoute = async (context) => {
             discountAmount: String(discountAmount || 0),
             shippingCost: String(shippingCost || 0),
             paymentMethod,
-            paymentStatus: PaymentStatus.PENDING,
+            paymentStatus: initialPaymentStatus,
             shippingData: fullShippingData,
             shippingMethod: shippingMethod || 'pickup',
             notes,

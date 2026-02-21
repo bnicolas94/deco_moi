@@ -1,4 +1,3 @@
-import nodemailer from 'nodemailer';
 import { db } from '@/lib/db/connection';
 import { orders, orderItems, emailQueue, users, siteConfig, addresses } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
@@ -6,18 +5,6 @@ import { ClientOrderConfirmationTemplate } from '@/emails/ClientOrderConfirmatio
 import { AdminOrderConfirmationTemplate } from '@/emails/AdminOrderConfirmation';
 
 export class EmailService {
-    private static getTransporter() {
-        return nodemailer.createTransport({
-            host: 'smtp.resend.com',
-            port: 465,
-            secure: true,
-            auth: {
-                user: 'resend',
-                pass: process.env.RESEND_API_KEY || import.meta.env.RESEND_API_KEY,
-            },
-        });
-    }
-
     private static async getAdminEmail() {
         const adminEmailEnv = process.env.ADMIN_EMAIL || import.meta.env.ADMIN_EMAIL;
         if (adminEmailEnv) {
@@ -39,15 +26,7 @@ export class EmailService {
         htmlBody: string,
         replyTo?: string
     ) {
-        const transporter = this.getTransporter();
-        const mailOptions = {
-            from: '"Deco Moi" <info@decomoi.com.ar>',
-            to,
-            subject,
-            html: htmlBody,
-            replyTo: replyTo || undefined,
-        };
-
+        const apiKey = process.env.RESEND_API_KEY || import.meta.env.RESEND_API_KEY;
         const maxRetries = 3;
         let attempt = 0;
         let lastError = null;
@@ -55,12 +34,32 @@ export class EmailService {
         while (attempt < maxRetries) {
             try {
                 attempt++;
-                await transporter.sendMail(mailOptions);
-                console.log(`Email sent successfully to ${to} (Role: ${recipientRole}) on attempt ${attempt}`);
-                return true;
+
+                const response = await fetch('https://api.resend.com/emails', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${apiKey}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        from: 'Deco Moi <info@decomoi.com.ar>',
+                        to: [to],
+                        subject: subject,
+                        html: htmlBody,
+                        reply_to: replyTo
+                    })
+                });
+
+                if (response.ok) {
+                    console.log(`Email sent successfully to ${to} (Role: ${recipientRole}) on attempt ${attempt}`);
+                    return true;
+                } else {
+                    const errorData = await response.text();
+                    throw new Error(`Resend API Error: ${response.status} - ${errorData}`);
+                }
             } catch (error: any) {
                 lastError = error;
-                console.error(`Attempt ${attempt} to send email failed for ${to}:`, error);
+                console.error(`Attempt ${attempt} to send email failed for ${to}:`, error.message);
 
                 if (attempt < maxRetries) {
                     // Exponential backoff
