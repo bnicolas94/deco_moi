@@ -70,6 +70,18 @@ export const POST: APIRoute = async ({ request }) => {
                                     }
                                 }
 
+                                // 2. Fallback por Monto Único (Si MP no nos da el DNI real del emisor y solo hay una orden con ese monto)
+                                if (!matchedOrder) {
+                                    const ordersWithSameAmount = pendingOrders.filter(order => {
+                                        const orderTotal = Number(order.total);
+                                        return orderTotal >= minAmount && orderTotal <= maxAmount;
+                                    });
+
+                                    if (ordersWithSameAmount.length === 1) {
+                                        matchedOrder = ordersWithSameAmount[0];
+                                    }
+                                }
+
                                 if (matchedOrder) {
                                     await db.update(orders)
                                         .set({ paymentStatus: PaymentStatus.APPROVED, updatedAt: new Date() })

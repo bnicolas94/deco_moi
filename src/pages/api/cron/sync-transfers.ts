@@ -89,16 +89,27 @@ export const GET: APIRoute = async ({ request }) => {
 
             for (const order of pendingOrders) {
                 const orderTotal = Number(order.total);
+                const checkoutDni = order.shippingData?.transfer_dni;
 
-                // Verificar monto
+                // 1. Intento de Match Exacto (Monto ± 1 + DNI coincidente)
                 if (orderTotal >= minAmount && orderTotal <= maxAmount) {
-                    // Verificar DNI (guardado en shippingData por el form de checkout)
-                    const checkoutDni = order.shippingData?.transfer_dni;
-
                     if (checkoutDni && checkoutDni.toString() === senderDni.toString()) {
                         matchedOrder = order;
                         break;
                     }
+                }
+            }
+
+            // 2. Fallback por Monto Único (Si MP no nos da el DNI real del emisor y solo hay una orden con ese monto)
+            if (!matchedOrder) {
+                const ordersWithSameAmount = pendingOrders.filter(order => {
+                    const orderTotal = Number(order.total);
+                    return orderTotal >= minAmount && orderTotal <= maxAmount;
+                });
+
+                if (ordersWithSameAmount.length === 1) {
+                    matchedOrder = ordersWithSameAmount[0];
+                    console.log(`[i] Match por monto único (Fallback) para orden ${matchedOrder.orderNumber}`);
                 }
             }
 
