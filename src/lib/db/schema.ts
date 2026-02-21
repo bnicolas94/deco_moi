@@ -455,7 +455,7 @@ export const emailQueue = pgTable('email_queue', {
 });
 
 // ============================================
-// UNMATCHED TRANSFERS
+// TRANSFERS NO ENCONTRADAS
 // ============================================
 export const unmatchedTransfers = pgTable('unmatched_transfers', {
     id: serial('id').primaryKey(),
@@ -467,4 +467,100 @@ export const unmatchedTransfers = pgTable('unmatched_transfers', {
     status: varchar('status', { length: 50 }).default('pending_review'), // 'pending_review', 'resolved'
     createdAt: timestamp('created_at').defaultNow(),
     updatedAt: timestamp('updated_at').defaultNow(),
+});
+
+// ============================================
+// MERCADO LIBRE INTEGRATION
+// ============================================
+
+// Tabla: vinculación SKU Deco Moi ↔ MercadoLibre
+export const meliItemLinks = pgTable('meli_item_links', {
+    id: serial('id').primaryKey(),
+    productId: integer('product_id').notNull().references(() => products.id),
+    meliItemId: varchar('meli_item_id', { length: 50 }).notNull().unique(), // Ej: MLA1234567890
+    meliTitle: varchar('meli_title', { length: 255 }),
+    meliCategoryId: varchar('meli_category_id', { length: 50 }),
+    meliListingType: varchar('meli_listing_type', { length: 50 }), // 'gold_special' | 'gold_pro' | 'free'
+    lastSyncAt: timestamp('last_sync_at'),
+    syncEnabled: boolean('sync_enabled').default(true),
+    lastSyncedPrice: decimal('last_synced_price', { precision: 10, scale: 2 }),
+    lastSyncedStock: integer('last_synced_stock'),
+    createdAt: timestamp('created_at').defaultNow(),
+    updatedAt: timestamp('updated_at').defaultNow(),
+});
+
+// Tabla: configuración de costos ML por categoría/producto
+export const meliPricingConfig = pgTable('meli_pricing_config', {
+    id: serial('id').primaryKey(),
+    scope: varchar('scope', { length: 20 }).notNull().default('global'), // 'global' | 'category' | 'product'
+    scopeId: varchar('scope_id', { length: 50 }), // ID de categoría ML o ID de producto interno
+    scopeLabel: varchar('scope_label', { length: 100 }), // Nombre legible
+    commissionPct: decimal('commission_pct', { precision: 5, scale: 2 }).notNull(), // Ej: 13.00
+    fixedCostThreshold1: decimal('fixed_cost_threshold1', { precision: 10, scale: 2 }).default('15000'),
+    fixedCostAmount1: decimal('fixed_cost_amount1', { precision: 10, scale: 2 }).default('1115'),
+    fixedCostThreshold2: decimal('fixed_cost_threshold2', { precision: 10, scale: 2 }).default('25000'),
+    fixedCostAmount2: decimal('fixed_cost_amount2', { precision: 10, scale: 2 }).default('2300'),
+    fixedCostThreshold3: decimal('fixed_cost_threshold3', { precision: 10, scale: 2 }).default('33000'),
+    fixedCostAmount3: decimal('fixed_cost_amount3', { precision: 10, scale: 2 }).default('2810'),
+    extraMarginPct: decimal('extra_margin_pct', { precision: 5, scale: 2 }).default('0'),
+    installmentsCostPct: decimal('installments_cost_pct', { precision: 5, scale: 2 }).default('0'),
+    roundingStrategy: varchar('rounding_strategy', { length: 20 }).default('round'), // 'round' | 'ceil' | 'floor'
+    isActive: boolean('is_active').default(true),
+    createdAt: timestamp('created_at').defaultNow(),
+    updatedAt: timestamp('updated_at').defaultNow(),
+});
+
+// Tabla: credenciales OAuth ML
+export const meliCredentials = pgTable('meli_credentials', {
+    id: serial('id').primaryKey(),
+    mlUserId: varchar('ml_user_id', { length: 50 }).notNull(),
+    mlUserNickname: varchar('ml_user_nickname', { length: 100 }),
+    accessToken: text('access_token').notNull(), // Encriptado en la DB
+    refreshToken: text('refresh_token').notNull(), // Encriptado en la DB
+    expiresAt: timestamp('expires_at').notNull(),
+    appId: varchar('app_id', { length: 50 }).notNull(),
+    isActive: boolean('is_active').default(true),
+    createdAt: timestamp('created_at').defaultNow(),
+    updatedAt: timestamp('updated_at').defaultNow(),
+});
+
+// Tabla: log de sincronizaciones
+export const meliSyncLog = pgTable('meli_sync_log', {
+    id: serial('id').primaryKey(),
+    type: varchar('type', { length: 30 }).notNull(), // 'price_sync' | 'stock_sync' | 'order_import'
+    direction: varchar('direction', { length: 10 }).notNull(), // 'push' | 'pull'
+    productId: integer('product_id'),
+    meliItemId: varchar('meli_item_id', { length: 50 }),
+    meliOrderId: varchar('meli_order_id', { length: 50 }),
+    status: varchar('status', { length: 20 }).notNull(), // 'success' | 'error' | 'skipped'
+    details: json('details').$type<Record<string, any>>(),
+    errorMessage: text('error_message'),
+    createdAt: timestamp('created_at').defaultNow(),
+});
+
+// Tabla: órdenes de MercadoLibre (importadas)
+export const meliOrders = pgTable('meli_orders', {
+    id: serial('id').primaryKey(),
+    meliOrderId: varchar('meli_order_id', { length: 50 }).notNull().unique(),
+    internalOrderId: uuid('internal_order_id'), // FK a orders si se crea una orden espejo
+    status: varchar('status', { length: 30 }).notNull(), // 'paid' | 'cancelled' | 'pending'
+    buyerNickname: varchar('buyer_nickname', { length: 100 }),
+    buyerEmail: varchar('buyer_email', { length: 255 }),
+    totalAmount: decimal('total_amount', { precision: 10, scale: 2 }).notNull(),
+    netAmount: decimal('net_amount', { precision: 10, scale: 2 }), // Total menos comisiones ML
+    mlCommissionAmount: decimal('ml_commission_amount', { precision: 10, scale: 2 }),
+    currency: varchar('currency', { length: 10 }).default('ARS'),
+    items: json('items').$type<Array<{
+        meliItemId: string;
+        title: string;
+        sku: string | null;
+        quantity: number;
+        unitPrice: number;
+        productId: number | null;
+    }>>(),
+    paymentId: varchar('payment_id', { length: 50 }),
+    shippingId: varchar('shipping_id', { length: 50 }),
+    dateCreated: timestamp('date_created').notNull(),
+    rawData: json('raw_data').$type<Record<string, any>>(), // Data cruda de ML para referencia
+    importedAt: timestamp('imported_at').defaultNow(),
 });

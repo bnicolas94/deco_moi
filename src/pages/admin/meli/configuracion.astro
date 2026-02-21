@@ -1,0 +1,241 @@
+---
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import { db } from '../../../lib/db/connection';
+import { meliPricingConfig, meliCredentials } from '../../../lib/db/schema';
+import { eq } from 'drizzle-orm';
+
+// Cargar config
+const configData = await db.select().from(meliPricingConfig).where(eq(meliPricingConfig.scope, 'global')).limit(1);
+const cf = configData[0] || {};
+const appId = import.meta.env.MELI_APP_ID || process.env.MELI_APP_ID || '';
+const redirectUri = import.meta.env.MELI_REDIRECT_URI || process.env.MELI_REDIRECT_URI || '';
+
+const creds = await db.select().from(meliCredentials).where(eq(meliCredentials.isActive, true)).limit(1);
+const isConnected = creds.length > 0;
+
+if (Astro.request.method === 'POST') {
+  try {
+    const data = await Astro.request.formData();
+    
+    await db.update(meliPricingConfig)
+      .set({
+        commissionPct: data.get('commissionPct')?.toString() || '13',
+        extraMarginPct: data.get('extraMarginPct')?.toString() || '0',
+        installmentsCostPct: data.get('installmentsCostPct')?.toString() || '0',
+        fixedCostThreshold1: data.get('threshold1')?.toString() || '15000',
+        fixedCostAmount1: data.get('amount1')?.toString() || '1115',
+        fixedCostThreshold2: data.get('threshold2')?.toString() || '25000',
+        fixedCostAmount2: data.get('amount2')?.toString() || '2300',
+        fixedCostThreshold3: data.get('threshold3')?.toString() || '33000',
+        fixedCostAmount3: data.get('amount3')?.toString() || '2810',
+        roundingStrategy: data.get('roundingStrategy')?.toString() || 'round',
+        updatedAt: new Date()
+      })
+      .where(eq(meliPricingConfig.scope, 'global'));
+      
+    // Redirect with success
+    return Astro.redirect('/admin/meli/configuracion?success=1');
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+const successParam = new URL(Astro.request.url).searchParams.get('success');
+---
+
+<AdminLayout title="Configuración MercadoLibre">
+  <div class="px-4 sm:px-6 lg:px-8 py-8 w-full max-w-9xl mx-auto">
+    <div class="sm:flex sm:justify-between sm:items-center mb-8">
+      <div class="mb-4 sm:mb-0">
+        <h1 class="text-2xl md:text-3xl text-slate-800 dark:text-slate-100 font-bold">
+          Configuración ML
+        </h1>
+      </div>
+      <div>
+         <a href="/admin/meli" class="btn bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600">Volver al Dashboard</a>
+      </div>
+    </div>
+
+    {successParam === '1' && (
+      <div class="mb-6 bg-emerald-100 text-emerald-700 px-4 py-3 rounded-sm border border-emerald-200">
+        Configuración guardada correctamente.
+      </div>
+    )}
+
+    <div class="grid grid-cols-12 gap-6">
+
+      <!-- Formulario Costos -->
+      <div class="col-span-full xl:col-span-8 bg-white dark:bg-slate-800 shadow-lg rounded-sm border border-slate-200 dark:border-slate-700">
+        <header class="px-5 py-4 border-b border-slate-100 dark:border-slate-700">
+          <h2 class="font-semibold text-slate-800 dark:text-slate-100">Configuración Global de Costos</h2>
+        </header>
+        <div class="p-5">
+          <form method="POST">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+              <div>
+                <label class="block text-sm font-medium mb-1">Comisión ML (%)</label>
+                <input type="number" step="0.01" name="commissionPct" class="form-input w-full" value={cf.commissionPct} required />
+              </div>
+              <div>
+                <label class="block text-sm font-medium mb-1">Margen Adicional (%)</label>
+                <input type="number" step="0.01" name="extraMarginPct" class="form-input w-full" value={cf.extraMarginPct} required />
+              </div>
+              <div>
+                <label class="block text-sm font-medium mb-1">Costo Cuotas Sin Interés (%)</label>
+                <input type="number" step="0.01" name="installmentsCostPct" class="form-input w-full" value={cf.installmentsCostPct} required />
+              </div>
+              <div>
+                <label class="block text-sm font-medium mb-1">Estrategia de Redondeo</label>
+                <select name="roundingStrategy" class="form-select w-full">
+                  <option value="round" selected={cf.roundingStrategy === 'round'}>Redondear cercano</option>
+                  <option value="ceil" selected={cf.roundingStrategy === 'ceil'}>Hacia arriba</option>
+                  <option value="floor" selected={cf.roundingStrategy === 'floor'}>Hacia abajo</option>
+                </select>
+              </div>
+            </div>
+
+            <h3 class="font-semibold text-slate-800 dark:text-slate-100 mt-6 mb-3">Costos Fijos por Unidad Escalonados (ARS)</h3>
+            <div class="space-y-3 mb-6">
+              <div class="flex gap-4 items-end">
+                <div class="flex-1">
+                  <label class="block text-xs text-slate-500 mb-1">Hasta precio (ARS)</label>
+                  <input type="number" name="threshold1" class="form-input w-full" value={cf.fixedCostThreshold1} />
+                </div>
+                <div class="flex-1">
+                  <label class="block text-xs text-slate-500 mb-1">Costo Fijo (ARS)</label>
+                  <input type="number" name="amount1" class="form-input w-full" value={cf.fixedCostAmount1} />
+                </div>
+              </div>
+              <div class="flex gap-4 items-end">
+                <div class="flex-1">
+                  <input type="number" name="threshold2" class="form-input w-full" value={cf.fixedCostThreshold2} />
+                </div>
+                <div class="flex-1">
+                  <input type="number" name="amount2" class="form-input w-full" value={cf.fixedCostAmount2} />
+                </div>
+              </div>
+              <div class="flex gap-4 items-end">
+                <div class="flex-1">
+                  <input type="number" name="threshold3" class="form-input w-full" value={cf.fixedCostThreshold3} />
+                </div>
+                <div class="flex-1">
+                  <input type="number" name="amount3" class="form-input w-full" value={cf.fixedCostAmount3} />
+                </div>
+              </div>
+            </div>
+
+            <div class="mt-6 border-t border-slate-200 dark:border-slate-700 pt-5">
+              <button type="submit" class="btn bg-indigo-500 hover:bg-indigo-600 text-white">Guardar Configuración</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- Credenciales y Simulador -->
+      <div class="col-span-full xl:col-span-4 space-y-6">
+        
+        <div class="bg-white dark:bg-slate-800 shadow-lg rounded-sm border border-slate-200 dark:border-slate-700 p-5">
+          <h2 class="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-2">Simulador de Precio ML</h2>
+          <p class="text-xs text-slate-500 mb-4">Ingresa el precio base en Deco Moi para ver cuánto quedaría en ML.</p>
+          
+          <div class="mb-4">
+            <label class="block text-sm font-medium mb-1">Precio Deco Moi ($)</label>
+            <input type="number" id="simPrecioBase" class="form-input w-full" placeholder="Ej: 10000" />
+          </div>
+          <button type="button" id="btnSimular" class="btn bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 w-full mb-4">Simular</button>
+          
+          <div id="simResult" class="hidden bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-3 rounded text-sm">
+             <div class="flex justify-between mb-1"><span>Costo Fijo ML:</span> <span class="font-medium text-rose-500" id="simFijo"></span></div>
+             <div class="flex justify-between mb-1"><span>Comisión ML:</span> <span class="font-medium text-rose-500" id="simCom"></span></div>
+             <div class="flex justify-between mb-2"><span>Margen Extra:</span> <span class="font-medium text-emerald-500" id="simMargen"></span></div>
+             <div class="flex justify-between font-bold text-lg pt-2 border-t border-slate-200 dark:border-slate-700">
+               <span>Precio Sugerido ML:</span> <span id="simPriceResult"></span>
+             </div>
+             <div class="flex justify-between font-bold text-sm pt-2 text-indigo-500">
+               <span>Neto Recibido:</span> <span id="simNet"></span>
+             </div>
+          </div>
+        </div>
+
+        <div class="bg-white dark:bg-slate-800 shadow-lg rounded-sm border border-slate-200 dark:border-slate-700 p-5">
+          <h2 class="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-2">Credenciales OAuth</h2>
+          <div class="mb-3">
+            <label class="block text-sm font-medium mb-1">App ID</label>
+            <input type="text" class="form-input w-full bg-slate-100 dark:bg-slate-900" value={appId} disabled />
+          </div>
+          <div class="mb-3">
+            <label class="block text-sm font-medium mb-1">Redirect URI</label>
+            <input type="text" class="form-input w-full text-xs bg-slate-100 dark:bg-slate-900" value={redirectUri} disabled />
+          </div>
+          <div class="mt-4 flex items-center">
+             <div class={`w-3 h-3 rounded-full mr-2 ${isConnected ? 'bg-emerald-500' : 'bg-rose-500'}`}></div>
+             <span class="text-sm font-medium">{isConnected ? 'Conexión Activa' : 'Desconectado'}</span>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+  </div>
+</AdminLayout>
+
+<script is:inline>
+  document.addEventListener('DOMContentLoaded', () => {
+    const btnSimular = document.getElementById('btnSimular');
+    const inputBase = document.getElementById('simPrecioBase');
+    const resultBox = document.getElementById('simResult');
+
+    btnSimular.addEventListener('click', async () => {
+      const basePrice = Number(inputBase.value);
+      if (!basePrice || basePrice <= 0) return;
+      
+      const configObj = {
+         commissionPct: document.querySelector('input[name="commissionPct"]').value,
+         extraMarginPct: document.querySelector('input[name="extraMarginPct"]').value,
+         installmentsCostPct: document.querySelector('input[name="installmentsCostPct"]').value,
+         threshold1: document.querySelector('input[name="threshold1"]').value,
+         amount1: document.querySelector('input[name="amount1"]').value,
+         threshold2: document.querySelector('input[name="threshold2"]').value,
+         amount2: document.querySelector('input[name="amount2"]').value,
+         threshold3: document.querySelector('input[name="threshold3"]').value,
+         amount3: document.querySelector('input[name="amount3"]').value,
+         roundingStrategy: document.querySelector('select[name="roundingStrategy"]').value
+      };
+
+      try {
+        // Obtenemos fixedCost
+        let fixedCost = 0;
+        if(basePrice <= Number(configObj.threshold1)) fixedCost = Number(configObj.amount1);
+        else if(basePrice <= Number(configObj.threshold2)) fixedCost = Number(configObj.amount2);
+        else if(basePrice <= Number(configObj.threshold3)) fixedCost = Number(configObj.amount3);
+        
+        const totalDeductionRate = (Number(configObj.commissionPct) + Number(configObj.extraMarginPct) + Number(configObj.installmentsCostPct)) / 100;
+        
+        if(totalDeductionRate >= 1) {
+          alert("Los porcentajes suman más de 100%, cálculo imposible.");
+          return;
+        }
+
+        let finalPrice = (basePrice + fixedCost) / (1 - totalDeductionRate);
+        if(configObj.roundingStrategy === 'ceil') finalPrice = Math.ceil(finalPrice);
+        else if(configObj.roundingStrategy === 'floor') finalPrice = Math.floor(finalPrice);
+        else finalPrice = Math.round(finalPrice);
+
+        const mlCommissionAmount = finalPrice * (Number(configObj.commissionPct)/100);
+        const extraMarginAmount = finalPrice * (Number(configObj.extraMarginPct)/100);
+        
+        const netReceived = finalPrice - (finalPrice * ((Number(configObj.commissionPct) + Number(configObj.installmentsCostPct))/100)) - fixedCost;
+
+        document.getElementById('simFijo').innerText = '$' + fixedCost.toFixed(2);
+        document.getElementById('simCom').innerText = '$' + mlCommissionAmount.toFixed(2);
+        document.getElementById('simMargen').innerText = '$' + extraMarginAmount.toFixed(2);
+        document.getElementById('simPriceResult').innerText = '$' + finalPrice.toFixed(0);
+        document.getElementById('simNet').innerText = '$' + netReceived.toFixed(2);
+
+        resultBox.classList.remove('hidden');
+      } catch (e) {
+        console.error(e);
+      }
+    });
+  });
+</script>

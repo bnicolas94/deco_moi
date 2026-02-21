@@ -1,0 +1,100 @@
+---
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import { db } from '../../../lib/db/connection';
+import { meliSyncLog, products } from '../../../lib/db/schema';
+import { eq, desc } from 'drizzle-orm';
+
+const logsData = await db
+  .select({
+    id: meliSyncLog.id,
+    type: meliSyncLog.type,
+    direction: meliSyncLog.direction,
+    status: meliSyncLog.status,
+    errorMessage: meliSyncLog.errorMessage,
+    createdAt: meliSyncLog.createdAt,
+    meliItemId: meliSyncLog.meliItemId,
+    meliOrderId: meliSyncLog.meliOrderId,
+    productName: products.name
+  })
+  .from(meliSyncLog)
+  .leftJoin(products, eq(meliSyncLog.productId, products.id))
+  .orderBy(desc(meliSyncLog.createdAt))
+  .limit(100);
+---
+
+<AdminLayout title="Logs de MercadoLibre">
+  <div class="px-4 sm:px-6 lg:px-8 py-8 w-full max-w-9xl mx-auto">
+    <div class="sm:flex sm:justify-between sm:items-center mb-8">
+      <div class="mb-4 sm:mb-0">
+        <h1 class="text-2xl md:text-3xl text-slate-800 dark:text-slate-100 font-bold">
+          Logs de Sincronización
+        </h1>
+      </div>
+      <div>
+         <a href="/admin/meli" class="btn bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600">Volver</a>
+      </div>
+    </div>
+
+    <!-- Lista de Logs ML -->
+    <div class="bg-white dark:bg-slate-800 shadow-lg rounded-sm border border-slate-200 dark:border-slate-700">
+      <div class="overflow-x-auto">
+        <table class="table-auto w-full dark:text-slate-300">
+          <thead class="text-xs font-semibold uppercase text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-900 border-t border-b border-slate-200 dark:border-slate-700">
+            <tr>
+              <th class="px-2 first:pl-5 last:pr-5 py-3 whitespace-nowrap"><div class="font-semibold text-left">Log ID</div></th>
+              <th class="px-2 first:pl-5 last:pr-5 py-3 whitespace-nowrap"><div class="font-semibold text-left">Fecha</div></th>
+              <th class="px-2 first:pl-5 last:pr-5 py-3 whitespace-nowrap"><div class="font-semibold text-left">Tipo</div></th>
+              <th class="px-2 first:pl-5 last:pr-5 py-3 whitespace-nowrap"><div class="font-semibold text-left">Entidad (ID / Nombre)</div></th>
+              <th class="px-2 first:pl-5 last:pr-5 py-3 whitespace-nowrap"><div class="font-semibold text-center">Estado</div></th>
+              <th class="px-2 first:pl-5 last:pr-5 py-3"><div class="font-semibold text-left">Detalles de Error</div></th>
+            </tr>
+          </thead>
+          <tbody class="text-sm divide-y divide-slate-200 dark:divide-slate-700">
+            {logsData.length === 0 ? (
+              <tr>
+                 <td colspan="6" class="px-2 py-4 text-center text-slate-500">El log está vacío.</td>
+              </tr>
+            ) : null}
+            {logsData.map((log) => (
+              <tr>
+                <td class="px-2 first:pl-5 last:pr-5 py-3 whitespace-nowrap">
+                  <div class="font-medium text-slate-800 dark:text-slate-100">#{log.id}</div>
+                </td>
+                <td class="px-2 first:pl-5 last:pr-5 py-3 whitespace-nowrap">
+                  {new Date(log.createdAt || '').toLocaleString('es-AR')}
+                </td>
+                <td class="px-2 first:pl-5 last:pr-5 py-3 whitespace-nowrap">
+                  <div class="capitalize text-slate-800 dark:text-slate-100">{log.type.replace('_', ' ')}</div>
+                  <div class="text-xs text-slate-500">{log.direction.toUpperCase()}</div>
+                </td>
+                <td class="px-2 first:pl-5 last:pr-5 py-3 whitespace-nowrap">
+                  {log.productName ? (
+                    <div><span class="text-slate-500">Producto:</span> {log.productName}</div>
+                  ) : null}
+                  {log.meliItemId ? (
+                    <div class="text-xs text-indigo-500">{log.meliItemId}</div>
+                  ) : null}
+                  {log.meliOrderId ? (
+                    <div class="text-xs text-slate-500">Orden: {log.meliOrderId}</div>
+                  ) : null}
+                </td>
+                <td class="px-2 first:pl-5 last:pr-5 py-3 whitespace-nowrap text-center">
+                   <div class={`inline-flex font-medium rounded-full text-center px-2.5 py-0.5 ${
+                     log.status === 'success' ? 'bg-emerald-100 text-emerald-600' :
+                     log.status === 'error' ? 'bg-rose-100 text-rose-600' :
+                     'bg-slate-100 text-slate-500'
+                   }`}>{log.status}</div>
+                </td>
+                <td class="px-2 first:pl-5 last:pr-5 py-3">
+                  <div class="text-rose-500 text-xs break-words max-w-sm">
+                    {log.errorMessage || '-'}
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</AdminLayout>

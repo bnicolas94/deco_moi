@@ -1,0 +1,164 @@
+---
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import { MeliService } from '../../../lib/services/MeliService';
+import { db } from '../../../lib/db/connection';
+import { meliCredentials, meliOrders, meliSyncLog } from '../../../lib/db/schema';
+import { eq, desc } from 'drizzle-orm';
+
+// Verificar conexión
+const creds = await db.select().from(meliCredentials).where(eq(meliCredentials.isActive, true)).limit(1);
+const isConnected = creds.length > 0;
+const credential = isConnected ? creds[0] : null;
+
+// Auth URL
+const authUrl = await MeliService.getAuthorizationUrl();
+
+// Obtener alertas desde request url (error o success)
+const url = new URL(Astro.request.url);
+const successMsg = url.searchParams.get('success');
+const errorMsg = url.searchParams.get('error');
+
+// Métricas de ventas en DB (Solo si conectado)
+let totalSalesML = 0;
+let ordersCountML = 0;
+let recentOrders: any[] = [];
+let recentLogs: any[] = [];
+
+if (isConnected) {
+  const allOrders = await db.select().from(meliOrders).orderBy(desc(meliOrders.dateCreated));
+  ordersCountML = allOrders.length;
+  totalSalesML = allOrders.reduce((acc, order) => acc + Number(order.totalAmount), 0);
+  recentOrders = allOrders.slice(0, 5);
+  
+  recentLogs = await db.select().from(meliSyncLog).orderBy(desc(meliSyncLog.createdAt)).limit(5);
+}
+
+---
+
+<AdminLayout title="Dashboard MercadoLibre">
+  <div class="px-4 sm:px-6 lg:px-8 py-8 w-full max-w-9xl mx-auto">
+    
+    <!-- Page header -->
+    <div class="sm:flex sm:justify-between sm:items-center mb-8">
+      <div class="mb-4 sm:mb-0">
+        <h1 class="text-2xl md:text-3xl text-slate-800 dark:text-slate-100 font-bold">
+          Integración MercadoLibre ✨
+        </h1>
+      </div>
+      
+      <!-- Menú de la sección ML -->
+      <div class="flex gap-2">
+        <a href="/admin/meli/configuracion" class="btn bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600">Configuración</a>
+        <a href="/admin/meli/publicaciones" class="btn bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600">Publicaciones</a>
+        <a href="/admin/meli/ordenes" class="btn bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600">Órdenes</a>
+      </div>
+    </div>
+
+    <!-- Alertas -->
+    {successMsg === 'auth_ok' && (
+      <div class="mb-6 bg-emerald-100 text-emerald-700 px-4 py-3 rounded-sm border border-emerald-200">
+        ¡Credenciales de MercadoLibre guardadas correctamente! Ya estás conectado.
+      </div>
+    )}
+    {errorMsg && (
+      <div class="mb-6 bg-rose-100 text-rose-700 px-4 py-3 rounded-sm border border-rose-200">
+        Hubo un error con la autenticación: {errorMsg}
+      </div>
+    )}
+
+    <!-- Cards -->
+    <div class="grid grid-cols-12 gap-6 mb-8">
+      
+      <!-- Estado Conexión Card -->
+      <div class="flex flex-col col-span-full sm:col-span-6 xl:col-span-4 bg-white dark:bg-slate-800 shadow-lg rounded-sm border border-slate-200 dark:border-slate-700 p-5">
+        <header class="mb-2">
+          <h2 class="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-2">Estado de Conexión</h2>
+        </header>
+        <div class="flex-grow flex flex-col justify-center">
+          {isConnected ? (
+             <div>
+               <div class="flex items-center text-emerald-500 mb-4">
+                 <svg class="w-6 h-6 fill-current mr-2" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" /></svg>
+                 <span class="font-bold">Conectado</span>
+               </div>
+               <p class="text-sm text-slate-500 dark:text-slate-400 mb-4">User ID: {credential?.mlUserId}</p>
+               <form method="POST" action="/api/meli/disconnect" class="mt-auto">
+                 <button type="submit" class="text-sm text-rose-500 hover:underline">Desconectar cuenta</button>
+               </form>
+             </div>
+          ) : (
+             <div>
+               <div class="flex items-center text-slate-400 dark:text-slate-500 mb-4">
+                 <svg class="w-6 h-6 fill-current mr-2" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13h2v6h-2zm0 8h2v2h-2z" /></svg>
+                 <span class="font-bold">Desconectado</span>
+               </div>
+               <p class="text-sm text-slate-500 dark:text-slate-400 mb-4">Debes conectar una cuenta de MercadoLibre para sincronizar productos.</p>
+               <a href={authUrl} class="btn bg-blue-600 hover:bg-blue-700 text-white w-full">Conectar cuenta ML</a>
+             </div>
+          )}
+        </div>
+      </div>
+
+      <!-- Métricas Cards -->
+      <div class="flex flex-col col-span-full sm:col-span-6 xl:col-span-4 bg-white dark:bg-slate-800 shadow-lg rounded-sm border border-slate-200 dark:border-slate-700 p-5">
+        <h2 class="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-2">Ventas ML (Mes)</h2>
+        <div class="text-3xl font-bold text-slate-800 dark:text-slate-100 mr-2">${totalSalesML.toLocaleString()} ARS</div>
+        <div class="text-sm text-slate-500 dark:text-slate-400 mt-2">{ordersCountML} órdenes ingresadas</div>
+      </div>
+      
+      <div class="flex flex-col col-span-full sm:col-span-6 xl:col-span-4 bg-white dark:bg-slate-800 shadow-lg rounded-sm border border-slate-200 dark:border-slate-700 p-5">
+         <h2 class="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-2">Ticket Promedio ML</h2>
+         <div class="text-3xl font-bold text-slate-800 dark:text-slate-100 mr-2">
+           ${ordersCountML > 0 ? (totalSalesML / ordersCountML).toLocaleString() : '0'} ARS
+         </div>
+      </div>
+
+    </div>
+
+    <!-- Actividad Reciente -->
+    {isConnected && (
+      <div class="grid grid-cols-12 gap-6">
+        <div class="col-span-full xl:col-span-6 bg-white dark:bg-slate-800 shadow-lg rounded-sm border border-slate-200 dark:border-slate-700">
+          <header class="px-5 py-4 border-b border-slate-100 dark:border-slate-700">
+            <h2 class="font-semibold text-slate-800 dark:text-slate-100">Últimas 5 Órdenes ML</h2>
+          </header>
+          <div class="p-3">
+             {recentOrders.length === 0 ? (
+               <p class="text-sm text-center py-4 text-slate-500">No hay órdenes importadas</p>
+             ) : (
+               <ul class="space-y-3">
+                 {recentOrders.map((ro) => (
+                   <li class="flex justify-between items-center text-sm">
+                     <span class="font-medium text-slate-800 dark:text-slate-100">#{ro.meliOrderId}</span>
+                     <span class="text-emerald-500 font-medium">${Number(ro.totalAmount).toLocaleString()}</span>
+                   </li>
+                 ))}
+               </ul>
+             )}
+          </div>
+        </div>
+
+        <div class="col-span-full xl:col-span-6 bg-white dark:bg-slate-800 shadow-lg rounded-sm border border-slate-200 dark:border-slate-700">
+          <header class="px-5 py-4 border-b border-slate-100 dark:border-slate-700">
+            <h2 class="font-semibold text-slate-800 dark:text-slate-100">Registro de Sync Reciente</h2>
+          </header>
+          <div class="p-3">
+             {recentLogs.length === 0 ? (
+               <p class="text-sm text-center py-4 text-slate-500">No hay sincronizaciones recientes</p>
+             ) : (
+               <ul class="space-y-3">
+                 {recentLogs.map((log) => (
+                   <li class="flex justify-between items-center text-sm">
+                     <span class="text-slate-600 dark:text-slate-400 capitalize">{log.type.replace('_', ' ')}</span>
+                     <span class={`font-medium ${log.status === 'success' ? 'text-emerald-500' : 'text-rose-500'}`}>{log.status}</span>
+                   </li>
+                 ))}
+               </ul>
+             )}
+          </div>
+        </div>
+      </div>
+    )}
+
+  </div>
+</AdminLayout>

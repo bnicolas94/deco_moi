@@ -1,0 +1,137 @@
+---
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import { db } from '../../../lib/db/connection';
+import { meliItemLinks, products } from '../../../lib/db/schema';
+import { eq, desc } from 'drizzle-orm';
+
+// Cargar productos y sus links ML
+const allLinks = await db
+  .select({
+    linkId: meliItemLinks.id,
+    productId: products.id,
+    productName: products.name,
+    productSku: products.sku,
+    basePrice: products.basePrice,
+    meliItemId: meliItemLinks.meliItemId,
+    meliTitle: meliItemLinks.meliTitle,
+    syncEnabled: meliItemLinks.syncEnabled,
+    lastSyncedPrice: meliItemLinks.lastSyncedPrice,
+    lastSyncAt: meliItemLinks.lastSyncAt,
+  })
+  .from(meliItemLinks)
+  .leftJoin(products, eq(meliItemLinks.productId, products.id))
+  .orderBy(desc(meliItemLinks.createdAt));
+
+---
+
+<AdminLayout title="Publicaciones MercadoLibre">
+  <div class="px-4 sm:px-6 lg:px-8 py-8 w-full max-w-9xl mx-auto">
+    <div class="sm:flex sm:justify-between sm:items-center mb-8">
+      <div class="mb-4 sm:mb-0">
+        <h1 class="text-2xl md:text-3xl text-slate-800 dark:text-slate-100 font-bold">
+          Publicaciones Vinculadas
+        </h1>
+      </div>
+      <div class="flex gap-2">
+         <a href="/admin/meli" class="btn bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600">Volver</a>
+      </div>
+    </div>
+
+    <!-- Filtros mockups -->
+    <div class="mb-4 sm:flex items-center justify-between">
+      <div class="mb-4 sm:mb-0">
+        <input id="searchInput" class="form-input w-full sm:w-80" type="search" placeholder="Buscar por SKU o Producto..." />
+      </div>
+      <div>
+         <button id="btnSyncAll" class="btn bg-indigo-500 hover:bg-indigo-600 text-white">Sincronizar Todas (Demo)</button>
+      </div>
+    </div>
+
+    <div class="bg-white dark:bg-slate-800 shadow-lg rounded-sm border border-slate-200 dark:border-slate-700 relative">
+      <div class="overflow-x-auto">
+        <table class="table-auto w-full dark:text-slate-300">
+          <thead class="text-xs font-semibold uppercase text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-900 border-t border-b border-slate-200 dark:border-slate-700">
+            <tr>
+              <th class="px-2 first:pl-5 last:pr-5 py-3 whitespace-nowrap"><div class="font-semibold text-left">Producto</div></th>
+              <th class="px-2 first:pl-5 last:pr-5 py-3 whitespace-nowrap"><div class="font-semibold text-left">Item ID (ML)</div></th>
+              <th class="px-2 first:pl-5 last:pr-5 py-3 whitespace-nowrap"><div class="font-semibold text-left">Precio Base</div></th>
+              <th class="px-2 first:pl-5 last:pr-5 py-3 whitespace-nowrap"><div class="font-semibold text-left">Último Precio ML</div></th>
+              <th class="px-2 first:pl-5 last:pr-5 py-3 whitespace-nowrap"><div class="font-semibold text-center">Sync</div></th>
+              <th class="px-2 first:pl-5 last:pr-5 py-3 whitespace-nowrap"><div class="font-semibold text-center">Acciones</div></th>
+            </tr>
+          </thead>
+          <tbody class="text-sm divide-y divide-slate-200 dark:divide-slate-700">
+            {allLinks.length === 0 ? (
+              <tr>
+                 <td colspan="6" class="px-2 py-4 text-center text-slate-500">No hay productos vinculados actualmente. Debes editar un producto para vincular su ML Item ID.</td>
+              </tr>
+            ) : null}
+            {allLinks.map((link) => (
+              <tr>
+                <td class="px-2 first:pl-5 last:pr-5 py-3 whitespace-nowrap">
+                  <div class="font-medium text-slate-800 dark:text-slate-100">{link.productName}</div>
+                  <div class="text-xs text-slate-500">SKU: {link.productSku || 'N/A'}</div>
+                </td>
+                <td class="px-2 first:pl-5 last:pr-5 py-3 whitespace-nowrap">
+                  <a href={`https://articulo.mercadolibre.com.ar/${link.meliItemId}`} target="_blank" class="text-indigo-500 hover:text-indigo-600 underline">
+                    {link.meliItemId}
+                  </a>
+                </td>
+                <td class="px-2 first:pl-5 last:pr-5 py-3 whitespace-nowrap">
+                  ${link.basePrice}
+                </td>
+                <td class="px-2 first:pl-5 last:pr-5 py-3 whitespace-nowrap">
+                  {link.lastSyncedPrice ? `$${link.lastSyncedPrice}` : 'N/A'}
+                  <div class="text-[10px] text-slate-400 max-w-28 truncate" title={link.lastSyncAt?.toISOString()}>
+                    {link.lastSyncAt ? new Date(link.lastSyncAt).toLocaleString('es-AR') : 'Nunca'}
+                  </div>
+                </td>
+                <td class="px-2 first:pl-5 last:pr-5 py-3 whitespace-nowrap text-center">
+                  {link.syncEnabled ? (
+                    <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium bg-emerald-100 text-emerald-800">Activo</span>
+                  ) : (
+                    <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium bg-rose-100 text-rose-800">Inactivo</span>
+                  )}
+                </td>
+                <td class="px-2 first:pl-5 last:pr-5 py-3 whitespace-nowrap text-center">
+                  <button class="text-indigo-500 hover:text-indigo-600 text-sm sync-btn" data-id={link.productId}>
+                    Sincronizar Precio
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</AdminLayout>
+
+<script is:inline>
+  document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('.sync-btn').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        const productId = e.target.getAttribute('data-id');
+        e.target.innerText = 'Sincronizando...';
+        try {
+          const res = await fetch('/api/meli/sync-price', {
+             method: 'POST',
+             headers: { 'Content-Type': 'application/json' },
+             body: JSON.stringify({ productId })
+          });
+          const data = await res.json();
+          if(data.success) {
+            alert('Sincronizado correctamente');
+            window.location.reload();
+          } else {
+            alert('Error: ' + data.error);
+            e.target.innerText = 'Sincronizar Precio';
+          }
+        } catch(err) {
+          alert('Error de red');
+          e.target.innerText = 'Sincronizar Precio';
+        }
+      });
+    });
+  });
+</script>
