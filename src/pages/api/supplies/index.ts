@@ -76,6 +76,7 @@ const supplySchema = z.object({
     packQuantity: z.number().optional().nullable(),
     parentId: z.number().optional().nullable(),
     yieldRatio: z.number().optional().nullable(),
+    minStock: z.number().optional().default(20),
     // Phase 15
     components: z.array(componentSchema).optional()
 });
@@ -87,6 +88,7 @@ export const POST: APIRoute = async ({ request }) => {
             ...data,
             unitCost: parseFloat(data.unitCost),
             stock: parseInt(data.stock) || 0,
+            minStock: data.minStock ? parseInt(data.minStock) : 20,
             packPrice: data.packPrice ? parseFloat(data.packPrice) : null,
             packQuantity: data.packQuantity ? parseFloat(data.packQuantity) : null,
             parentId: data.parentId ? parseInt(data.parentId) : null,
@@ -103,6 +105,7 @@ export const POST: APIRoute = async ({ request }) => {
             unit: parsed.unit,
             unitCost: parsed.unitCost.toString(),
             stock: parsed.stock,
+            minStock: parsed.minStock,
             supplier: parsed.supplier,
             link: parsed.link,
             notes: parsed.notes,

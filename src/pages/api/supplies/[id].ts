@@ -16,6 +16,7 @@ export const PUT: APIRoute = async ({ request, params }) => {
         if (data.unit !== undefined) updateData.unit = data.unit;
         if (data.unitCost !== undefined) updateData.unitCost = parseFloat(data.unitCost).toString();
         if (data.stock !== undefined) updateData.stock = parseInt(data.stock);
+        if (data.minStock !== undefined) updateData.minStock = parseInt(data.minStock);
         if (data.supplier !== undefined) updateData.supplier = data.supplier;
         if (data.link !== undefined) updateData.link = data.link;
         if (data.notes !== undefined) updateData.notes = data.notes;

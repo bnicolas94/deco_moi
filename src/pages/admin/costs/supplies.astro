@@ -278,6 +278,10 @@ const CATEGORIES = [
                                     <label class="block text-xs font-black text-gray-500 uppercase tracking-wider">Stock Actual</label>
                                     <input type="number" id="f-stock" min="0" placeholder="0" class="block w-full rounded-2xl border-gray-100 bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-50 font-mono font-bold sm:text-sm h-12 border transition-all px-4" />
                                 </div>
+                                <div class="space-y-2">
+                                    <label class="block text-xs font-black text-gray-500 uppercase tracking-wider">Stock Mínimo (Alerta)</label>
+                                    <input type="number" id="f-min-stock" min="0" placeholder="Ej: 20" class="block w-full rounded-2xl border-gray-100 bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-50 font-mono font-bold sm:text-sm h-12 border transition-all px-4" />
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -392,7 +396,7 @@ const CATEGORIES = [
         function renderStats() {
             const total = supplies.length;
             const active = supplies.filter(s => s.isActive).length;
-            const lowStock = supplies.filter(s => s.stock > 0 && s.stock < 20).length;
+            const lowStock = supplies.filter(s => s.stock > 0 && s.stock < (s.minStock ?? 20)).length;
             const avgCost = supplies.length ? supplies.reduce((a, s) => a + parseFloat(s.unitCost || 0), 0) / supplies.length : 0;
 
             document.getElementById('stats-row').innerHTML = `
@@ -448,18 +452,162 @@ const CATEGORIES = [
             });
         }
 
+        function renderRow(s, depth = 0, parentData = {}) {
+            const children = supplies.filter(child => { // Changed from state.rawSupplies to supplies
+                if (child.parentId === s.id) return true;
+                if (child.components && child.components.length > 0 && child.components[0].parentId === s.id) return true;
+                return false;
+            });
+            const hasChildren = children.length > 0;
+            const isComposite = s.components && s.components.length > 1;
+            const cat = CATEGORY_MAP[s.category];
+            const isLowStock = s.stock > 0 && s.stock < (s.minStock ?? 20);
+
+            // Inheritance logic
+            const effectiveSupplier = s.supplier || parentData.supplier || '';
+            const effectiveLink = s.link || parentData.link || '';
+
+            let rowHtml = `
+                <tr class="${depth === 0 ? 'item-row' : 'child-row hidden group/child'} hover:bg-gray-50/70 transition-colors ${s.isActive ? '' : 'opacity-60 bg-gray-50/30'} ${hasChildren ? 'cursor-pointer group/parent' : ''} ${depth > 0 ? 'bg-gray-50/20' : ''}" 
+                    data-id="${s.id}" 
+                    ${depth === 0 ? 'data-type="parent"' : `data-parent-of-group="${parentData.id}"`}>
+                    <td class="p-5 ${depth === 0 ? 'pl-8' : ''}" style="padding-left: ${depth * 32 + (depth === 0 ? 32 : 64)}px">
+                        <div class="flex items-center gap-3">
+                            ${hasChildren ? `
+                                <div class="w-6 h-6 flex items-center justify-center rounded-lg bg-gray-100 group-hover/parent:bg-indigo-100 transition-colors toggle-children" data-parent-id="${s.id}">
+                                    <svg class="w-3.5 h-3.5 text-gray-500 group-hover/parent:text-indigo-600 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="4" d="M9 5l7 7-7 7"></path></svg>
+                                </div>
+                            ` : depth > 0 ? '<div class="w-4 h-0.5 bg-gray-200"></div>' : '<div class="w-6"></div>'}
+                            <div>
+                                <div class="flex items-center gap-2">
+                                    <div class="font-black text-gray-900 ${depth === 0 ? 'text-sm' : 'text-xs'} leading-tight">${s.name}</div>
+                                    ${isComposite ? '<span class="px-1.5 py-0.5 rounded-lg bg-indigo-50 text-indigo-500 text-[8px] font-black uppercase tracking-tighter" title="Insumo compuesto por varias partes">🧩 Compuesto</span>' : ''}
+                                </div>
+                                <div class="flex flex-col gap-0.5 mt-1">
+                                    ${effectiveSupplier ? `<div class="text-[9px] text-gray-400 font-black uppercase tracking-widest">${effectiveSupplier}</div>` : ''}
+                                    ${depth > 0 ? `
+                                        <div class="text-[8px] text-gray-400 uppercase font-bold tracking-widest">
+                                            ${s.parentId === parentData.id ? `Rinde x${parseFloat(s.yieldRatio || 1)}` : `Parte de composición (x${parseFloat(s.components[0].yieldRatio || 1)})`} 
+                                            del padre
+                                        </div>
+                                    ` : ''}
+                                </div>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="p-5">
+                        <span class="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white text-[10px] font-black uppercase tracking-wider text-gray-500 border border-gray-100 shadow-sm">
+                            ${cat ? cat.icon : ''} ${cat ? cat.label : s.category}
+                        </span>
+                    </td>
+                    <td class="p-5">
+                        <span class="font-mono text-xs font-black text-gray-400 bg-gray-100 px-2 py-0.5 rounded-lg">${s.unit}</span>
+                    </td>
+                    <td class="p-5">
+                        <span class="font-mono text-sm font-black text-indigo-600">${fmt(s.unitCost)}</span>
+                    </td>
+                    <td class="p-5 whitespace-nowrap">
+                        <span class="font-mono text-xs font-bold text-gray-500">${s.packPrice ? fmt(s.packPrice) : '-'}</span>
+                    </td>
+                    <td class="p-5">
+                        <div class="flex items-center gap-2">
+                            <span class="font-mono text-sm font-bold tabular-nums ${isLowStock ? 'text-rose-600' : 'text-gray-700'}">${Number(s.stock || 0).toLocaleString('es-AR')}</span>
+                            ${isLowStock ? '<span class="text-rose-500 animate-pulse text-xs">⚠️</span>' : ''}
+                        </div>
+                    </td>
+                    <td class="p-5">
+                        <span class="text-[9px] font-black text-gray-400 uppercase tracking-tighter tabular-nums">${new Date(s.updatedAt).toLocaleDateString()}</span>
+                    </td>
+                    <td class="p-5">
+                        <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-[0.1em] ${s.isActive ? 'bg-emerald-50 text-emerald-600' : 'bg-gray-100 text-gray-400'}">
+                            <span class="w-1.5 h-1.5 rounded-full ${s.isActive ? 'bg-emerald-500' : 'bg-gray-400 shadow-inner'}"></span>
+                            ${s.isActive ? 'Activo' : 'Inactivo'}
+                        </span>
+                    </td>
+                    <td class="p-5 pr-8 text-right">
+                        <div class="flex items-center justify-end gap-1 ${depth > 0 ? 'opacity-0 group-hover/child:opacity-100 transition-opacity' : ''}">
+                            ${effectiveLink ? `
+                                <a href="${effectiveLink}" target="_blank" class="p-2.5 text-gray-400 hover:text-indigo-600 hover:bg-white hover:shadow-sm rounded-xl transition-all border border-transparent hover:border-indigo-50" title="Ver enlace">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
+                                </a>` : ''}
+                            <button class="p-2.5 text-gray-400 hover:text-indigo-600 hover:bg-white hover:shadow-sm rounded-xl transition-all border border-transparent hover:border-indigo-50 btn-edit" data-id="${s.id}" title="Editar">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
+                            </button>
+                            <button class="p-2.5 text-gray-400 hover:text-rose-600 hover:bg-white hover:shadow-sm rounded-xl transition-all border border-transparent hover:border-rose-50 btn-delete" data-id="${s.id}" title="Eliminar">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            `;
+
+            if (hasChildren) {
+                children.forEach(c => {
+                    rowHtml += renderRow(c, depth + 1, { id: s.id, supplier: effectiveSupplier, link: effectiveLink });
+                });
+            }
+
+            return rowHtml;
+        }
+
+        function updatePagination(totalRoots, totalFiltered) {
+            const start = (state.page - 1) * state.perPage;
+            const totalPages = Math.ceil(totalRoots / state.perPage);
+            const pag = document.getElementById('pagination');
+            if (totalPages <= 1) { pag.innerHTML = ''; }
+            
+            if (totalPages > 1) {
+                let pagHtml = `
+                    <button class="w-10 h-10 flex items-center justify-center rounded-xl border border-gray-100 bg-white text-gray-400 hover:text-indigo-600 hover:shadow-md transition-all disabled:opacity-30 disabled:pointer-events-none active:scale-90" id="pag-prev" ${state.page === 1 ? 'disabled' : ''}>
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M15 19l-7-7 7-7"></path></svg>
+                    </button>
+                `;
+                for (let i = 1; i <= totalPages; i++) {
+                    pagHtml += `
+                        <button class="w-10 h-10 flex items-center justify-center rounded-xl border text-[11px] font-black transition-all active:scale-90 ${i === state.page ? 'border-indigo-600 bg-indigo-600 text-white shadow-xl shadow-indigo-100' : 'border-gray-100 bg-white text-gray-400 hover:text-gray-900 hover:shadow-md'}" data-page="${i}">${i}</button>
+                    `;
+                }
+                pagHtml += `
+                    <button class="w-10 h-10 flex items-center justify-center rounded-xl border border-gray-100 bg-white text-gray-400 hover:text-indigo-600 hover:shadow-md transition-all disabled:opacity-30 disabled:pointer-events-none active:scale-90" id="pag-next" ${state.page === totalPages ? 'disabled' : ''}>
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M9 5l7 7-7 7"></path></svg>
+                    </button>
+                `;
+                pag.innerHTML = pagHtml;
+
+                pag.querySelector('#pag-prev')?.addEventListener('click', () => { state.page--; renderTable(); });
+                pag.querySelector('#pag-next')?.addEventListener('click', () => { state.page++; renderTable(); });
+                pag.querySelectorAll('[data-page]').forEach(btn => {
+                    btn.addEventListener('click', () => { state.page = parseInt(btn.dataset.page); renderTable(); });
+                });
+            }
+
+            const endIdx = Math.min(start + state.perPage, totalRoots);
+            document.getElementById('table-info').textContent =
+                totalRoots === 0 ? 'Sin resultados' :
+                `${start + 1}–${endIdx} DE ${totalFiltered} EN TOTAL`;
+        }
+
         function renderTable() {
             const filtered = getFiltered();
-            const total = filtered.length;
+            
+            // UI Hierarchical Logic: 
+            // 1. Identify ALL roots in the filtered set
+            const roots = filtered.filter(s => {
+                const hasLegacyParent = !!s.parentId && filtered.some(p => p.id === s.parentId);
+                const hasCompParent = s.components && s.components.length > 0 && filtered.some(p => p.id === s.components[0].parentId);
+                return !hasLegacyParent && !hasCompParent;
+            });
+
+            // 2. Paginate the ROOTS
             const start = (state.page - 1) * state.perPage;
-            const pageItems = filtered.slice(start, start + state.perPage);
+            const pagedRoots = roots.slice(start, start + state.perPage);
 
             const tbody = document.getElementById('table-body');
 
-            if (pageItems.length === 0) {
+            if (pagedRoots.length === 0) {
                 tbody.innerHTML = `
                     <tr>
-                        <td colspan="8" class="p-24 text-center">
+                        <td colspan="9" class="p-24 text-center">
                             <div class="flex flex-col items-center gap-4 text-gray-300">
                                 <div class="p-6 bg-gray-50 rounded-full">
                                     <svg class="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707.293l-2.414-2.414A1 1 0 006.586 13H4"></path></svg>
@@ -471,144 +619,14 @@ const CATEGORIES = [
                 return;
             }
 
-            // UI Hierarchical Logic: 
-            // Identify roots (items whose designated primary parent is not in the current list)
-            const roots = pageItems.filter(s => {
-                const hasLegacyParent = !!s.parentId && pageItems.some(p => p.id === s.parentId);
-                const hasCompParent = s.components && s.components.length > 0 && pageItems.some(p => p.id === s.components[0].parentId);
-                return !hasLegacyParent && !hasCompParent;
-            });
-            const itemsToRender = roots;
-
             let html = '';
-            itemsToRender.forEach(s => {
-                const children = pageItems.filter(child => {
-                    if (child.parentId === s.id) return true;
-                    if (child.components && child.components.length > 0 && child.components[0].parentId === s.id) return true;
-                    return false;
-                });
-                const hasChildren = children.length > 0;
-                const isComposite = s.components && s.components.length > 1;
-                const cat = CATEGORY_MAP[s.category];
-                const isLowStock = s.stock > 0 && s.stock < 20;
-
-                html += `
-                    <tr class="item-row hover:bg-gray-50/70 transition-colors ${s.isActive ? '' : 'opacity-60 bg-gray-50/30'} ${hasChildren ? 'cursor-pointer group/parent' : ''}" data-id="${s.id}" data-type="parent">
-                        <td class="p-5 pl-8">
-                            <div class="flex items-center gap-3">
-                                ${hasChildren ? `
-                                    <div class="w-6 h-6 flex items-center justify-center rounded-lg bg-gray-100 group-hover/parent:bg-indigo-100 transition-colors toggle-children" data-parent-id="${s.id}">
-                                        <svg class="w-3.5 h-3.5 text-gray-500 group-hover/parent:text-indigo-600 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="4" d="M9 5l7 7-7 7"></path></svg>
-                                    </div>
-                                ` : '<div class="w-6"></div>'}
-                                <div>
-                                    <div class="flex items-center gap-2">
-                                        <div class="font-black text-gray-900 text-sm leading-tight">${s.name}</div>
-                                        ${isComposite ? '<span class="px-1.5 py-0.5 rounded-lg bg-indigo-50 text-indigo-500 text-[8px] font-black uppercase tracking-tighter" title="Insumo compuesto por varias partes">🧩 Compuesto</span>' : ''}
-                                    </div>
-                                    ${s.supplier ? `<div class="text-[9px] text-gray-400 font-black uppercase tracking-widest mt-1">${s.supplier}</div>` : ''}
-                                </div>
-                            </div>
-                        </td>
-                        <td class="p-5">
-                            <span class="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white text-[10px] font-black uppercase tracking-wider text-gray-500 border border-gray-100 shadow-sm">
-                                ${cat ? cat.icon : ''} ${cat ? cat.label : s.category}
-                            </span>
-                        </td>
-                        <td class="p-5">
-                            <span class="font-mono text-xs font-black text-gray-400 bg-gray-100 px-2 py-0.5 rounded-lg">${s.unit}</span>
-                        </td>
-                        <td class="p-5">
-                            <span class="font-mono text-sm font-black text-indigo-600">${fmt(s.unitCost)}</span>
-                        </td>
-                        <td class="p-5 whitespace-nowrap">
-                            <span class="font-mono text-xs font-bold text-gray-500">${s.packPrice ? fmt(s.packPrice) : '-'}</span>
-                        </td>
-                        <td class="p-5">
-                            <div class="flex items-center gap-2">
-                                <span class="font-mono text-sm font-bold tabular-nums ${isLowStock ? 'text-rose-600' : 'text-gray-700'}">${Number(s.stock || 0).toLocaleString('es-AR')}</span>
-                                ${isLowStock ? '<span class="text-rose-500 animate-pulse text-xs">⚠️</span>' : ''}
-                            </div>
-                        </td>
-                        <td class="p-5">
-                            <span class="text-[9px] font-black text-gray-400 uppercase tracking-tighter tabular-nums">${new Date(s.updatedAt).toLocaleDateString()}</span>
-                        </td>
-                        <td class="p-5">
-                            <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-[0.1em] ${s.isActive ? 'bg-emerald-50 text-emerald-600' : 'bg-gray-100 text-gray-400'}">
-                                <span class="w-1.5 h-1.5 rounded-full ${s.isActive ? 'bg-emerald-500' : 'bg-gray-400 shadow-inner'}"></span>
-                                ${s.isActive ? 'Activo' : 'Inactivo'}
-                            </span>
-                        </td>
-                        <td class="p-5 pr-8 text-right">
-                            <div class="flex items-center justify-end gap-1">
-                                ${s.link ? `
-                                    <a href="${s.link}" target="_blank" class="p-2.5 text-gray-400 hover:text-indigo-600 hover:bg-white hover:shadow-sm rounded-xl transition-all border border-transparent hover:border-indigo-50" title="Ver enlace">
-                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
-                                    </a>` : ''}
-                                <button class="p-2.5 text-gray-400 hover:text-indigo-600 hover:bg-white hover:shadow-sm rounded-xl transition-all border border-transparent hover:border-indigo-50 btn-edit" data-id="${s.id}" title="Editar">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
-                                </button>
-                                <button class="p-2.5 text-gray-400 hover:text-rose-600 hover:bg-white hover:shadow-sm rounded-xl transition-all border border-transparent hover:border-rose-50 btn-delete" data-id="${s.id}" title="Eliminar">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                                </button>
-                            </div>
-                        </td>
-                    </tr>
-                `;
-
-                if (hasChildren) {
-                    children.forEach(c => {
-                        const childCat = CATEGORY_MAP[c.category];
-                        html += `
-                            <tr class="child-row group/child hidden transition-all duration-300 bg-gray-50/20" data-parent-of-group="${s.id}">
-                                <td class="p-4 pl-16">
-                                    <div class="flex items-center gap-3">
-                                        <div class="w-4 h-0.5 bg-gray-200"></div>
-                                        <div>
-                                            <div class="font-bold text-gray-700 text-xs">${c.name}</div>
-                                            <div class="text-[8px] text-gray-400 uppercase font-bold tracking-widest mt-0.5">
-                                                ${c.parentId === s.id ? `Rinde x${parseFloat(c.yieldRatio || 1)}` : `Parte de composición (x${parseFloat(c.components[0].yieldRatio || 1)})`} 
-                                                del padre
-                                            </div>
-                                        </div>
-                                    </div>
-                                </td>
-                                <td class="p-4">
-                                     <span class="text-[9px] font-bold uppercase text-gray-400">${childCat?.label || c.category}</span>
-                                </td>
-                                <td class="p-4">
-                                    <span class="font-mono text-[10px] text-gray-400">${c.unit}</span>
-                                </td>
-                                <td class="p-4">
-                                    <span class="font-mono text-xs font-bold text-indigo-500">${fmt(c.unitCost)}</span>
-                                </td>
-                                <td class="p-4 whitespace-nowrap">
-                                    <span class="font-mono text-[10px] text-gray-400">${c.packPrice ? fmt(c.packPrice) : '-'}</span>
-                                </td>
-                                <td class="p-4 text-xs tabular-nums text-gray-500">
-                                    ${Number(c.stock || 0)}
-                                </td>
-                                <td class="p-4"></td>
-                                <td class="p-4"></td>
-                                <td class="p-4 pr-8 text-right">
-                                    <div class="flex items-center justify-end gap-1 opacity-0 group-hover/child:opacity-100 transition-opacity">
-                                        <button class="p-2 text-gray-400 hover:text-indigo-600 btn-edit" data-id="${c.id}">
-                                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
-                                        </button>
-                                        <button class="p-2 text-gray-400 hover:text-rose-600 btn-delete" data-id="${c.id}">
-                                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>
-                        `;
-                    });
-                }
+            pagedRoots.forEach(root => {
+                html += renderRow(root);
             });
-
+            
             tbody.innerHTML = html;
+            updatePagination(roots.length, filtered.length);
 
-            // Expand logic
             tbody.querySelectorAll('.item-row[data-type="parent"]').forEach(row => {
                 row.addEventListener('click', (e) => {
                     // Don't toggle if clicking buttons
@@ -658,37 +676,6 @@ const CATEGORIES = [
                 });
             });
 
-            const endIdx = Math.min(start + state.perPage, total);
-            document.getElementById('table-info').textContent =
-                total === 0 ? 'Sin resultados' :
-                `${start + 1}–${endIdx} DE ${total} INSUMOS`;
-
-            const totalPages = Math.ceil(total / state.perPage);
-            const pag = document.getElementById('pagination');
-            if (totalPages <= 1) { pag.innerHTML = ''; return; }
-            
-            let pagHtml = `
-                <button class="w-10 h-10 flex items-center justify-center rounded-xl border border-gray-100 bg-white text-gray-400 hover:text-indigo-600 hover:shadow-md transition-all disabled:opacity-30 disabled:pointer-events-none active:scale-90" id="pag-prev" ${state.page === 1 ? 'disabled' : ''}>
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M15 19l-7-7 7-7"></path></svg>
-                </button>
-            `;
-            for (let i = 1; i <= totalPages; i++) {
-                pagHtml += `
-                    <button class="w-10 h-10 flex items-center justify-center rounded-xl border text-[11px] font-black transition-all active:scale-90 ${i === state.page ? 'border-indigo-600 bg-indigo-600 text-white shadow-xl shadow-indigo-100' : 'border-gray-100 bg-white text-gray-400 hover:text-gray-900 hover:shadow-md'}" data-page="${i}">${i}</button>
-                `;
-            }
-            pagHtml += `
-                <button class="w-10 h-10 flex items-center justify-center rounded-xl border border-gray-100 bg-white text-gray-400 hover:text-indigo-600 hover:shadow-md transition-all disabled:opacity-30 disabled:pointer-events-none active:scale-90" id="pag-next" ${state.page === totalPages ? 'disabled' : ''}>
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M9 5l7 7-7 7"></path></svg>
-                </button>
-            `;
-            pag.innerHTML = pagHtml;
-
-            pag.querySelector('#pag-prev')?.addEventListener('click', () => { state.page--; renderTable(); });
-            pag.querySelector('#pag-next')?.addEventListener('click', () => { state.page++; renderTable(); });
-            pag.querySelectorAll('[data-page]').forEach(btn => {
-                btn.addEventListener('click', () => { state.page = parseInt(btn.dataset.page); renderTable(); });
-            });
         }
 
         function render() {
@@ -715,6 +702,7 @@ const CATEGORIES = [
             form.reset();
             document.getElementById('supply-id').value = '';
             document.getElementById('f-active').checked = true;
+            document.getElementById('f-min-stock').value = '20';
             modalTitle.textContent = 'Nuevo Insumo';
             compContainer.innerHTML = '';
             compEmpty.classList.remove('hidden');
@@ -730,6 +718,7 @@ const CATEGORIES = [
             document.getElementById('f-unit').value = s.unit;
             document.getElementById('f-cost').value = parseFloat(s.unitCost);
             document.getElementById('f-stock').value = s.stock || 0;
+            document.getElementById('f-min-stock').value = s.minStock ?? 20;
             document.getElementById('f-supplier').value = s.supplier || '';
             document.getElementById('f-link').value = s.link || '';
             document.getElementById('f-notes').value = s.notes || '';
@@ -774,6 +763,7 @@ const CATEGORIES = [
                 unit: document.getElementById('f-unit').value,
                 unitCost: parseFloat(document.getElementById('f-cost').value),
                 stock: parseInt(document.getElementById('f-stock').value) || 0,
+                minStock: parseInt(document.getElementById('f-min-stock').value) || 20,
                 supplier: document.getElementById('f-supplier').value.trim(),
                 link: document.getElementById('f-link').value.trim(),
                 notes: document.getElementById('f-notes').value.trim(),

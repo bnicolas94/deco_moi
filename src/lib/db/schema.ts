@@ -591,6 +591,7 @@ export const supplies = pgTable('supplies', {
     packPrice: decimal('pack_price', { precision: 10, scale: 2 }),
     packQuantity: decimal('pack_quantity', { precision: 10, scale: 3 }),
     yieldRatio: decimal('yield_ratio', { precision: 10, scale: 3 }),
+    minStock: integer('min_stock').default(20),
     updatedAt: timestamp('updated_at').defaultNow(),
     createdAt: timestamp('created_at').defaultNow(),
 });
