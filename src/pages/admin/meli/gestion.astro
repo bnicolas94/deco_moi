@@ -113,71 +113,110 @@ const allProducts = await db
       return;
     }
 
-    listingsBody.innerHTML = items.map(item => {
-      const statusClass = {
-        'active': 'bg-emerald-100 text-emerald-800',
-        'paused': 'bg-amber-100 text-amber-800',
-        'closed': 'bg-rose-100 text-rose-800',
-        'inactive': 'bg-rose-100 text-rose-800'
-      }[item.status] || 'bg-slate-100 text-slate-800';
+    // Agrupamos por family_id si existe, o por id si tiene variaciones
+    // En el backend ya expandimos variaciones anidadas, así que vienen como items individuales con variationId.
+    // Los miembros de una familia vienen como items individuales con el mismo family_id.
+    
+    const groups = {};
+    items.forEach(item => {
+      const gId = item.family_id || `no-family-${item.id}`;
+      if (!groups[gId]) groups[gId] = { id: gId, isFamily: !!item.family_id, items: [] };
+      groups[gId].items.push(item);
+    });
 
-      const localDataHtml = item.localData ? `
-        <div class="flex items-center gap-2">
-          <div class="flex-grow">
-            <div class="text-sm font-medium text-emerald-600 flex items-center gap-1">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
-              Vinculado
+    listingsBody.innerHTML = Object.values(groups).map(group => {
+      let rowsHtml = '';
+      
+      // Si es un grupo de familia, podemos poner un separador o header sutil
+      if (group.isFamily && group.items.length > 1) {
+          rowsHtml += `
+            <tr class="bg-slate-50/50 dark:bg-slate-900/50">
+              <td colspan="6" class="px-5 py-2">
+                <div class="flex items-center gap-2">
+                  <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+                  <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Grupo de Familia / Packs (ID: ${group.id})</span>
+                </div>
+              </td>
+            </tr>
+          `;
+      }
+
+      group.items.forEach(item => {
+        const statusClass = {
+          'active': 'bg-emerald-100 text-emerald-800',
+          'paused': 'bg-amber-100 text-amber-800',
+          'closed': 'bg-rose-100 text-rose-800',
+          'inactive': 'bg-rose-100 text-rose-800'
+        }[item.status] || 'bg-slate-100 text-slate-800';
+
+        const domId = item.variationId ? `${item.id}-${item.variationId}` : item.id;
+
+        const localDataHtml = item.localData ? `
+          <div class="flex items-center gap-2">
+            <div class="flex-grow">
+              <div class="text-sm font-medium text-emerald-600 flex items-center gap-1">
+                <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                Vinculado
+              </div>
+              <div class="text-xs text-slate-600 truncate max-w-48">${item.localData.productName}</div>
+              <div class="text-[10px] text-slate-400 font-mono">SKU: ${item.localData.productSku || 'N/A'}</div>
             </div>
-            <div class="text-xs text-slate-600 truncate max-w-48">${item.localData.productName}</div>
-            <div class="text-[10px] text-slate-400 font-mono">SKU: ${item.localData.productSku || 'N/A'}</div>
+            <button class="text-slate-400 hover:text-indigo-500 unset-link-btn" data-dom-id="${domId}" title="Cambiar vínculo">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
+            </button>
           </div>
-          <button class="text-slate-400 hover:text-indigo-500 unset-link-btn" data-item-id="${item.id}" title="Cambiar vínculo">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
-          </button>
-        </div>
-      ` : `
-        <select class="form-select w-full text-sm py-1 h-8 product-select" data-item-id="${item.id}">
-          <option value="">-- Seleccionar --</option>
-          ${allProducts.map(p => `<option value="${p.id}">${p.name} (${p.sku || 'N/A'})</option>`).join('')}
-        </select>
-      `;
+        ` : `
+          <select class="form-select w-full text-xs py-0.5 h-7 product-select" data-dom-id="${domId}">
+            <option value="">-- Vincular --</option>
+            ${allProducts.map(p => `<option value="${p.id}">${p.name} (${p.sku || 'N/A'})</option>`).join('')}
+          </select>
+        `;
 
-      return `
-        <tr data-item-id="${item.id}">
-          <td class="px-2 first:pl-5 last:pr-5 py-3 whitespace-nowrap text-center">
-            ${item.thumbnail ? `<img src="${item.thumbnail}" class="w-10 h-10 rounded object-cover mx-auto" />` : '<div class="w-10 h-10 bg-slate-100 rounded mx-auto flex items-center justify-center text-slate-400 text-xs">Sin foto</div>'}
-          </td>
-          <td class="px-2 first:pl-5 last:pr-5 py-3 whitespace-normal">
-            <div class="font-medium text-slate-800 dark:text-slate-100">${item.title}</div>
-            <div class="text-xs text-slate-500 mt-1 flex items-center gap-2">
-              <span class="font-mono bg-slate-100 px-1 py-0.5 rounded text-[10px]">${item.id}</span>
-              <a href="${item.permalink}" target="_blank" class="text-indigo-500 hover:underline">Ver en ML ↗</a>
-              <span class="text-slate-400 ml-2">$${item.price.toLocaleString('es-AR')} actu.</span>
-            </div>
-          </td>
-          <td class="px-2 first:pl-5 last:pr-5 py-3 whitespace-nowrap text-center">
-            <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium capitalize ${statusClass}">${item.status}</span>
-          </td>
-          <td class="px-2 first:pl-5 last:pr-5 py-3 whitespace-nowrap">
-            ${localDataHtml}
-          </td>
-          <td class="px-2 first:pl-5 last:pr-5 py-3 whitespace-nowrap text-right">
-            ${item.localData ? `<span class="font-medium text-slate-800">$${Number(item.localData.inversionTotal).toLocaleString('es-AR', {minimumFractionDigits: 2})}</span>` : '<span class="text-xs text-slate-400">-</span>'}
-          </td>
-          <td class="px-2 first:pl-5 last:pr-5 py-3 whitespace-nowrap text-center">
-            ${item.localData ? `
-              <button class="text-indigo-500 hover:text-indigo-600 text-sm font-medium flex items-center gap-1 sync-price-btn mx-auto" data-product-id="${item.localData.productId}">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
-                Sync Precio
-              </button>
-            ` : `
-              <button class="btn text-xs bg-indigo-500 text-white hover:bg-indigo-600 h-7 py-0 save-link-btn" data-item-id="${item.id}">
-                Guardar Vínculo
-              </button>
-            `}
-          </td>
-        </tr>
-      `;
+        const typeBadge = item.variationId 
+          ? `<span class="bg-indigo-50 text-indigo-600 text-[9px] font-bold px-1.5 py-0.5 rounded ml-2 uppercase">Variante</span>`
+          : (item.family_id ? `<span class="bg-slate-100 text-slate-500 text-[9px] font-bold px-1.5 py-0.5 rounded ml-2 uppercase">Pack</span>` : '');
+
+        rowsHtml += `
+          <tr data-dom-id="${domId}" class="${group.isFamily ? 'border-l-2 border-slate-200 dark:border-slate-700' : ''}">
+            <td class="px-2 first:pl-5 last:pr-5 py-3 whitespace-nowrap text-center">
+              ${item.thumbnail ? `<img src="${item.thumbnail}" class="w-8 h-8 rounded object-cover mx-auto" />` : '<div class="w-8 h-8 bg-slate-100 rounded mx-auto flex items-center justify-center text-slate-400 text-[9px]">?</div>'}
+            </td>
+            <td class="px-2 first:pl-5 last:pr-5 py-3 whitespace-normal">
+              <div class="font-medium text-slate-800 dark:text-slate-100 text-sm">
+                ${item.title}
+                ${typeBadge}
+              </div>
+              <div class="text-[10px] text-slate-500 mt-0.5 flex items-center gap-2">
+                <span class="font-mono bg-slate-50 px-1 py-0.5 rounded">${item.id}${item.variationId ? ` / ${item.variationId}` : ''}</span>
+                <a href="${item.permalink}" target="_blank" class="text-indigo-500 hover:underline hover:text-indigo-600">En ML ↗</a>
+                <span class="text-slate-400 ml-1 font-bold">$${item.price.toLocaleString('es-AR')}</span>
+              </div>
+            </td>
+            <td class="px-2 first:pl-5 last:pr-5 py-3 whitespace-nowrap text-center">
+              <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium capitalize ${statusClass}">${item.status}</span>
+            </td>
+            <td class="px-2 first:pl-5 last:pr-5 py-3 whitespace-nowrap">
+              ${localDataHtml}
+            </td>
+            <td class="px-2 first:pl-5 last:pr-5 py-3 whitespace-nowrap text-right">
+              ${item.localData ? `<span class="font-bold text-slate-700">$${Number(item.localData.inversionTotal).toLocaleString('es-AR', {minimumFractionDigits: 2})}</span>` : '<span class="text-xs text-slate-400">-</span>'}
+            </td>
+            <td class="px-2 first:pl-5 last:pr-5 py-3 whitespace-nowrap text-center">
+              ${item.localData ? `
+                <button class="text-indigo-500 hover:text-indigo-600 text-xs font-bold flex items-center gap-1 sync-price-btn mx-auto p-1 border border-indigo-100 rounded hover:bg-indigo-50 transition-colors" data-product-id="${item.localData.productId}">
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                  Sync
+                </button>
+              ` : `
+                <button class="btn text-[10px] bg-slate-800 text-white hover:bg-slate-900 dark:bg-indigo-600 dark:hover:bg-indigo-700 h-7 py-0 px-2 font-bold save-link-btn" data-dom-id="${domId}">
+                  Vincular
+                </button>
+              `}
+            </td>
+          </tr>
+        `;
+      });
+      return rowsHtml;
     }).join('');
 
     attachEvents();
@@ -187,8 +226,8 @@ const allProducts = await db
     // Unset link
     document.querySelectorAll('.unset-link-btn').forEach(btn => {
       btn.onclick = () => {
-        const itemId = btn.getAttribute('data-item-id');
-        const item = allItems.find(i => i.id === itemId);
+        const domId = btn.getAttribute('data-dom-id');
+        const item = allItems.find(i => (i.variationId ? `${i.id}-${i.variationId}` : i.id) === domId);
         if (item) {
           item.localData = null;
           renderItems(allItems);
@@ -199,19 +238,26 @@ const allProducts = await db
     // Save link
     document.querySelectorAll('.save-link-btn').forEach(btn => {
       btn.onclick = async () => {
-        const itemId = btn.getAttribute('data-item-id');
-        const select = document.querySelector(`.product-select[data-item-id="${itemId}"]`);
+        const domId = btn.getAttribute('data-dom-id');
+        const item = allItems.find(i => (i.variationId ? `${i.id}-${i.variationId}` : i.id) === domId);
+        
+        const select = document.querySelector(`.product-select[data-dom-id="${domId}"]`);
         const productId = select.value;
         if (!productId) return alert('Selecciona un producto');
 
         btn.disabled = true;
-        btn.innerText = 'Guardando...';
+        btn.innerText = 'Sync...';
 
         try {
           const res = await fetch('/api/meli/link-listing', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ meliItemId: itemId, productId, syncEnabled: true })
+            body: JSON.stringify({ 
+              meliItemId: item.id, 
+              meliVariationId: item.variationId,
+              productId, 
+              syncEnabled: true 
+            })
           });
           const data = await res.json();
           if (data.success) {
@@ -219,12 +265,12 @@ const allProducts = await db
           } else {
             alert('Error: ' + data.error);
             btn.disabled = false;
-            btn.innerText = 'Guardar Vínculo';
+            btn.innerText = 'Vincular';
           }
         } catch (e) {
           alert('Error de red');
           btn.disabled = false;
-          btn.innerText = 'Guardar Vínculo';
+          btn.innerText = 'Vincular';
         }
       };
     });
@@ -235,7 +281,7 @@ const allProducts = await db
         const productId = btn.getAttribute('data-product-id');
         btn.disabled = true;
         const originalHtml = btn.innerHTML;
-        btn.innerText = 'Sincronizando...';
+        btn.innerText = 'Syncing...';
 
         try {
           const res = await fetch('/api/meli/sync-price', {
@@ -264,7 +310,7 @@ const allProducts = await db
     const q = e.target.value.toLowerCase();
     const filtered = allItems.filter(i => 
       i.title.toLowerCase().includes(q) || 
-      i.id.toLowerCase().includes(q) ||
+      i.id.toString().toLowerCase().includes(q) ||
       (i.localData && i.localData.productName.toLowerCase().includes(q))
     );
     renderItems(filtered);

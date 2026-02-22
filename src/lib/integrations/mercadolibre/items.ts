@@ -60,9 +60,32 @@ export async function updateMeliItem(itemId: string, updates: {
     price?: number;
     available_quantity?: number;
     status?: 'active' | 'paused' | 'closed';
+    variationId?: string | null;
 }) {
     const token = await getValidAccessToken();
     const url = `${API_BASE}/items/${itemId}`;
+
+    let body = {};
+    if (updates.variationId) {
+        // Update specific variation
+        body = {
+            variations: [
+                {
+                    id: updates.variationId,
+                    price: updates.price,
+                    available_quantity: updates.available_quantity
+                }
+            ],
+            status: updates.status
+        };
+    } else {
+        // Root item update
+        body = {
+            price: updates.price,
+            available_quantity: updates.available_quantity,
+            status: updates.status
+        };
+    }
 
     const response = await fetch(url, {
         method: 'PUT',
@@ -70,7 +93,7 @@ export async function updateMeliItem(itemId: string, updates: {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json'
         },
-        body: JSON.stringify(updates)
+        body: JSON.stringify(body)
     });
 
     if (!response.ok) {
@@ -88,7 +111,7 @@ export async function updateMeliItem(itemId: string, updates: {
  */
 export async function getAllSellerItems(userId: string, limit: number = 50, offset: number = 0) {
     const token = await getValidAccessToken();
-    
+
     // 1. Get the item IDs
     const searchUrl = `${API_BASE}/users/${userId}/items/search?limit=${limit}&offset=${offset}`;
     const searchRes = await fetch(searchUrl, {
@@ -112,11 +135,11 @@ export async function getAllSellerItems(userId: string, limit: number = 50, offs
 
     // 2. Fetch full details for the retrieved IDs
     // ML API allows up to 20 IDs per request on /items?ids=
-    const items = [];
+    const items: any[] = [];
     for (let i = 0; i < itemIds.length; i += 20) {
         const chunk = itemIds.slice(i, i + 20);
         const itemsUrl = `${API_BASE}/items?ids=${chunk.join(',')}`;
-        
+
         const itemsRes = await fetch(itemsUrl, {
             headers: { Authorization: `Bearer ${token}` }
         });

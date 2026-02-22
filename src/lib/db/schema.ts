@@ -1,4 +1,4 @@
-import { pgTable, serial, text, integer, decimal, timestamp, boolean, json, uuid, varchar } from 'drizzle-orm/pg-core';
+import { pgTable, serial, text, integer, decimal, timestamp, boolean, json, uuid, varchar, uniqueIndex } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
 import type { PerspectiveConfig, SurfaceConfig, CameraConfig, DesignPresets } from '@/types/mockup';
 
@@ -477,7 +477,8 @@ export const unmatchedTransfers = pgTable('unmatched_transfers', {
 export const meliItemLinks = pgTable('meli_item_links', {
     id: serial('id').primaryKey(),
     productId: integer('product_id').notNull().references(() => products.id),
-    meliItemId: varchar('meli_item_id', { length: 50 }).notNull().unique(), // Ej: MLA1234567890
+    meliItemId: varchar('meli_item_id', { length: 50 }).notNull(), // Ej: MLA1234567890
+    meliVariationId: varchar('meli_variation_id', { length: 50 }), // ID de variación anidada si existe
     meliTitle: varchar('meli_title', { length: 255 }),
     meliCategoryId: varchar('meli_category_id', { length: 50 }),
     meliListingType: varchar('meli_listing_type', { length: 50 }), // 'gold_special' | 'gold_pro' | 'free'
@@ -487,6 +488,10 @@ export const meliItemLinks = pgTable('meli_item_links', {
     lastSyncedStock: integer('last_synced_stock'),
     createdAt: timestamp('created_at').defaultNow(),
     updatedAt: timestamp('updated_at').defaultNow(),
+}, (table) => {
+    return {
+        meliItemVariationIdx: uniqueIndex('meli_item_variation_idx').on(table.meliItemId, table.meliVariationId),
+    };
 });
 
 // Tabla: configuración de costos ML por categoría/producto

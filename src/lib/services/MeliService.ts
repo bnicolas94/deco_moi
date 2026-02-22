@@ -102,30 +102,34 @@ export class MeliService {
 
     static async syncPrice(productId: number): Promise<{ success: boolean; error?: string }> {
         try {
-            const link = await db.select().from(meliItemLinks).where(eq(meliItemLinks.productId, productId)).limit(1);
-            if (!link.length || !link[0].syncEnabled) {
+            const links = await db.select().from(meliItemLinks).where(and(eq(meliItemLinks.productId, productId), eq(meliItemLinks.syncEnabled, true)));
+            if (!links.length) {
                 return { success: false, error: 'Product not linked or sync disabled' };
             }
 
-            const meliItemId = link[0].meliItemId;
             const newPrice = await this.calculateMeliPriceForProduct(productId);
-
             if (newPrice === null) return { success: false, error: 'Product price calc failed' };
 
-            await updateMeliItem(meliItemId, { price: newPrice });
+            for (const link of links) {
+                await updateMeliItem(link.meliItemId, {
+                    price: newPrice,
+                    variationId: link.meliVariationId
+                });
 
-            await db.update(meliItemLinks).set({
-                lastSyncedPrice: newPrice.toString(),
-                lastSyncAt: new Date(),
-            }).where(eq(meliItemLinks.id, link[0].id));
+                await db.update(meliItemLinks).set({
+                    lastSyncedPrice: newPrice.toString(),
+                    lastSyncAt: new Date(),
+                }).where(eq(meliItemLinks.id, link.id));
 
-            await db.insert(meliSyncLog).values({
-                type: 'price_sync',
-                direction: 'push',
-                productId,
-                meliItemId,
-                status: 'success',
-            });
+                await db.insert(meliSyncLog).values({
+                    type: 'price_sync',
+                    direction: 'push',
+                    productId,
+                    meliItemId: link.meliItemId,
+                    status: 'success',
+                    details: { variationId: link.meliVariationId }
+                });
+            }
 
             return { success: true };
         } catch (e: any) {
@@ -146,28 +150,33 @@ export class MeliService {
             const productData = await db.select().from(products).where(eq(products.id, productId)).limit(1);
             if (!productData.length) return { success: false, error: 'Product not found' };
 
-            const link = await db.select().from(meliItemLinks).where(eq(meliItemLinks.productId, productId)).limit(1);
-            if (!link.length || !link[0].syncEnabled) {
+            const links = await db.select().from(meliItemLinks).where(and(eq(meliItemLinks.productId, productId), eq(meliItemLinks.syncEnabled, true)));
+            if (!links.length) {
                 return { success: false, error: 'Product not linked or sync disabled' };
             }
 
-            const meliItemId = link[0].meliItemId;
-            const stock = productData[0].stock ?? 0;
+            const stock = Number(productData[0].stock) || 0;
 
-            await updateMeliItem(meliItemId, { available_quantity: stock });
+            for (const link of links) {
+                await updateMeliItem(link.meliItemId, {
+                    available_quantity: stock,
+                    variationId: link.meliVariationId
+                });
 
-            await db.update(meliItemLinks).set({
-                lastSyncedStock: stock,
-                lastSyncAt: new Date(),
-            }).where(eq(meliItemLinks.id, link[0].id));
+                await db.update(meliItemLinks).set({
+                    lastSyncedStock: stock,
+                    lastSyncAt: new Date(),
+                }).where(eq(meliItemLinks.id, link.id));
 
-            await db.insert(meliSyncLog).values({
-                type: 'stock_sync',
-                direction: 'push',
-                productId,
-                meliItemId,
-                status: 'success',
-            });
+                await db.insert(meliSyncLog).values({
+                    type: 'stock_sync',
+                    direction: 'push',
+                    productId,
+                    meliItemId: link.meliItemId,
+                    status: 'success',
+                    details: { variationId: link.meliVariationId }
+                });
+            }
 
             return { success: true };
         } catch (e: any) {
