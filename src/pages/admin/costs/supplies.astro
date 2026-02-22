@@ -1,0 +1,990 @@
+---
+import AdminLayout from '@/layouts/AdminLayout.astro';
+import { db } from '@/lib/db/connection';
+import { supplies } from '@/lib/db/schema';
+import { 
+    Package, 
+    Plus, 
+    Search, 
+    Download, 
+    Upload, 
+    TrendingUp, 
+    Calculator,
+    Archive,
+    ShoppingCart,
+    MoreHorizontal,
+    Edit3,
+    Trash2,
+    ExternalLink,
+    AlertCircle
+} from 'lucide-react';
+
+// Fetch initial data from DB
+const initialSupplies = await db.select().from(supplies).orderBy(supplies.name);
+
+const CATEGORIES = [
+  { id: 'chocolates', label: 'Chocolates', icon: '🍫' },
+  { id: 'hojas',      label: 'Hojas / Papeles', icon: '📄' },
+  { id: 'velas',      label: 'Velas', icon: '🕯️' },
+  { id: 'cajas',      label: 'Cajas', icon: '📦' },
+  { id: 'extras',     label: 'Extras', icon: '✨' },
+  { id: 'tejidos',    label: 'Tejidos', icon: '🧵' },
+];
+---
+
+<AdminLayout title="Gestión de Insumos">
+    <div class="max-w-7xl mx-auto space-y-6 pb-20">
+        
+        <!-- Header & Breadcrumbs -->
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+            <div>
+                <div class="flex items-center gap-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">
+                    <a href="/admin" class="hover:text-indigo-600 transition-colors">Admin</a>
+                    <span class="opacity-30">/</span>
+                    <a href="/admin/costs/config" class="hover:text-indigo-600 transition-colors">Costos</a>
+                    <span class="opacity-30">/</span>
+                    <span class="text-indigo-600">Insumos</span>
+                </div>
+                <h1 class="text-3xl font-extrabold text-gray-900 tracking-tight flex items-center gap-3">
+                    <div class="p-2 bg-indigo-50 rounded-xl">
+                        <Archive className="w-8 h-8 text-indigo-600" />
+                    </div>
+                    Insumos
+                </h1>
+                <p class="text-gray-500 mt-1 font-medium italic">Materias primas y materiales con sus costos unitarios.</p>
+            </div>
+            
+            <div class="flex items-center gap-3">
+                <button id="btn-import" class="inline-flex items-center px-4 py-2 bg-white border border-gray-200 text-gray-700 text-sm font-bold rounded-xl hover:bg-gray-50 transition-colors shadow-sm">
+                    <Upload className="w-4 h-4 mr-2" />
+                    Importar
+                </button>
+                <button id="btn-new" class="inline-flex items-center px-4 py-2 bg-indigo-600 text-white text-sm font-bold rounded-xl hover:bg-indigo-700 transition-colors shadow-sm focus:ring-4 focus:ring-indigo-100">
+                    <Plus className="w-4 h-4 mr-2" />
+                    Nuevo Insumo
+                </button>
+            </div>
+        </div>
+
+        <!-- Sub-navigation -->
+        <div class="mb-6 border-b border-gray-200">
+            <nav class="-mb-px flex space-x-8">
+                <a href="/admin/costs/config" class="pb-4 px-1 border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 font-medium text-sm flex items-center gap-2">
+                    <Calculator className="w-4 h-4" />
+                    Configuración
+                </a>
+                <a href="/admin/costs/supplies" class="pb-4 px-1 border-b-2 border-indigo-500 text-indigo-600 font-bold text-sm flex items-center gap-2">
+                    <Archive className="w-4 h-4" />
+                    Insumos
+                </a>
+                <a href="/admin/costs/dashboard" class="pb-4 px-1 border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 font-medium text-sm flex items-center gap-2">
+                    <TrendingUp className="w-4 h-4" />
+                    Dashboard
+                </a>
+            </nav>
+        </div>
+
+        <!-- Stats Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4" id="stats-row">
+            <!-- Rendered by JS -->
+        </div>
+
+        <!-- Toolbar -->
+        <div class="flex flex-col lg:flex-row gap-4 items-center justify-between bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
+            <div class="flex flex-1 items-center gap-4 w-full lg:w-auto">
+                <div class="relative flex-1 max-w-sm group">
+                    <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 group-focus-within:text-indigo-500 transition-colors" />
+                    <input 
+                        type="text" 
+                        id="search-input" 
+                        placeholder="Buscar por nombre o proveedor..." 
+                        class="pl-10 w-full rounded-xl border-gray-200 focus:border-indigo-500 focus:ring-indigo-500 text-sm h-11 border transition-all"
+                    />
+                </div>
+                
+                <select id="filter-status" class="rounded-xl border-gray-200 text-sm focus:ring-indigo-500 border h-11 px-4 bg-white shadow-sm font-bold text-gray-700">
+                    <option value="all">Todos los estados</option>
+                    <option value="active">Activos</option>
+                    <option value="inactive">Inactivos</option>
+                </select>
+
+                <select id="sort-select" class="rounded-xl border-gray-200 text-sm focus:ring-indigo-500 border h-11 px-4 bg-white shadow-sm font-bold text-gray-700">
+                    <option value="name-asc">Nombre A→Z</option>
+                    <option value="name-desc">Nombre Z→A</option>
+                    <option value="price-asc">Precio ↑</option>
+                    <option value="price-desc">Precio ↓</option>
+                    <option value="stock-asc">Stock ↑</option>
+                    <option value="stock-desc">Stock ↓</option>
+                </select>
+            </div>
+            
+            <button id="btn-export" class="flex items-center gap-2 px-6 py-2.5 text-gray-600 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all text-sm font-bold border border-transparent hover:border-indigo-100">
+                <Download className="w-4 h-4" />
+                Exportar CSV
+            </button>
+        </div>
+
+        <!-- Categories -->
+        <div class="flex flex-wrap gap-2" id="category-tabs">
+            <!-- Rendered by JS -->
+        </div>
+
+        <!-- Main Table -->
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="bg-gray-50/50 border-b border-gray-100 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                            <th class="p-5 pl-8">Insumo / Proveedor</th>
+                            <th class="p-5">Categoría</th>
+                            <th class="p-5">Unidad</th>
+                            <th class="p-5">Costo Unitario</th>
+                            <th class="p-5">Costo Pack</th>
+                            <th class="p-5">Stock</th>
+                            <th class="p-5">Actualizado</th>
+                            <th class="p-5">Estado</th>
+                            <th class="p-5 pr-8 text-right">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="table-body" class="divide-y divide-gray-50">
+                        <!-- Rendered by Client-side JS -->
+                    </tbody>
+                </table>
+            </div>
+            
+            <!-- Table Footer / Pagination -->
+            <div class="p-6 bg-gray-50/50 border-t border-gray-100 flex flex-col sm:flex-row items-center justify-between gap-4">
+                <span id="table-info" class="text-xs font-bold text-gray-400 uppercase tracking-widest">Calculando...</span>
+                <div id="pagination" class="flex items-center gap-1.5">
+                    <!-- Pagination JS -->
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Modal: Nuevo/Editar Insumo -->
+    <div id="modal-overlay" class="fixed inset-0 bg-slate-900/60 z-[100] backdrop-blur-sm hidden items-center justify-center p-4 transition-all duration-300">
+        <div class="bg-white rounded-[2rem] shadow-2xl w-full max-w-xl max-h-[95vh] overflow-hidden flex flex-col transform transition-all animate-in fade-in zoom-in-95 slide-in-from-bottom-4 duration-300">
+            <div class="p-8 pb-6 flex justify-between items-center bg-gray-50/50">
+                <div>
+                    <h3 class="text-2xl font-black text-gray-900 leading-none" id="modal-title">Nuevo Insumo</h3>
+                    <p class="text-xs font-medium text-gray-400 mt-2">Completá los detalles para la gestión de costos.</p>
+                </div>
+                <button type="button" id="modal-close" class="p-3 hover:bg-white hover:shadow-sm rounded-2xl transition-all text-gray-400 hover:text-gray-900 border border-transparent hover:border-gray-100">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            
+            <form id="supply-form" class="p-8 pt-2 overflow-y-auto space-y-8">
+                <input type="hidden" id="supply-id" />
+                
+                <!-- Section: Basic -->
+                <div class="space-y-4">
+                    <div class="flex items-center gap-2 mb-2">
+                        <div class="w-1.5 h-4 bg-indigo-500 rounded-full"></div>
+                        <p class="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Información básica</p>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 gap-5">
+                        <div class="space-y-2 group">
+                            <label class="block text-xs font-black text-gray-500 uppercase tracking-wider group-focus-within:text-indigo-600 transition-colors">Nombre del material <span class="text-rose-500">*</span></label>
+                            <input type="text" id="f-name" required placeholder="Ej: Papel Glossy Laser A4" class="block w-full rounded-2xl border-gray-100 bg-gray-50 shadow-inner focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-50 font-medium sm:text-sm h-12 border transition-all px-4" />
+                        </div>
+                        
+                        <div class="grid grid-cols-2 gap-5">
+                            <div class="space-y-2">
+                                <label class="block text-xs font-black text-gray-500 uppercase tracking-wider">Categoría <span class="text-rose-500">*</span></label>
+                                <select id="f-category" required class="block w-full rounded-2xl border-gray-100 bg-gray-50 focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-50 font-bold sm:text-sm h-12 border transition-all px-4">
+                                    <option value="">Seleccionar...</option>
+                                    {CATEGORIES.map(c => <option value={c.id}>{c.icon} {c.label}</option>)}
+                                </select>
+                            </div>
+                            <div class="space-y-2">
+                                <label class="block text-xs font-black text-gray-500 uppercase tracking-wider">Unidad <span class="text-rose-500">*</span></label>
+                                <select id="f-unit" required class="block w-full rounded-2xl border-gray-100 bg-gray-50 focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-50 font-bold sm:text-sm h-12 border transition-all px-4">
+                                    <option value="">Seleccionar...</option>
+                                    <option value="u">u (unidad)</option>
+                                    <option value="kg">kg</option>
+                                    <option value="g">g (gramo)</option>
+                                    <option value="m">m (metro)</option>
+                                    <option value="cm">cm</option>
+                                    <option value="hoja">hoja</option>
+                                    <option value="lt">lt (litro)</option>
+                                    <option value="ml">ml</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section: Financial & Logic -->
+                <div class="space-y-4">
+                    <div class="flex items-center gap-2 mb-2">
+                        <div class="w-1.5 h-4 bg-emerald-500 rounded-full"></div>
+                        <p class="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Costo y Existencias</p>
+                    </div>
+                    
+                    <div class="bg-gray-50/50 p-6 rounded-[2rem] border border-gray-100 space-y-6">
+                        <!-- Pack Calculation -->
+                        <div class="grid grid-cols-2 gap-5">
+                            <div class="space-y-2">
+                                <label class="block text-xs font-black text-gray-500 uppercase tracking-wider">Precio Paquete</label>
+                                <div class="relative">
+                                    <span class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-black">$</span>
+                                    <input type="number" id="f-pack-price" step="0.01" min="0" placeholder="0.00" class="block w-full pl-8 rounded-2xl border-gray-100 bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-50 font-mono font-bold sm:text-sm h-12 border transition-all" />
+                                </div>
+                            </div>
+                            <div class="space-y-2">
+                                <label class="block text-xs font-black text-gray-500 uppercase tracking-wider">Cantidad x Paquete</label>
+                                <input type="number" id="f-pack-qty" step="0.001" min="0" placeholder="Ej: 100" class="block w-full rounded-2xl border-gray-100 bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-50 font-mono font-bold sm:text-sm h-12 border transition-all px-4" />
+                            </div>
+                        </div>
+
+                        <div class="relative py-2">
+                            <div class="absolute inset-0 flex items-center"><div class="w-full border-t border-gray-100"></div></div>
+                            <div class="relative flex justify-center"><span class="bg-white px-3 text-[10px] font-black text-gray-300 uppercase tracking-widest">o heredar de</span></div>
+                        </div>
+
+                        <!-- Multi-Parent Composition -->
+                        <div class="space-y-4 pt-2">
+                            <div class="flex items-center justify-between px-1">
+                                <label class="block text-xs font-black text-gray-500 uppercase tracking-wider">Composición (Insumos Padres)</label>
+                                <button type="button" id="btn-add-comp" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-50 text-indigo-600 text-[10px] font-black uppercase tracking-wider hover:bg-indigo-100 transition-all">
+                                    <Plus className="w-3 h-3" />
+                                    Agregar Padre
+                                </button>
+                            </div>
+                            
+                            <div id="comp-container" class="space-y-3">
+                                <!-- Dynamic Component Rows -->
+                            </div>
+                            
+                            <div id="comp-empty" class="text-center py-6 bg-gray-50/50 rounded-2xl border border-dashed border-gray-200">
+                                <p class="text-[10px] font-bold text-gray-400 uppercase">Sin padres (Insumo independiente)</p>
+                            </div>
+                        </div>
+
+                        <div class="pt-2">
+                            <div class="grid grid-cols-2 gap-5">
+                                <div class="space-y-2">
+                                    <label class="block text-xs font-black text-gray-500 uppercase tracking-wider group-focus-within:text-indigo-600 transition-colors">Costo Unitario (ARS) <span class="text-rose-500">*</span></label>
+                                    <div class="relative">
+                                        <span class="absolute left-4 top-1/2 -translate-y-1/2 text-indigo-400 font-black">$</span>
+                                        <input type="number" id="f-cost" step="0.01" min="0" required class="block w-full pl-8 rounded-2xl border-indigo-100 bg-indigo-50/30 focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-50 font-mono font-bold sm:text-sm h-12 border transition-all shadow-sm" />
+                                    </div>
+                                </div>
+                                <div class="space-y-2">
+                                    <label class="block text-xs font-black text-gray-500 uppercase tracking-wider">Stock Actual</label>
+                                    <input type="number" id="f-stock" min="0" placeholder="0" class="block w-full rounded-2xl border-gray-100 bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-50 font-mono font-bold sm:text-sm h-12 border transition-all px-4" />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section: Vendor -->
+                <div class="space-y-4">
+                    <div class="flex items-center gap-2 mb-2">
+                        <div class="w-1.5 h-4 bg-amber-500 rounded-full"></div>
+                        <p class="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Proveedor y Referencias</p>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 gap-5">
+                        <div class="space-y-2">
+                            <label class="block text-xs font-black text-gray-500 uppercase tracking-wider">Nombre del Proveedor</label>
+                            <input type="text" id="f-supplier" placeholder="Ej: Indubox, Papelería X" class="block w-full rounded-2xl border-gray-100 bg-gray-50 focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-50 font-medium sm:text-sm h-12 border transition-all px-4" />
+                        </div>
+                        <div class="space-y-2">
+                            <label class="block text-xs font-black text-gray-500 uppercase tracking-wider">Link de compra / Referencia</label>
+                            <div class="relative group">
+                                <ExternalLink className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300 group-focus-within:text-indigo-500 transition-colors" />
+                                <input type="url" id="f-link" placeholder="https://..." class="block w-full pl-11 rounded-2xl border-gray-100 bg-gray-50 focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-50 font-medium sm:text-sm h-12 border transition-all" />
+                            </div>
+                        </div>
+                        <div class="space-y-2">
+                            <label class="block text-xs font-black text-gray-500 uppercase tracking-wider">Notas internas</label>
+                            <textarea id="f-notes" rows="2" placeholder="Observaciones adicionales, tiempos de entrega, etc." class="block w-full rounded-2xl border-gray-100 bg-gray-50 focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-50 font-medium sm:text-sm border transition-all p-4"></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Active Toggle -->
+                <div class="flex items-center justify-between p-6 bg-slate-50 rounded-[1.5rem] border border-slate-100 hover:bg-white transition-all cursor-pointer group" onclick="document.getElementById('f-active').click()">
+                    <div class="flex items-center gap-3">
+                        <div class="p-2 bg-white rounded-lg shadow-sm border border-gray-100 group-hover:border-indigo-100 transition-colors">
+                            <AlertCircle className="w-5 h-5 text-gray-400 group-hover:text-indigo-500" />
+                        </div>
+                        <div>
+                            <span class="block text-sm font-black text-gray-700">Insumo Activo</span>
+                            <p class="text-[10px] font-bold text-gray-400 uppercase">Visible en cálculos y selección</p>
+                        </div>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer pointer-events-none">
+                        <input type="checkbox" id="f-active" class="sr-only peer" checked>
+                        <div class="w-12 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-[24px] peer-checked:after:border-white after:content-[''] after:absolute after:top-[4px] after:left-[4px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600"></div>
+                    </label>
+                </div>
+            </form>
+            
+            <div class="p-8 border-t border-gray-100 flex items-center justify-end gap-3 bg-gray-50/50">
+                <button type="button" id="modal-cancel" class="px-8 py-3 text-sm font-black text-gray-400 hover:text-gray-900 hover:bg-white rounded-2xl transition-all uppercase tracking-widest">Cancelar</button>
+                <button type="button" id="modal-save" class="px-8 py-3 bg-indigo-600 text-white text-sm font-black rounded-2xl hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-100 active:scale-95 uppercase tracking-widest">Guardar Cambios</button>
+            </div>
+        </div>
+    </div>
+
+    <script is:inline define:vars={{ CATEGORIES, initialSupplies }}>
+        let supplies = initialSupplies || [];
+        
+        const fmt = (n) => {
+            const val = typeof n === 'string' ? parseFloat(n) : n;
+            return '$ ' + val.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        };
+
+        const CATEGORY_MAP = Object.fromEntries(CATEGORIES.map(c => [c.id, c]));
+
+        let state = {
+            search: '',
+            cat: 'all',
+            status: 'all',
+            sort: 'name-asc',
+            page: 1,
+            perPage: 12,
+        };
+
+        function getFiltered() {
+            let list = [...supplies];
+            if (state.search) {
+                const q = state.search.toLowerCase();
+                const matchedSupplies = supplies.filter(s => 
+                    s.name.toLowerCase().includes(q) || 
+                    (s.supplier && s.supplier.toLowerCase().includes(q))
+                );
+                
+                const relevantIds = new Set(matchedSupplies.map(s => s.id));
+                matchedSupplies.forEach(s => {
+                    if (s.parentId) relevantIds.add(Number(s.parentId)); // Include parent
+                    // Include children
+                    supplies.filter(child => child.parentId === s.id).forEach(c => relevantIds.add(c.id));
+                });
+
+                list = supplies.filter(s => relevantIds.has(s.id));
+            }
+            if (state.cat !== 'all') list = list.filter(s => s.category === state.cat);
+            if (state.status === 'active') list = list.filter(s => s.isActive);
+            if (state.status === 'inactive') list = list.filter(s => !s.isActive);
+            
+            list.sort((a, b) => {
+                const costA = parseFloat(a.unitCost || 0);
+                const costB = parseFloat(b.unitCost || 0);
+                if (state.sort === 'name-asc')   return a.name.localeCompare(b.name);
+                if (state.sort === 'name-desc')  return b.name.localeCompare(a.name);
+                if (state.sort === 'price-asc')  return costA - costB;
+                if (state.sort === 'price-desc') return costB - costA;
+                if (state.sort === 'stock-asc')  return a.stock - b.stock;
+                if (state.sort === 'stock-desc') return b.stock - a.stock;
+                return 0;
+            });
+            return list;
+        }
+
+        function renderStats() {
+            const total = supplies.length;
+            const active = supplies.filter(s => s.isActive).length;
+            const lowStock = supplies.filter(s => s.stock > 0 && s.stock < 20).length;
+            const avgCost = supplies.length ? supplies.reduce((a, s) => a + parseFloat(s.unitCost || 0), 0) / supplies.length : 0;
+
+            document.getElementById('stats-row').innerHTML = `
+                <div class="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 hover:border-indigo-100 transition-all group">
+                    <p class="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-2 group-hover:text-indigo-400 transition-colors">Total Insumos</p>
+                    <div class="flex items-end justify-between">
+                        <h4 class="text-3xl font-black text-gray-900 tabular-nums">${total}</h4>
+                        <span class="text-[10px] font-black text-indigo-600 bg-indigo-50 px-2 py-1 rounded-lg uppercase tracking-tight">${active} activos</span>
+                    </div>
+                </div>
+                <div class="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 hover:border-amber-100 transition-all group">
+                    <p class="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-2 group-hover:text-amber-500 transition-colors">Categorías</p>
+                    <h4 class="text-3xl font-black text-gray-900 tabular-nums">${CATEGORIES.length}</h4>
+                </div>
+                <div class="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 hover:border-rose-100 transition-all group">
+                    <p class="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-2 group-hover:text-rose-500 transition-colors">Stock Bajo</p>
+                    <div class="flex items-end justify-between">
+                        <h4 class="text-3xl font-black text-rose-600 tabular-nums">${lowStock}</h4>
+                        <span class="text-[10px] font-black text-rose-400 uppercase tracking-widest bg-rose-50 px-2 py-1 rounded-lg">FALTANTES</span>
+                    </div>
+                </div>
+                <div class="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 hover:border-emerald-100 transition-all group">
+                    <p class="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-2 group-hover:text-emerald-500 transition-colors">Costo Promedio</p>
+                    <h4 class="text-3xl font-black text-gray-900 tabular-nums" style="font-size:1.5rem">${fmt(avgCost)}</h4>
+                </div>
+            `;
+        }
+
+        function renderCatTabs() {
+            const tabs = document.getElementById('category-tabs');
+            const allCount = supplies.length;
+            let html = `
+                <button class="cat-tab px-5 py-2.5 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all shadow-sm active:scale-95 ${state.cat === 'all' ? 'bg-gray-900 text-white shadow-indigo-100' : 'bg-white text-gray-400 hover:text-gray-900 hover:shadow-md'}" data-cat="all">
+                    Todos <span class="ml-2 font-mono opacity-50 tabular-nums">${allCount}</span>
+                </button>
+            `;
+            CATEGORIES.forEach(cat => {
+                const count = supplies.filter(s => s.category === cat.id).length;
+                if (count === 0) return;
+                html += `
+                    <button class="cat-tab px-5 py-2.5 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all shadow-sm active:scale-95 ${state.cat === cat.id ? 'bg-indigo-600 text-white shadow-indigo-100' : 'bg-white text-gray-400 hover:text-gray-900 hover:shadow-md'}" data-cat="${cat.id}">
+                        <span class="mr-2">${cat.icon}</span> ${cat.label} <span class="ml-2 font-mono opacity-50 tabular-nums">${count}</span>
+                    </button>
+                `;
+            });
+            tabs.innerHTML = html;
+            tabs.querySelectorAll('.cat-tab').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    state.cat = btn.dataset.cat;
+                    state.page = 1;
+                    render();
+                });
+            });
+        }
+
+        function renderTable() {
+            const filtered = getFiltered();
+            const total = filtered.length;
+            const start = (state.page - 1) * state.perPage;
+            const pageItems = filtered.slice(start, start + state.perPage);
+
+            const tbody = document.getElementById('table-body');
+
+            if (pageItems.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="8" class="p-24 text-center">
+                            <div class="flex flex-col items-center gap-4 text-gray-300">
+                                <div class="p-6 bg-gray-50 rounded-full">
+                                    <svg class="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707.293l-2.414-2.414A1 1 0 006.586 13H4"></path></svg>
+                                </div>
+                                <p class="text-sm font-black uppercase tracking-[0.2em] italic">Sin insumos para mostrar</p>
+                            </div>
+                        </td>
+                    </tr>`;
+                return;
+            }
+
+            // UI Hierarchical Logic: 
+            // Identify roots (items whose designated primary parent is not in the current list)
+            const roots = pageItems.filter(s => {
+                const hasLegacyParent = !!s.parentId && pageItems.some(p => p.id === s.parentId);
+                const hasCompParent = s.components && s.components.length > 0 && pageItems.some(p => p.id === s.components[0].parentId);
+                return !hasLegacyParent && !hasCompParent;
+            });
+            const itemsToRender = roots;
+
+            let html = '';
+            itemsToRender.forEach(s => {
+                const children = pageItems.filter(child => {
+                    if (child.parentId === s.id) return true;
+                    if (child.components && child.components.length > 0 && child.components[0].parentId === s.id) return true;
+                    return false;
+                });
+                const hasChildren = children.length > 0;
+                const isComposite = s.components && s.components.length > 1;
+                const cat = CATEGORY_MAP[s.category];
+                const isLowStock = s.stock > 0 && s.stock < 20;
+
+                html += `
+                    <tr class="item-row hover:bg-gray-50/70 transition-colors ${s.isActive ? '' : 'opacity-60 bg-gray-50/30'} ${hasChildren ? 'cursor-pointer group/parent' : ''}" data-id="${s.id}" data-type="parent">
+                        <td class="p-5 pl-8">
+                            <div class="flex items-center gap-3">
+                                ${hasChildren ? `
+                                    <div class="w-6 h-6 flex items-center justify-center rounded-lg bg-gray-100 group-hover/parent:bg-indigo-100 transition-colors toggle-children" data-parent-id="${s.id}">
+                                        <svg class="w-3.5 h-3.5 text-gray-500 group-hover/parent:text-indigo-600 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="4" d="M9 5l7 7-7 7"></path></svg>
+                                    </div>
+                                ` : '<div class="w-6"></div>'}
+                                <div>
+                                    <div class="flex items-center gap-2">
+                                        <div class="font-black text-gray-900 text-sm leading-tight">${s.name}</div>
+                                        ${isComposite ? '<span class="px-1.5 py-0.5 rounded-lg bg-indigo-50 text-indigo-500 text-[8px] font-black uppercase tracking-tighter" title="Insumo compuesto por varias partes">🧩 Compuesto</span>' : ''}
+                                    </div>
+                                    ${s.supplier ? `<div class="text-[9px] text-gray-400 font-black uppercase tracking-widest mt-1">${s.supplier}</div>` : ''}
+                                </div>
+                            </div>
+                        </td>
+                        <td class="p-5">
+                            <span class="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white text-[10px] font-black uppercase tracking-wider text-gray-500 border border-gray-100 shadow-sm">
+                                ${cat ? cat.icon : ''} ${cat ? cat.label : s.category}
+                            </span>
+                        </td>
+                        <td class="p-5">
+                            <span class="font-mono text-xs font-black text-gray-400 bg-gray-100 px-2 py-0.5 rounded-lg">${s.unit}</span>
+                        </td>
+                        <td class="p-5">
+                            <span class="font-mono text-sm font-black text-indigo-600">${fmt(s.unitCost)}</span>
+                        </td>
+                        <td class="p-5 whitespace-nowrap">
+                            <span class="font-mono text-xs font-bold text-gray-500">${s.packPrice ? fmt(s.packPrice) : '-'}</span>
+                        </td>
+                        <td class="p-5">
+                            <div class="flex items-center gap-2">
+                                <span class="font-mono text-sm font-bold tabular-nums ${isLowStock ? 'text-rose-600' : 'text-gray-700'}">${Number(s.stock || 0).toLocaleString('es-AR')}</span>
+                                ${isLowStock ? '<span class="text-rose-500 animate-pulse text-xs">⚠️</span>' : ''}
+                            </div>
+                        </td>
+                        <td class="p-5">
+                            <span class="text-[9px] font-black text-gray-400 uppercase tracking-tighter tabular-nums">${new Date(s.updatedAt).toLocaleDateString()}</span>
+                        </td>
+                        <td class="p-5">
+                            <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-[0.1em] ${s.isActive ? 'bg-emerald-50 text-emerald-600' : 'bg-gray-100 text-gray-400'}">
+                                <span class="w-1.5 h-1.5 rounded-full ${s.isActive ? 'bg-emerald-500' : 'bg-gray-400 shadow-inner'}"></span>
+                                ${s.isActive ? 'Activo' : 'Inactivo'}
+                            </span>
+                        </td>
+                        <td class="p-5 pr-8 text-right">
+                            <div class="flex items-center justify-end gap-1">
+                                ${s.link ? `
+                                    <a href="${s.link}" target="_blank" class="p-2.5 text-gray-400 hover:text-indigo-600 hover:bg-white hover:shadow-sm rounded-xl transition-all border border-transparent hover:border-indigo-50" title="Ver enlace">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
+                                    </a>` : ''}
+                                <button class="p-2.5 text-gray-400 hover:text-indigo-600 hover:bg-white hover:shadow-sm rounded-xl transition-all border border-transparent hover:border-indigo-50 btn-edit" data-id="${s.id}" title="Editar">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
+                                </button>
+                                <button class="p-2.5 text-gray-400 hover:text-rose-600 hover:bg-white hover:shadow-sm rounded-xl transition-all border border-transparent hover:border-rose-50 btn-delete" data-id="${s.id}" title="Eliminar">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+
+                if (hasChildren) {
+                    children.forEach(c => {
+                        const childCat = CATEGORY_MAP[c.category];
+                        html += `
+                            <tr class="child-row group/child hidden transition-all duration-300 bg-gray-50/20" data-parent-of-group="${s.id}">
+                                <td class="p-4 pl-16">
+                                    <div class="flex items-center gap-3">
+                                        <div class="w-4 h-0.5 bg-gray-200"></div>
+                                        <div>
+                                            <div class="font-bold text-gray-700 text-xs">${c.name}</div>
+                                            <div class="text-[8px] text-gray-400 uppercase font-bold tracking-widest mt-0.5">
+                                                ${c.parentId === s.id ? `Rinde x${parseFloat(c.yieldRatio || 1)}` : `Parte de composición (x${parseFloat(c.components[0].yieldRatio || 1)})`} 
+                                                del padre
+                                            </div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="p-4">
+                                     <span class="text-[9px] font-bold uppercase text-gray-400">${childCat?.label || c.category}</span>
+                                </td>
+                                <td class="p-4">
+                                    <span class="font-mono text-[10px] text-gray-400">${c.unit}</span>
+                                </td>
+                                <td class="p-4">
+                                    <span class="font-mono text-xs font-bold text-indigo-500">${fmt(c.unitCost)}</span>
+                                </td>
+                                <td class="p-4 whitespace-nowrap">
+                                    <span class="font-mono text-[10px] text-gray-400">${c.packPrice ? fmt(c.packPrice) : '-'}</span>
+                                </td>
+                                <td class="p-4 text-xs tabular-nums text-gray-500">
+                                    ${Number(c.stock || 0)}
+                                </td>
+                                <td class="p-4"></td>
+                                <td class="p-4"></td>
+                                <td class="p-4 pr-8 text-right">
+                                    <div class="flex items-center justify-end gap-1 opacity-0 group-hover/child:opacity-100 transition-opacity">
+                                        <button class="p-2 text-gray-400 hover:text-indigo-600 btn-edit" data-id="${c.id}">
+                                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
+                                        </button>
+                                        <button class="p-2 text-gray-400 hover:text-rose-600 btn-delete" data-id="${c.id}">
+                                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        `;
+                    });
+                }
+            });
+
+            tbody.innerHTML = html;
+
+            // Expand logic
+            tbody.querySelectorAll('.item-row[data-type="parent"]').forEach(row => {
+                row.addEventListener('click', (e) => {
+                    // Don't toggle if clicking buttons
+                    if (e.target.closest('button') || e.target.closest('a')) return;
+                    
+                    const parentId = row.dataset.id;
+                    const children = tbody.querySelectorAll(`.child-row[data-parent-of-group="${parentId}"]`);
+                    const chevron = row.querySelector('.toggle-children svg');
+                    
+                    if (children.length > 0) {
+                        const isHidden = children[0].classList.contains('hidden');
+                        children.forEach(child => {
+                            if (isHidden) {
+                                child.classList.remove('hidden');
+                                child.classList.add('animate-in', 'fade-in', 'slide-in-from-top-1');
+                            } else {
+                                child.classList.add('hidden');
+                            }
+                        });
+                        if (chevron) {
+                            chevron.style.transform = isHidden ? 'rotate(90deg)' : 'rotate(0deg)';
+                        }
+                    }
+                });
+            });
+
+            // If searching, auto-expand rows that have child matches
+            if (state.search) {
+                tbody.querySelectorAll('.child-row').forEach(row => {
+                    row.classList.remove('hidden');
+                });
+                tbody.querySelectorAll('.toggle-children svg').forEach(svg => {
+                    svg.style.transform = 'rotate(90deg)';
+                });
+            }
+
+            tbody.querySelectorAll('.btn-edit').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    openEdit(parseInt(btn.dataset.id));
+                });
+            });
+            tbody.querySelectorAll('.btn-delete').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    deleteSupply(parseInt(btn.dataset.id));
+                });
+            });
+
+            const endIdx = Math.min(start + state.perPage, total);
+            document.getElementById('table-info').textContent =
+                total === 0 ? 'Sin resultados' :
+                `${start + 1}–${endIdx} DE ${total} INSUMOS`;
+
+            const totalPages = Math.ceil(total / state.perPage);
+            const pag = document.getElementById('pagination');
+            if (totalPages <= 1) { pag.innerHTML = ''; return; }
+            
+            let pagHtml = `
+                <button class="w-10 h-10 flex items-center justify-center rounded-xl border border-gray-100 bg-white text-gray-400 hover:text-indigo-600 hover:shadow-md transition-all disabled:opacity-30 disabled:pointer-events-none active:scale-90" id="pag-prev" ${state.page === 1 ? 'disabled' : ''}>
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M15 19l-7-7 7-7"></path></svg>
+                </button>
+            `;
+            for (let i = 1; i <= totalPages; i++) {
+                pagHtml += `
+                    <button class="w-10 h-10 flex items-center justify-center rounded-xl border text-[11px] font-black transition-all active:scale-90 ${i === state.page ? 'border-indigo-600 bg-indigo-600 text-white shadow-xl shadow-indigo-100' : 'border-gray-100 bg-white text-gray-400 hover:text-gray-900 hover:shadow-md'}" data-page="${i}">${i}</button>
+                `;
+            }
+            pagHtml += `
+                <button class="w-10 h-10 flex items-center justify-center rounded-xl border border-gray-100 bg-white text-gray-400 hover:text-indigo-600 hover:shadow-md transition-all disabled:opacity-30 disabled:pointer-events-none active:scale-90" id="pag-next" ${state.page === totalPages ? 'disabled' : ''}>
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M9 5l7 7-7 7"></path></svg>
+                </button>
+            `;
+            pag.innerHTML = pagHtml;
+
+            pag.querySelector('#pag-prev')?.addEventListener('click', () => { state.page--; renderTable(); });
+            pag.querySelector('#pag-next')?.addEventListener('click', () => { state.page++; renderTable(); });
+            pag.querySelectorAll('[data-page]').forEach(btn => {
+                btn.addEventListener('click', () => { state.page = parseInt(btn.dataset.page); renderTable(); });
+            });
+        }
+
+        function render() {
+            renderStats();
+            renderCatTabs();
+            renderTable();
+        }
+
+        const overlay = document.getElementById('modal-overlay');
+        const modalTitle = document.getElementById('modal-title');
+        const form = document.getElementById('supply-form');
+
+        function openModal() {
+            overlay.classList.remove('hidden');
+            overlay.classList.add('flex');
+            setTimeout(() => {
+                overlay.classList.add('fade-in');
+            }, 10);
+        }
+
+        function closeModal() {
+            overlay.classList.remove('flex');
+            overlay.classList.add('hidden');
+            form.reset();
+            document.getElementById('supply-id').value = '';
+            document.getElementById('f-active').checked = true;
+            modalTitle.textContent = 'Nuevo Insumo';
+            compContainer.innerHTML = '';
+            compEmpty.classList.remove('hidden');
+        }
+
+        function openEdit(id) {
+            const s = supplies.find(x => x.id === id);
+            if (!s) return;
+            modalTitle.textContent = 'Editar Insumo';
+            document.getElementById('supply-id').value = id;
+            document.getElementById('f-name').value = s.name;
+            document.getElementById('f-category').value = s.category;
+            document.getElementById('f-unit').value = s.unit;
+            document.getElementById('f-cost').value = parseFloat(s.unitCost);
+            document.getElementById('f-stock').value = s.stock || 0;
+            document.getElementById('f-supplier').value = s.supplier || '';
+            document.getElementById('f-link').value = s.link || '';
+            document.getElementById('f-notes').value = s.notes || '';
+            document.getElementById('f-active').checked = s.isActive;
+            
+            // Phase 11 fields
+            document.getElementById('f-pack-price').value = s.packPrice ? parseFloat(s.packPrice) : '';
+            document.getElementById('f-pack-qty').value = s.packQuantity ? parseFloat(s.packQuantity) : '';
+            
+            // Phase 15: Components
+            compContainer.innerHTML = '';
+            if (s.components && s.components.length > 0) {
+                s.components.forEach(c => addComponentRow(c));
+                compEmpty.classList.add('hidden');
+            } else if (s.parentId) {
+                // Legacy fallback
+                addComponentRow({ parentId: s.parentId, yieldRatio: s.yieldRatio });
+                compEmpty.classList.add('hidden');
+            } else {
+                compEmpty.classList.remove('hidden');
+            }
+            
+            openModal();
+        }
+
+        async function saveSupply() {
+            const id = document.getElementById('supply-id').value;
+            
+            // Gather components
+            const components = [];
+            compContainer.querySelectorAll('.group').forEach(row => {
+                const parentId = row.querySelector('.comp-parent').value;
+                const yieldRatio = row.querySelector('.comp-yield').value;
+                if (parentId && yieldRatio) {
+                    components.push({ parentId: parseInt(parentId), yieldRatio: parseFloat(yieldRatio) });
+                }
+            });
+
+            const data = {
+                name: document.getElementById('f-name').value.trim(),
+                category: document.getElementById('f-category').value,
+                unit: document.getElementById('f-unit').value,
+                unitCost: parseFloat(document.getElementById('f-cost').value),
+                stock: parseInt(document.getElementById('f-stock').value) || 0,
+                supplier: document.getElementById('f-supplier').value.trim(),
+                link: document.getElementById('f-link').value.trim(),
+                notes: document.getElementById('f-notes').value.trim(),
+                isActive: document.getElementById('f-active').checked,
+                packPrice: document.getElementById('f-pack-price').value || null,
+                packQuantity: document.getElementById('f-pack-qty').value || null,
+                components: components
+            };
+
+            if (!data.name || !data.category || !data.unit || isNaN(data.unitCost)) {
+                window.showToast('Completá los campos obligatorios', 'error');
+                return;
+            }
+
+            const saveBtn = document.getElementById('modal-save');
+            const originalText = saveBtn.textContent;
+            saveBtn.disabled = true;
+            saveBtn.textContent = 'Guardando...';
+
+            try {
+                const url = id ? `/api/supplies/${id}` : '/api/supplies';
+                const method = id ? 'PUT' : 'POST';
+                
+                const res = await fetch(url, {
+                    method,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                if (res.ok) {
+                    const savedItems = await res.json();
+                    const itemsToUpdate = Array.isArray(savedItems) ? savedItems : [savedItems];
+                    
+                    itemsToUpdate.forEach(item => {
+                        const idx = supplies.findIndex(x => x.id === item.id);
+                        if (idx !== -1) {
+                            supplies[idx] = item;
+                        } else {
+                            supplies.unshift(item);
+                        }
+                    });
+
+                    if (id) {
+                        window.showToast('Insumo(s) actualizado(s) correctamente');
+                    } else {
+                        window.showToast('Insumo creado correctamente');
+                    }
+                    closeModal();
+                    render();
+                } else {
+                    const err = await res.json();
+                    window.showToast(err.error || 'Error al guardar', 'error');
+                }
+            } catch (error) {
+                console.error('Save error:', error);
+                window.showToast('Error de conexión', 'error');
+            } finally {
+                saveBtn.disabled = false;
+                saveBtn.textContent = originalText;
+            }
+        }
+
+        // Auto-calculation logic
+        const fCost = document.getElementById('f-cost');
+        const fPackPrice = document.getElementById('f-pack-price');
+        const fPackQty = document.getElementById('f-pack-qty');
+        const compContainer = document.getElementById('comp-container');
+        const compEmpty = document.getElementById('comp-empty');
+        const btnAddComp = document.getElementById('btn-add-comp');
+
+        function addComponentRow(data = { parentId: '', yieldRatio: '' }) {
+            const row = document.createElement('div');
+            row.className = 'flex items-center gap-3 bg-white p-3 rounded-2xl border border-gray-100 shadow-sm group animate-in flex-col md:flex-row';
+            row.innerHTML = `
+                <div class="flex-1 w-full">
+                    <select class="comp-parent block w-full rounded-xl border-gray-50 bg-gray-50/50 focus:bg-white focus:border-indigo-500 font-bold text-xs h-10 border transition-all px-3">
+                        <option value="">Seleccionar Padre...</option>
+                        ${supplies
+                            .filter(s => s.id !== parseInt(document.getElementById('supply-id').value))
+                            .map(s => `<option value="${s.id}" ${data.parentId == s.id ? 'selected' : ''}>${s.name} (${s.unit})</option>`)
+                            .join('')}
+                    </select>
+                </div>
+                <div class="flex items-center gap-2 w-full md:w-32">
+                    <span class="text-[10px] font-black text-gray-400">X</span>
+                    <input type="number" step="0.001" value="${data.yieldRatio}" placeholder="Rinde" class="comp-yield block w-full rounded-xl border-gray-50 bg-gray-50/50 focus:bg-white focus:border-indigo-500 font-mono font-bold text-xs h-10 border transition-all px-3" />
+                </div>
+                <button type="button" class="btn-remove-comp p-2 text-gray-300 hover:text-rose-500 transition-colors">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                </button>
+            `;
+
+            row.querySelector('.btn-remove-comp').addEventListener('click', () => {
+                row.remove();
+                if (compContainer.children.length === 0) compEmpty.classList.remove('hidden');
+                recalculateUnitCost();
+            });
+
+            row.querySelectorAll('select, input').forEach(el => {
+                el.addEventListener('input', recalculateUnitCost);
+            });
+
+            compContainer.appendChild(row);
+            compEmpty.classList.add('hidden');
+        }
+
+        btnAddComp.addEventListener('click', () => addComponentRow());
+
+        function recalculateUnitCost() {
+            const pPrice = parseFloat(fPackPrice.value);
+            const pQty = parseFloat(fPackQty.value);
+            
+            // Priority 1: Pack Calc
+            if (!isNaN(pPrice) && !isNaN(pQty) && pQty > 0) {
+                fCost.value = (pPrice / pQty).toFixed(2);
+                return;
+            }
+
+            // Priority 2: Composition Sum
+            let total = 0;
+            let hasParents = false;
+            compContainer.querySelectorAll('.group').forEach(row => {
+                const pid = row.querySelector('.comp-parent').value;
+                const yieldVal = parseFloat(row.querySelector('.comp-yield').value);
+                
+                if (pid && !isNaN(yieldVal) && yieldVal > 0) {
+                    const parent = supplies.find(s => s.id == pid);
+                    if (parent) {
+                        total += parseFloat(parent.unitCost) / yieldVal;
+                        hasParents = true;
+                    }
+                }
+            });
+
+            if (hasParents) {
+                fCost.value = total.toFixed(2);
+            }
+        }
+
+        fPackPrice.addEventListener('input', recalculateUnitCost);
+        fPackQty.addEventListener('input', recalculateUnitCost);
+
+        async function deleteSupply(id) {
+            if (!confirm('¿Estás seguro de eliminar este insumo? Esta acción no se puede deshacer.')) return;
+            
+            try {
+                const res = await fetch(`/api/supplies/${id}`, { method: 'DELETE' });
+                if (res.ok) {
+                    supplies = supplies.filter(x => x.id !== id);
+                    window.showToast('Insumo eliminado');
+                    render();
+                } else {
+                    window.showToast('Error al eliminar', 'error');
+                }
+            } catch (error) {
+                console.error('Delete error:', error);
+                window.showToast('Error de conexión', 'error');
+            }
+        }
+
+        document.getElementById('btn-new').addEventListener('click', () => {
+            closeModal();
+            openModal();
+        });
+        document.getElementById('modal-close').addEventListener('click', closeModal);
+        document.getElementById('modal-cancel').addEventListener('click', closeModal);
+        document.getElementById('modal-save').addEventListener('click', saveSupply);
+        
+        document.getElementById('search-input').addEventListener('input', (e) => {
+            state.search = e.target.value;
+            state.page = 1;
+            render();
+        });
+
+        document.getElementById('filter-status').addEventListener('change', (e) => {
+            state.status = e.target.value;
+            state.page = 1;
+            renderTable();
+        });
+
+        document.getElementById('sort-select').addEventListener('change', (e) => {
+            state.sort = e.target.value;
+            renderTable();
+        });
+
+        document.getElementById('btn-export').addEventListener('click', () => {
+            const filtered = getFiltered();
+            const rows = [['Nombre', 'Categoría', 'Unidad', 'Costo Unitario', 'Stock', 'Proveedor', 'Link', 'Estado']];
+            filtered.forEach(s => {
+                rows.push([
+                    s.name,
+                    CATEGORY_MAP[s.category]?.label || s.category,
+                    s.unit,
+                    s.unitCost,
+                    s.stock,
+                    s.supplier || '',
+                    s.link || '',
+                    s.isActive ? 'Activo' : 'Inactivo'
+                ]);
+            });
+            const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
+            const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a'); a.href = url; a.download = 'insumos-decomoi.csv'; a.click();
+            URL.revokeObjectURL(url);
+        });
+
+        document.getElementById('btn-import').addEventListener('click', () => {
+            window.showToast('Módulo de importación próximamente disponible', 'success');
+        });
+
+        render();
+    </script>
+</AdminLayout>

@@ -1,11 +1,11 @@
 ---
 import AdminLayout from '../../../layouts/AdminLayout.astro';
 import { db } from '../../../lib/db/connection';
-import { meliItemLinks, products } from '../../../lib/db/schema';
-import { eq, desc } from 'drizzle-orm';
+import { meliItemLinks, products, costItems, productCostItems } from '../../../lib/db/schema';
+import { eq, desc, and } from 'drizzle-orm';
 
 // Cargar productos y sus links ML
-const allLinks = await db
+const allLinksRaw = await db
   .select({
     linkId: meliItemLinks.id,
     productId: products.id,
@@ -21,6 +21,46 @@ const allLinks = await db
   .from(meliItemLinks)
   .leftJoin(products, eq(meliItemLinks.productId, products.id))
   .orderBy(desc(meliItemLinks.createdAt));
+
+// Obtener costos globales activos (una sola vez)
+const globalCosts = await db.select().from(costItems).where(
+  and(eq(costItems.isActive, true), eq(costItems.isGlobal, true))
+);
+
+// Para cada link, calcular la Inversión Total
+const allLinks = await Promise.all(allLinksRaw.map(async (link) => {
+  if (!link.productId) return { ...link, inversionTotal: 0 };
+
+  // Costos específicos del producto
+  const pCosts = await db.select({
+    name: costItems.name,
+    type: costItems.type,
+    value: costItems.value,
+    isActive: costItems.isActive,
+  }).from(productCostItems)
+    .innerJoin(costItems, eq(productCostItems.costItemId, costItems.id))
+    .where(eq(productCostItems.productId, link.productId));
+
+  // Merge costos producto + globales (sin duplicar)
+  let allCosts = [...pCosts.filter(c => c.isActive).map(c => ({ name: c.name, type: c.type, value: Number(c.value) }))];
+  globalCosts.forEach(gc => {
+    if (!allCosts.some(p => p.name === gc.name)) {
+      allCosts.push({ name: gc.name, type: gc.type, value: Number(gc.value) });
+    }
+  });
+
+  let neto = Number(link.basePrice);
+  let fijo = 0;
+  allCosts.forEach(cost => {
+    if (cost.type === 'percentage') {
+      neto -= neto * (cost.value / 100);
+    } else {
+      fijo += cost.value;
+    }
+  });
+
+  return { ...link, inversionTotal: neto + fijo };
+}));
 
 ---
 
@@ -54,7 +94,7 @@ const allLinks = await db
             <tr>
               <th class="px-2 first:pl-5 last:pr-5 py-3 whitespace-nowrap"><div class="font-semibold text-left">Producto</div></th>
               <th class="px-2 first:pl-5 last:pr-5 py-3 whitespace-nowrap"><div class="font-semibold text-left">Item ID (ML)</div></th>
-              <th class="px-2 first:pl-5 last:pr-5 py-3 whitespace-nowrap"><div class="font-semibold text-left">Precio Base</div></th>
+              <th class="px-2 first:pl-5 last:pr-5 py-3 whitespace-nowrap"><div class="font-semibold text-left">Inversión Total</div></th>
               <th class="px-2 first:pl-5 last:pr-5 py-3 whitespace-nowrap"><div class="font-semibold text-left">Último Precio ML</div></th>
               <th class="px-2 first:pl-5 last:pr-5 py-3 whitespace-nowrap"><div class="font-semibold text-center">Sync</div></th>
               <th class="px-2 first:pl-5 last:pr-5 py-3 whitespace-nowrap"><div class="font-semibold text-center">Acciones</div></th>
@@ -78,7 +118,7 @@ const allLinks = await db
                   </a>
                 </td>
                 <td class="px-2 first:pl-5 last:pr-5 py-3 whitespace-nowrap">
-                  ${link.basePrice}
+                  ${Number(link.inversionTotal).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </td>
                 <td class="px-2 first:pl-5 last:pr-5 py-3 whitespace-nowrap">
                   {link.lastSyncedPrice ? `$${link.lastSyncedPrice}` : 'N/A'}

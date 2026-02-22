@@ -566,3 +566,59 @@ export const meliOrders = pgTable('meli_orders', {
     rawData: json('raw_data').$type<Record<string, any>>(), // Data cruda de ML para referencia
     importedAt: timestamp('imported_at').defaultNow(),
 });
+
+// ============================================
+// INSUMOS (Supplies)
+// ============================================
+export const supplies = pgTable('supplies', {
+    id: serial('id').primaryKey(),
+    name: varchar('name', { length: 200 }).notNull(),
+    category: varchar('category', { length: 50 }).notNull(),
+    unit: varchar('unit', { length: 20 }).notNull(),
+    unitCost: decimal('unit_cost', { precision: 10, scale: 2 }).notNull(),
+    stock: integer('stock').default(0),
+    supplier: varchar('supplier', { length: 100 }),
+    link: varchar('link', { length: 500 }),
+    notes: text('notes'),
+    isActive: boolean('is_active').default(true),
+    // Phase 11 & 12
+    parentId: integer('parent_id'),
+    packPrice: decimal('pack_price', { precision: 10, scale: 2 }),
+    packQuantity: decimal('pack_quantity', { precision: 10, scale: 3 }),
+    yieldRatio: decimal('yield_ratio', { precision: 10, scale: 3 }),
+    updatedAt: timestamp('updated_at').defaultNow(),
+    createdAt: timestamp('created_at').defaultNow(),
+});
+
+export const productSupplies = pgTable('product_supplies', {
+    id: serial('id').primaryKey(),
+    productId: integer('product_id').notNull().references(() => products.id, { onDelete: 'cascade' }),
+    supplyId: integer('supply_id').notNull().references(() => supplies.id, { onDelete: 'cascade' }),
+    quantity: decimal('quantity', { precision: 10, scale: 3 }).notNull().default('0'),
+    partsUsed: decimal('parts_used', { precision: 10, scale: 3 }),
+    partsTotal: decimal('parts_total', { precision: 10, scale: 3 }),
+    createdAt: timestamp('created_at').defaultNow(),
+    updatedAt: timestamp('updated_at').defaultNow(),
+});
+
+export const supplyComposition = pgTable('supply_composition', {
+    id: serial('id').primaryKey(),
+    supplyId: integer('supply_id').notNull().references(() => supplies.id, { onDelete: 'cascade' }),
+    parentId: integer('parent_id').notNull().references(() => supplies.id, { onDelete: 'cascade' }),
+    yieldRatio: decimal('yield_ratio', { precision: 10, scale: 3 }).notNull().default('1'),
+    createdAt: timestamp('created_at').defaultNow(),
+    updatedAt: timestamp('updated_at').defaultNow(),
+});
+
+export const supplyCompositionRelations = relations(supplyComposition, ({ one }) => ({
+    childSupply: one(supplies, {
+        fields: [supplyComposition.supplyId],
+        references: [supplies.id],
+    }),
+    parentSupply: one(supplies, {
+        fields: [supplyComposition.parentId],
+        references: [supplies.id],
+    }),
+}));
+
+

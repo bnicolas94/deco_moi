@@ -80,3 +80,62 @@ export async function updateMeliItem(itemId: string, updates: {
 
     return response.json();
 }
+
+/**
+ * Retrieves all items (active, paused, closed) for a given seller.
+ * Uses the /users/{userId}/items/search endpoint to get IDs,
+ * then fetches the full item details.
+ */
+export async function getAllSellerItems(userId: string, limit: number = 50, offset: number = 0) {
+    const token = await getValidAccessToken();
+    
+    // 1. Get the item IDs
+    const searchUrl = `${API_BASE}/users/${userId}/items/search?limit=${limit}&offset=${offset}`;
+    const searchRes = await fetch(searchUrl, {
+        headers: { Authorization: `Bearer ${token}` }
+    });
+
+    if (!searchRes.ok) {
+        const errText = await searchRes.text();
+        throw new Error(`Failed to search seller items: ${searchRes.status} ${errText}`);
+    }
+
+    const searchData = await searchRes.json();
+    const itemIds: string[] = searchData.results || [];
+
+    if (itemIds.length === 0) {
+        return {
+            paging: searchData.paging,
+            items: []
+        };
+    }
+
+    // 2. Fetch full details for the retrieved IDs
+    // ML API allows up to 20 IDs per request on /items?ids=
+    const items = [];
+    for (let i = 0; i < itemIds.length; i += 20) {
+        const chunk = itemIds.slice(i, i + 20);
+        const itemsUrl = `${API_BASE}/items?ids=${chunk.join(',')}`;
+        
+        const itemsRes = await fetch(itemsUrl, {
+            headers: { Authorization: `Bearer ${token}` }
+        });
+
+        if (!itemsRes.ok) {
+            console.error(`Failed to fetch item chunk ${chunk.join(',')}`);
+            continue;
+        }
+
+        const itemsData = await itemsRes.json();
+        itemsData.forEach((res: any) => {
+            if (res.code === 200) {
+                items.push(res.body);
+            }
+        });
+    }
+
+    return {
+        paging: searchData.paging,
+        items
+    };
+}

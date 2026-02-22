@@ -1,0 +1,277 @@
+---
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import { db } from '../../../lib/db/connection';
+import { products } from '../../../lib/db/schema';
+import { eq, desc } from 'drizzle-orm';
+
+// Cargar catálogo local para el datalist (selector de productos)
+const allProducts = await db
+  .select({
+    id: products.id,
+    name: products.name,
+    sku: products.sku,
+  })
+  .from(products)
+  .orderBy(desc(products.createdAt));
+
+---
+
+<AdminLayout title="Gestión Externa MercadoLibre">
+  <div class="px-4 sm:px-6 lg:px-8 py-8 w-full max-w-9xl mx-auto">
+    <div class="sm:flex sm:justify-between sm:items-center mb-8">
+      <div class="mb-4 sm:mb-0">
+        <h1 class="text-2xl md:text-3xl text-slate-800 dark:text-slate-100 font-bold">
+          Gestor de Publicaciones ML Externas
+        </h1>
+        <p class="text-sm text-slate-500 mt-1">Vincula o sobreescribe productos de tu catálogo a tus ítems ya creados en Mercado Libre.</p>
+      </div>
+      <div class="flex gap-2">
+         <a href="/admin/meli" class="btn bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600">Volver al Dashboard</a>
+      </div>
+    </div>
+
+    <!-- Filtros -->
+    <div class="mb-4 sm:flex items-center justify-between">
+      <div class="mb-4 sm:mb-0">
+        <input id="searchInput" class="form-input w-full sm:w-80" type="search" placeholder="Buscar publicación de ML..." />
+      </div>
+      <div>
+         <button id="btnReload" class="btn bg-white border-slate-200 text-slate-600 hover:border-slate-300">
+            <span id="reloadText">Recargar Listado</span>
+         </button>
+      </div>
+    </div>
+
+    <div class="bg-white dark:bg-slate-800 shadow-lg rounded-sm border border-slate-200 dark:border-slate-700 relative">
+      <div class="overflow-x-auto">
+        <table class="table-auto w-full dark:text-slate-300" id="listingsTable">
+          <thead class="text-xs font-semibold uppercase text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-900 border-t border-b border-slate-200 dark:border-slate-700">
+            <tr>
+              <th class="px-2 first:pl-5 last:pr-5 py-3 whitespace-nowrap w-16"><div class="font-semibold text-center">Img</div></th>
+              <th class="px-2 first:pl-5 last:pr-5 py-3 whitespace-normal min-w-48"><div class="font-semibold text-left">Publicación en ML</div></th>
+              <th class="px-2 first:pl-5 last:pr-5 py-3 whitespace-nowrap"><div class="font-semibold text-center">Estado ML</div></th>
+              <th class="px-2 first:pl-5 last:pr-5 py-3 whitespace-nowrap"><div class="font-semibold text-left">Vinculación (Catálogo Local)</div></th>
+              <th class="px-2 first:pl-5 last:pr-5 py-3 whitespace-nowrap"><div class="font-semibold text-right">Inversión Final</div></th>
+              <th class="px-2 first:pl-5 last:pr-5 py-3 whitespace-nowrap"><div class="font-semibold text-center">Acciones</div></th>
+            </tr>
+          </thead>
+          <tbody id="listingsBody" class="text-sm divide-y divide-slate-200 dark:divide-slate-700">
+            <tr>
+              <td colspan="6" class="px-2 py-8 text-center text-slate-500">
+                Cargando publicaciones...
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</AdminLayout>
+
+<script is:inline define:vars={{ allProducts }}>
+  let allItems = [];
+  const listingsBody = document.getElementById('listingsBody');
+  const searchInput = document.getElementById('searchInput');
+  const btnReload = document.getElementById('btnReload');
+  const reloadText = document.getElementById('reloadText');
+
+  async function loadListings() {
+    listingsBody.innerHTML = `
+      <tr>
+        <td colspan="6" class="px-2 py-8 text-center text-slate-500">
+          <svg class="animate-spin h-6 w-6 mx-auto mb-2 text-indigo-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+          Trayendo catálogo desde MercadoLibre...
+        </td>
+      </tr>
+    `;
+    reloadText.innerText = 'Cargando...';
+    btnReload.disabled = true;
+
+    try {
+      const res = await fetch('/api/meli/listings?limit=50');
+      const data = await res.json();
+      if (data.success) {
+        allItems = data.items;
+        renderItems(allItems);
+      } else {
+        listingsBody.innerHTML = `<tr><td colspan="6" class="px-2 py-4 text-center text-rose-500">Error: ${data.error}</td></tr>`;
+      }
+    } catch (e) {
+      listingsBody.innerHTML = `<tr><td colspan="6" class="px-2 py-4 text-center text-rose-500">Error de red al cargar publicaciones.</td></tr>`;
+    } finally {
+      reloadText.innerText = 'Recargar Listado';
+      btnReload.disabled = false;
+    }
+  }
+
+  function renderItems(items) {
+    if (items.length === 0) {
+      listingsBody.innerHTML = '<tr><td colspan="6" class="px-2 py-4 text-center text-slate-500">No se encontraron publicaciones.</td></tr>';
+      return;
+    }
+
+    listingsBody.innerHTML = items.map(item => {
+      const statusClass = {
+        'active': 'bg-emerald-100 text-emerald-800',
+        'paused': 'bg-amber-100 text-amber-800',
+        'closed': 'bg-rose-100 text-rose-800',
+        'inactive': 'bg-rose-100 text-rose-800'
+      }[item.status] || 'bg-slate-100 text-slate-800';
+
+      const localDataHtml = item.localData ? `
+        <div class="flex items-center gap-2">
+          <div class="flex-grow">
+            <div class="text-sm font-medium text-emerald-600 flex items-center gap-1">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+              Vinculado
+            </div>
+            <div class="text-xs text-slate-600 truncate max-w-48">${item.localData.productName}</div>
+            <div class="text-[10px] text-slate-400 font-mono">SKU: ${item.localData.productSku || 'N/A'}</div>
+          </div>
+          <button class="text-slate-400 hover:text-indigo-500 unset-link-btn" data-item-id="${item.id}" title="Cambiar vínculo">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
+          </button>
+        </div>
+      ` : `
+        <select class="form-select w-full text-sm py-1 h-8 product-select" data-item-id="${item.id}">
+          <option value="">-- Seleccionar --</option>
+          ${allProducts.map(p => `<option value="${p.id}">${p.name} (${p.sku || 'N/A'})</option>`).join('')}
+        </select>
+      `;
+
+      return `
+        <tr data-item-id="${item.id}">
+          <td class="px-2 first:pl-5 last:pr-5 py-3 whitespace-nowrap text-center">
+            ${item.thumbnail ? `<img src="${item.thumbnail}" class="w-10 h-10 rounded object-cover mx-auto" />` : '<div class="w-10 h-10 bg-slate-100 rounded mx-auto flex items-center justify-center text-slate-400 text-xs">Sin foto</div>'}
+          </td>
+          <td class="px-2 first:pl-5 last:pr-5 py-3 whitespace-normal">
+            <div class="font-medium text-slate-800 dark:text-slate-100">${item.title}</div>
+            <div class="text-xs text-slate-500 mt-1 flex items-center gap-2">
+              <span class="font-mono bg-slate-100 px-1 py-0.5 rounded text-[10px]">${item.id}</span>
+              <a href="${item.permalink}" target="_blank" class="text-indigo-500 hover:underline">Ver en ML ↗</a>
+              <span class="text-slate-400 ml-2">$${item.price.toLocaleString('es-AR')} actu.</span>
+            </div>
+          </td>
+          <td class="px-2 first:pl-5 last:pr-5 py-3 whitespace-nowrap text-center">
+            <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium capitalize ${statusClass}">${item.status}</span>
+          </td>
+          <td class="px-2 first:pl-5 last:pr-5 py-3 whitespace-nowrap">
+            ${localDataHtml}
+          </td>
+          <td class="px-2 first:pl-5 last:pr-5 py-3 whitespace-nowrap text-right">
+            ${item.localData ? `<span class="font-medium text-slate-800">$${Number(item.localData.inversionTotal).toLocaleString('es-AR', {minimumFractionDigits: 2})}</span>` : '<span class="text-xs text-slate-400">-</span>'}
+          </td>
+          <td class="px-2 first:pl-5 last:pr-5 py-3 whitespace-nowrap text-center">
+            ${item.localData ? `
+              <button class="text-indigo-500 hover:text-indigo-600 text-sm font-medium flex items-center gap-1 sync-price-btn mx-auto" data-product-id="${item.localData.productId}">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                Sync Precio
+              </button>
+            ` : `
+              <button class="btn text-xs bg-indigo-500 text-white hover:bg-indigo-600 h-7 py-0 save-link-btn" data-item-id="${item.id}">
+                Guardar Vínculo
+              </button>
+            `}
+          </td>
+        </tr>
+      `;
+    }).join('');
+
+    attachEvents();
+  }
+
+  function attachEvents() {
+    // Unset link
+    document.querySelectorAll('.unset-link-btn').forEach(btn => {
+      btn.onclick = () => {
+        const itemId = btn.getAttribute('data-item-id');
+        const item = allItems.find(i => i.id === itemId);
+        if (item) {
+          item.localData = null;
+          renderItems(allItems);
+        }
+      };
+    });
+
+    // Save link
+    document.querySelectorAll('.save-link-btn').forEach(btn => {
+      btn.onclick = async () => {
+        const itemId = btn.getAttribute('data-item-id');
+        const select = document.querySelector(`.product-select[data-item-id="${itemId}"]`);
+        const productId = select.value;
+        if (!productId) return alert('Selecciona un producto');
+
+        btn.disabled = true;
+        btn.innerText = 'Guardando...';
+
+        try {
+          const res = await fetch('/api/meli/link-listing', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ meliItemId: itemId, productId, syncEnabled: true })
+          });
+          const data = await res.json();
+          if (data.success) {
+            await loadListings();
+          } else {
+            alert('Error: ' + data.error);
+            btn.disabled = false;
+            btn.innerText = 'Guardar Vínculo';
+          }
+        } catch (e) {
+          alert('Error de red');
+          btn.disabled = false;
+          btn.innerText = 'Guardar Vínculo';
+        }
+      };
+    });
+
+    // Sync Price
+    document.querySelectorAll('.sync-price-btn').forEach(btn => {
+      btn.onclick = async () => {
+        const productId = btn.getAttribute('data-product-id');
+        btn.disabled = true;
+        const originalHtml = btn.innerHTML;
+        btn.innerText = 'Sincronizando...';
+
+        try {
+          const res = await fetch('/api/meli/sync-price', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ productId })
+          });
+          const data = await res.json();
+          if (data.success) {
+            await loadListings();
+          } else {
+            alert('Error: ' + data.error);
+            btn.disabled = false;
+            btn.innerHTML = originalHtml;
+          }
+        } catch (e) {
+          alert('Error de red');
+          btn.disabled = false;
+          btn.innerHTML = originalHtml;
+        }
+      };
+    });
+  }
+
+  searchInput.oninput = (e) => {
+    const q = e.target.value.toLowerCase();
+    const filtered = allItems.filter(i => 
+      i.title.toLowerCase().includes(q) || 
+      i.id.toLowerCase().includes(q) ||
+      (i.localData && i.localData.productName.toLowerCase().includes(q))
+    );
+    renderItems(filtered);
+  };
+
+  btnReload.onclick = loadListings;
+
+  // Initial load
+  loadListings();
+</script>

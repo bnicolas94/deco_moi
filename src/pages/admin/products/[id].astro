@@ -1,7 +1,7 @@
 ---
 import AdminLayout from '@/layouts/AdminLayout.astro';
 import { db } from '@/lib/db/connection';
-import { products, categories, mockupTemplates, productionTimeRules, meliItemLinks, costItems, productCostItems } from '@/lib/db/schema';
+import { products, categories, mockupTemplates, productionTimeRules, meliItemLinks, costItems, productCostItems, productSupplies, supplies } from '@/lib/db/schema';
 import { eq, asc, and } from 'drizzle-orm';
 import { Save, ArrowLeft, Image as ImageIcon, Trash2, Star, Plus, Clock } from 'lucide-react';
 
@@ -47,6 +47,33 @@ if (!isNew && id) {
     .where(eq(productCostItems.productId, parseInt(id)));
     
     productCosts = pCosts.filter(c => c.isActive).map(c => ({ name: c.name, type: c.type, value: Number(c.value) }));
+
+    // Fetch product specific supplies
+    const pSupplies = await db.select({
+        quantity: productSupplies.quantity,
+        partsUsed: productSupplies.partsUsed,
+        partsTotal: productSupplies.partsTotal,
+        unitCost: supplies.unitCost
+    }).from(productSupplies).innerJoin(supplies, eq(productSupplies.supplyId, supplies.id))
+    .where(eq(productSupplies.productId, parseInt(id)));
+
+    const suppliesTotal = Math.round(pSupplies.reduce((acc, s) => {
+        let qty = parseFloat(s.quantity.toString());
+        if (s.partsUsed && s.partsTotal) {
+            qty = parseFloat(s.partsUsed.toString()) / parseFloat(s.partsTotal.toString());
+        }
+        return acc + (qty * Number(s.unitCost));
+    }, 0) * 100) / 100;
+
+    if (suppliesTotal > 0) {
+        // Merge with existing "Insumos" if present or push new
+        const existingIdx = productCosts.findIndex(c => c.name.toLowerCase() === 'insumos');
+        if (existingIdx !== -1) {
+            productCosts[existingIdx].value += suppliesTotal;
+        } else {
+            productCosts.push({ name: 'Insumos', type: 'fixed', value: suppliesTotal });
+        }
+    }
 }
 
 // Global active costs
@@ -197,7 +224,12 @@ const currentImages = product?.images || [];
                                 <p class="text-[10px] text-gray-400 italic">Beneficio real estimado.</p>
                             </div>
                             <div class="space-y-2 group lg:col-span-1">
-                                <label class="block text-sm font-bold text-gray-700 group-focus-within:text-indigo-600 transition-colors">Precio Base (Bruto)</label>
+                                <div class="flex items-center justify-between">
+                                    <label class="block text-sm font-bold text-gray-700 group-focus-within:text-indigo-600 transition-colors">Precio Base (Bruto)</label>
+                                    <button type="button" id="toggleBreakdown" class="p-1 text-gray-400 hover:text-indigo-600 transition-colors" title="Ver Desglose de Cálculo">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-info"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+                                    </button>
+                                </div>
                                 <div class="relative">
                                     <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center text-gray-400 font-bold">$</span>
                                     <input 
@@ -231,6 +263,86 @@ const currentImages = product?.images || [];
                                     placeholder="PRD-001"
                                     class="block w-full rounded-xl border-gray-200 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm h-11 border px-4"
                                 />
+                            </div>
+                        </div>
+
+                        <!-- Pricing Breakdown Panel (Hidden by default) -->
+                        <div id="pricingBreakdown" class="hidden animate-in fade-in slide-in-from-top-2 p-5 bg-indigo-50/50 border border-indigo-100 rounded-2xl space-y-4">
+                            <div class="flex items-center justify-between border-b border-indigo-100/50 pb-2">
+                                <h3 class="text-xs font-black text-indigo-900 uppercase tracking-wider flex items-center gap-2">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-microscope"><path d="M6 18h8"/><path d="M3 22h18"/><path d="M14 22a7 7 0 1 0 0-14h-1"/><path d="M9 14h2"/><path d="M9 12a2 2 0 0 1-2-2V6h6v4a2 2 0 0 1-2 2Z"/><path d="M12 6V3a1 1 0 0 0-1-1H9a1 1 0 0 0-1 1v3"/></svg>
+                                    Desglose de Transparencia
+                                </h3>
+                                <span class="text-[10px] font-bold text-indigo-400">Fórmula: (Neto + Fijos) / (1 - %Fees)</span>
+                            </div>
+                            
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-8 text-[11px]">
+                                <!-- Fixed Costs List -->
+                                <div class="space-y-2">
+                                    <p class="font-bold text-gray-500 uppercase tracking-tight flex items-center justify-between">
+                                        Costos Fijos 
+                                        <span id="bd-total-fixed" class="text-rose-600">$0.00</span>
+                                    </p>
+                                    <div id="bd-fixed-list" class="space-y-1.5">
+                                        <!-- Will be populated by JS -->
+                                    </div>
+                                </div>
+                                
+                                <!-- Percentage Fees List -->
+                                <div class="space-y-2">
+                                    <p class="font-bold text-gray-500 uppercase tracking-tight flex items-center justify-between">
+                                        Comisiones y Gastos
+                                        <span id="bd-total-perc" class="text-indigo-600">0%</span>
+                                    </p>
+                                    <div id="bd-perc-list" class="space-y-1.5">
+                                        <!-- Will be populated by JS -->
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Final Summary -->
+                            <div class="pt-3 border-t border-indigo-100/50 flex flex-wrap items-center gap-x-6 gap-y-2 text-xs">
+                                <div class="flex items-center gap-1.5">
+                                    <span class="text-gray-400 font-medium">Inversión Total:</span>
+                                    <span id="bd-sum-investment" class="font-bold text-gray-900">$0.00</span>
+                                    <span class="text-[10px] text-gray-400">(Neto + Fijos)</span>
+                                </div>
+                                <div class="flex items-center gap-1.5">
+                                    <span class="text-gray-400 font-medium">Divisor:</span>
+                                    <span id="bd-divisor" class="font-bold text-gray-900">0.00</span>
+                                    <span class="text-[10px] text-gray-400">(1 - <span id="bd-perc-val">0</span>/100)</span>
+                                </div>
+                                <div class="ml-auto bg-indigo-600 text-white px-3 py-1.5 rounded-lg flex items-center gap-2">
+                                    <span class="font-bold uppercase text-[9px] tracking-widest opacity-80">Precio Final:</span>
+                                    <span id="bd-final-price" class="text-sm font-black">$0.00</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Fixed Costs Indicator & Multiplier -->
+                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 bg-rose-50/50 border border-rose-100/50 rounded-xl mt-2 animate-in fade-in slide-in-from-top-1">
+                            <div class="text-sm font-bold text-rose-500 flex items-center gap-1.5">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-calculator"><rect width="16" height="20" x="4" y="2" rx="2"/><line x1="8" x2="16" y1="6" y2="6"/><line x1="16" x2="16" y1="14" y2="18"/><path d="M16 10h.01"/><path d="M12 10h.01"/><path d="M8 10h.01"/><path d="M12 14h.01"/><path d="M8 14h.01"/><path d="M12 18h.01"/><path d="M8 18h.01"/></svg>
+                                <span>Costo Fijo Total: <span id="totalFixedLabel">$ 0.00</span></span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <span class="text-[10px] text-rose-400 font-medium mr-1 uppercase tracking-widest hidden sm:inline-block">Multiplicador:</span>
+                                <div class="flex items-center bg-white border border-rose-100 rounded-lg p-0.5 shadow-sm">
+                                    <button type="button" class="multiplier-btn px-2.5 py-1 hover:bg-rose-50 text-rose-600 font-bold text-xs rounded-md transition-all active:scale-95" data-multiply="2">x2</button>
+                                    <button type="button" class="multiplier-btn px-2.5 py-1 hover:bg-rose-50 text-rose-600 font-bold text-xs rounded-md transition-all active:scale-95" data-multiply="3">x3</button>
+                                    <button type="button" class="multiplier-btn px-2.5 py-1 hover:bg-rose-50 text-rose-600 font-bold text-xs rounded-md transition-all active:scale-95" data-multiply="4">x4</button>
+                                    <div class="w-px h-4 bg-rose-100 mx-1"></div>
+                                    <div class="relative flex items-center">
+                                        <span class="absolute left-1.5 text-[10px] font-bold text-rose-400">x</span>
+                                        <input 
+                                            type="number" 
+                                            step="0.1" 
+                                            id="manualMultiplier" 
+                                            placeholder="Personalizado" 
+                                            class="w-16 pl-4 pr-1 py-1 text-xs font-bold text-rose-600 border-none focus:ring-0 placeholder:text-rose-200 placeholder:font-medium"
+                                        />
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
@@ -587,18 +699,54 @@ const currentImages = product?.images || [];
 
     const calculateGrossFromNet = (net) => {
         if (!net || isNaN(net)) return '';
-        // Gross = (Net + Fixed) / (1 - Percentage/100)
-        // Ensure we handle cases where percentage >= 100 gracefully (though impossible in practice if sane values)
         if (totalPerc >= 100) return 'Error';
         const gross = (net + totalFixed) / (1 - (totalPerc / 100));
+        updateVisualBreakdown(net, gross);
         return parseFloat(gross).toFixed(2);
+    };
+
+    const updateVisualBreakdown = (net, gross) => {
+        const bdFixedList = document.getElementById('bd-fixed-list');
+        const bdPercList = document.getElementById('bd-perc-list');
+        
+        if (!bdFixedList || !bdPercList) return;
+        
+        // Populate Fixed Costs
+        bdFixedList.innerHTML = '';
+        allCosts.filter(c => c.type === 'fixed').forEach(c => {
+            const row = document.createElement('div');
+            row.className = 'flex items-center justify-between text-gray-600';
+            row.innerHTML = `<span>${c.name}</span> <span class="font-bold">$${c.value.toFixed(2)}</span>`;
+            bdFixedList.appendChild(row);
+        });
+        document.getElementById('bd-total-fixed').textContent = `$${totalFixed.toFixed(2)}`;
+        
+        // Populate Percentages
+        bdPercList.innerHTML = '';
+        allCosts.filter(c => c.type === 'percentage').forEach(c => {
+            const row = document.createElement('div');
+            row.className = 'flex items-center justify-between text-gray-600';
+            row.innerHTML = `<span>${c.name}</span> <span class="font-bold">${c.value}%</span>`;
+            bdPercList.appendChild(row);
+        });
+        document.getElementById('bd-total-perc').textContent = `${totalPerc.toFixed(2)}%`;
+        
+        // Totals
+        const investment = net + totalFixed;
+        const divisor = 1 - (totalPerc / 100);
+        
+        document.getElementById('bd-sum-investment').textContent = `$${investment.toLocaleString('es-AR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+        document.getElementById('bd-divisor').textContent = divisor.toFixed(4);
+        document.getElementById('bd-perc-val').textContent = totalPerc.toFixed(2);
+        document.getElementById('bd-final-price').textContent = `$${gross.toLocaleString('es-AR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
     };
 
     const calculateNetFromGross = (gross) => {
         if (!gross || isNaN(gross)) return '';
         // Net = Gross - Fixed - (Gross * Percentage/100)
-        const net = gross - totalFixed - (gross * (totalPerc / 100));
-        return parseFloat(net).toFixed(2);
+        const netValue = gross - totalFixed - (gross * (totalPerc / 100));
+        updateVisualBreakdown(netValue, gross);
+        return parseFloat(netValue).toFixed(2);
     };
 
     netInput?.addEventListener('input', (e) => {
@@ -623,6 +771,59 @@ const currentImages = product?.images || [];
     if (baseInput?.value) {
         netInput.value = calculateNetFromGross(parseFloat(baseInput.value));
     }
+    
+    // Fixed Costs Logic
+    const fixedLabel = document.getElementById('totalFixedLabel');
+    if (fixedLabel) {
+        fixedLabel.textContent = `$ ${totalFixed.toFixed(2)}`;
+    }
+    
+    document.querySelectorAll('.multiplier-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const multiplier = parseFloat(e.target.getAttribute('data-multiply'));
+            if (!isNaN(multiplier) && netInput) {
+                const manualInput = document.getElementById('manualMultiplier');
+                if (manualInput) manualInput.value = multiplier;
+                
+                applyMultiplier(multiplier);
+            }
+        });
+    });
+
+    const manualMultInput = document.getElementById('manualMultiplier');
+    manualMultInput?.addEventListener('input', (e) => {
+        const val = parseFloat(e.target.value);
+        if (!isNaN(val) && val > 0) {
+            applyMultiplier(val);
+        }
+    });
+
+    function applyMultiplier(multiplier) {
+        if (!netInput) return;
+        // Neto = Fijos * (Multiplicador - 1) 
+        // This ensures (Neto + Fijos) = Fijos * Multiplicador
+        const newNet = multiplier > 1 ? totalFixed * (multiplier - 1) : totalFixed * multiplier;
+        netInput.value = newNet.toFixed(2);
+        
+        // Dispatch input event to auto-calculate basePrice
+        netInput.dispatchEvent(new Event('input', { bubbles: true }));
+        
+        // Add a small visual pulse to the net input to show it updated
+        netInput.parentElement.classList.add('ring-2', 'ring-emerald-400', 'ring-offset-1');
+        setTimeout(() => {
+            netInput.parentElement.classList.remove('ring-2', 'ring-emerald-400', 'ring-offset-1');
+        }, 300);
+    }
+
+    // Toggle Breakdown
+    const toggleBtn = document.getElementById('toggleBreakdown');
+    const breakdownPanel = document.getElementById('pricingBreakdown');
+    toggleBtn?.addEventListener('click', () => {
+        breakdownPanel.classList.toggle('hidden');
+        toggleBtn.classList.toggle('text-indigo-600');
+        toggleBtn.classList.toggle('bg-indigo-50');
+        toggleBtn.classList.toggle('rounded-md');
+    });
 
     // Event Listeners Setup
     document.addEventListener('DOMContentLoaded', () => {

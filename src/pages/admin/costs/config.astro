@@ -1,14 +1,37 @@
 ---
 import AdminLayout from '@/layouts/AdminLayout.astro';
 import { db } from '@/lib/db/connection';
-import { costItems, shippingRealCosts, products, productCostItems } from '@/lib/db/schema';
-import { Calculator, Truck, Package, Plus, Trash2, Save } from 'lucide-react';
-import { eq, inArray } from 'drizzle-orm';
+import { costItems, shippingRealCosts, products, productCostItems, supplies } from '@/lib/db/schema';
+import { Calculator, Truck, Package, Plus, Trash2, Save, Archive, ExternalLink } from 'lucide-react';
+import { eq, inArray, and } from 'drizzle-orm';
 
 // Fetch initial data
 const allCostItems = await db.select().from(costItems).orderBy(costItems.name);
 const allShippingCosts = await db.select().from(shippingRealCosts).orderBy(shippingRealCosts.zone);
 const allProducts = await db.select().from(products).where(eq(products.isActive, true)).orderBy(products.name);
+const allSupplies = await db.select().from(supplies).where(eq(supplies.isActive, true)).orderBy(supplies.name);
+
+// Extract unique supply categories for tabs
+const supplyCategories = [...new Set(allSupplies.map(s => s.category))].sort();
+
+// Group supplies for hierarchical display
+const rootSupplies = allSupplies.filter(s => !s.parentId || !allSupplies.some(p => p.id === s.parentId));
+const suppliesByParent = new Map();
+allSupplies.forEach(s => {
+    if (s.parentId) {
+        if (!suppliesByParent.has(s.parentId)) suppliesByParent.set(s.parentId, []);
+        suppliesByParent.get(s.parentId).push(s);
+    }
+});
+
+const SUPPLY_ICONS: Record<string, string> = {
+  'chocolates': '🍫',
+  'hojas': '📄',
+  'velas': '🕯️',
+  'cajas': '📦',
+  'extras': '✨',
+  'tejidos': '🧵'
+};
 
 // We need a map of product -> cost items for the UI calculations
 const allProductLinks = await db.select().from(productCostItems);
@@ -171,6 +194,118 @@ allProductLinks.forEach(link => {
                                     ))}
                                 </div>
                             </form>
+
+                            <div class="mt-8 pt-6 border-t border-gray-100">
+                                <div class="flex items-center gap-2 mb-4">
+                                    <Archive className="w-5 h-5 text-indigo-600" />
+                                    <h3 class="text-md font-bold text-gray-900">Insumos Utilizados</h3>
+                                </div>
+                                
+                                <div class="flex flex-wrap gap-2 mb-6" id="supply-category-tabs">
+                                    <button type="button" class="supply-tab-btn px-4 py-2 rounded-full text-xs font-bold transition-all border bg-indigo-600 text-white border-indigo-600 shadow-sm flex items-center gap-2" data-category="ALL">
+                                        <span>🏷️</span>
+                                        TODOS ({allSupplies.length})
+                                    </button>
+                                    {supplyCategories.map(cat => (
+                                        <button type="button" class="supply-tab-btn px-4 py-2 rounded-full text-xs font-bold transition-all border bg-white text-gray-500 border-gray-200 hover:bg-gray-50 flex items-center gap-2" data-category={cat}>
+                                            <span>{SUPPLY_ICONS[cat.toLowerCase()] || '📦'}</span>
+                                            {cat.toUpperCase()} ({allSupplies.filter(s => s.category === cat).length})
+                                        </button>
+                                    ))}
+                                </div>
+
+                                <div class="space-y-3" id="product-supplies-list">
+                                    {allSupplies.length === 0 ? (
+                                        <p class="text-sm text-gray-400 italic">No hay insumos activos.</p>
+                                    ) : (
+                                        <div class="grid grid-cols-1 gap-3">
+                                            {rootSupplies.map(root => {
+                                                const children = suppliesByParent.get(root.id) || [];
+                                                const hasChildren = children.length > 0;
+                                                const isActualChild = !!root.parentId && allSupplies.some(p => p.id === root.parentId);
+                                                
+                                                // If this is a root item because it is an orphan, treat it as a normal item
+                                                return (
+                                                    <div class="supply-group border border-gray-100 rounded-2xl overflow-hidden bg-white shadow-sm" data-category={root.category}>
+                                                        <!-- Item Row -->
+                                                        <div class={`supply-item-row flex items-center justify-between p-4 bg-white hover:bg-gray-50/50 transition-colors ${hasChildren ? 'cursor-pointer' : ''}`} data-id={root.id} data-has-children={hasChildren ? "true" : "false"}>
+                                                            <div class="flex items-center gap-3">
+                                                                <input type="checkbox" name="supply_ids[]" value={root.id} data-cost={root.unitCost} class="supply-checkbox h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed" disabled />
+                                                                <div class="flex-1">
+                                                                    <div class="flex items-center gap-2">
+                                                                        {hasChildren && (
+                                                                            <svg class="w-3 h-3 text-gray-400 transform transition-transform duration-200 chevron-icon" data-id={root.id} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M9 5l7 7-7 7"></path></svg>
+                                                                        )}
+                                                                        <div class="text-sm font-bold text-gray-900">{root.name}</div>
+                                                                    </div>
+                                                                    <div class="flex items-center gap-2">
+                                                                        <div class="text-[10px] text-gray-400 uppercase font-bold tracking-wider">${Number(root.unitCost).toLocaleString('es-AR')} / {root.unit}</div>
+                                                                        <div class="row-subtotal hidden text-[10px] font-black text-rose-500 bg-rose-50 px-1.5 py-0.5 rounded border border-rose-100" data-id={root.id}>
+                                                                            $0.00
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                            <div class="flex items-center gap-3">
+                                                                <button type="button" class="yield-toggle p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all disabled:opacity-30" title="Calculadora de Rinde" data-id={root.id} disabled>
+                                                                    <Calculator className="w-3.5 h-3.5" />
+                                                                </button>
+                                                                <div class="flex items-center gap-2">
+                                                                    <div class="qty-container" data-id={root.id}>
+                                                                        <input type="number" step="0.001" min="0" value="0" data-id={root.id} class="supply-qty w-20 h-9 rounded-lg border-gray-200 text-sm font-bold text-center focus:ring-indigo-500 focus:border-indigo-500 disabled:opacity-50" disabled />
+                                                                    </div>
+                                                                    <div class="yield-container hidden flex items-center gap-1.5 p-1 bg-indigo-50 rounded-lg border border-indigo-100" data-id={root.id}>
+                                                                        <input type="number" placeholder="Uso" data-id={root.id} class="yield-used w-12 h-7 bg-white rounded border-indigo-100 text-[11px] font-bold text-center focus:ring-indigo-500 focus:border-indigo-500" />
+                                                                        <span class="text-[10px] font-bold text-indigo-400 uppercase">de</span>
+                                                                        <input type="number" placeholder="Total" data-id={root.id} class="yield-total w-12 h-7 bg-white rounded border-indigo-100 text-[11px] font-bold text-center focus:ring-indigo-500 focus:border-indigo-500" />
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+
+                                                        <!-- Children Container -->
+                                                        {hasChildren && (
+                                                            <div class="children-list hidden border-t border-gray-50 bg-gray-50/30" data-parent-of-list={root.id}>
+                                                                {children.map(child => (
+                                                                    <div class="supply-item-row flex items-center justify-between p-3 pl-10 border-b border-gray-50 last:border-0 hover:bg-gray-100/50 transition-colors" data-id={child.id} data-category={child.category}>
+                                                                        <div class="flex items-center gap-3">
+                                                                            <input type="checkbox" name="supply_ids[]" value={child.id} data-cost={child.unitCost} class="supply-checkbox h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed" disabled />
+                                                                            <div class="flex-1">
+                                                                                <div class="text-sm font-bold text-gray-700">{child.name}</div>
+                                                                                <div class="flex items-center gap-2">
+                                                                                    <div class="text-[10px] text-gray-400 font-bold uppercase tracking-wider">${Number(child.unitCost).toLocaleString('es-AR')} / {child.unit}</div>
+                                                                                    <div class="row-subtotal hidden text-[10px] font-black text-rose-500 bg-rose-50 px-1.5 py-0.5 rounded border border-rose-100" data-id={child.id}>
+                                                                                        $0.00
+                                                                                    </div>
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
+                                                                        <div class="flex items-center gap-3">
+                                                                            <button type="button" class="yield-toggle p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all disabled:opacity-30" title="Calculadora de Rinde" data-id={child.id} disabled>
+                                                                                <Calculator className="w-3.5 h-3.5" />
+                                                                            </button>
+                                                                            <div class="flex items-center gap-2">
+                                                                                <div class="qty-container" data-id={child.id}>
+                                                                                    <input type="number" step="0.001" min="0" value="0" data-id={child.id} class="supply-qty w-20 h-9 rounded-lg border-gray-200 text-sm font-bold text-center focus:ring-indigo-500 focus:border-indigo-500 disabled:opacity-50" disabled />
+                                                                                </div>
+                                                                                <div class="yield-container hidden flex items-center gap-1.5 p-1 bg-indigo-50 rounded-lg border border-indigo-100" data-id={child.id}>
+                                                                                    <input type="number" placeholder="Uso" data-id={child.id} class="yield-used w-12 h-7 bg-white rounded border-indigo-100 text-[11px] font-bold text-center focus:ring-indigo-500 focus:border-indigo-500" />
+                                                                                    <span class="text-[10px] font-bold text-indigo-400 uppercase">de</span>
+                                                                                    <input type="number" placeholder="Total" data-id={child.id} class="yield-total w-12 h-7 bg-white rounded border-indigo-100 text-[11px] font-bold text-center focus:ring-indigo-500 focus:border-indigo-500" />
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -299,6 +434,30 @@ allProductLinks.forEach(link => {
         });
     });
 
+    // SUPPLY CATEGORY TABS LOGIC
+    document.querySelectorAll('.supply-tab-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const cat = e.currentTarget.getAttribute('data-category');
+            
+            // UI Update Buttons
+            document.querySelectorAll('.supply-tab-btn').forEach(b => {
+                b.classList.remove('bg-indigo-600', 'text-white', 'border-indigo-600', 'shadow-sm');
+                b.classList.add('bg-white', 'text-gray-500', 'border-gray-200');
+            });
+            e.currentTarget.classList.remove('bg-white', 'text-gray-500', 'border-gray-200');
+            e.currentTarget.classList.add('bg-indigo-600', 'text-white', 'border-indigo-600', 'shadow-sm');
+
+            // Filter Rows
+            document.querySelectorAll('.supply-group').forEach(group => {
+                if (cat === 'ALL' || group.dataset.category === cat) {
+                    group.classList.remove('hidden');
+                } else {
+                    group.classList.add('hidden');
+                }
+            });
+        });
+    });
+
     // COST ITEM CREATION
     document.getElementById('create-cost-item-form')?.addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -350,6 +509,9 @@ allProductLinks.forEach(link => {
     let currentProductId = null;
     const prodSelector = document.getElementById('product-selector');
     const costCheckboxes = document.querySelectorAll('.cost-checkbox');
+    const supplyCheckboxes = document.querySelectorAll('.supply-checkbox');
+    const supplyQtys = document.querySelectorAll('.supply-qty');
+    const yieldToggles = document.querySelectorAll('.yield-toggle');
     const saveProdCostsBtn = document.getElementById('save-product-costs');
     const prodLoading = document.getElementById('product-loading');
     
@@ -366,6 +528,7 @@ allProductLinks.forEach(link => {
         if (!currentProductId) return;
         let totalCost = 0;
 
+        // 1. Cost Items (Percentages and Fixed)
         costCheckboxes.forEach(cb => {
             if (cb.checked) {
                 const isPercent = cb.getAttribute('data-type') === 'percentage';
@@ -375,6 +538,43 @@ allProductLinks.forEach(link => {
                 } else {
                     totalCost += val;
                 }
+            }
+        });
+
+        // 2. Supplies (Unit Cost * Quantity)
+        supplyCheckboxes.forEach(cb => {
+            if (cb.checked) {
+                const supplyId = cb.value;
+                const unitCost = parseFloat(cb.getAttribute('data-cost'));
+                
+                const yieldContainer = document.querySelector(`.yield-container[data-id="${supplyId}"]`);
+                const subtotalEl = document.querySelector(`.row-subtotal[data-id="${supplyId}"]`);
+                let qty = 0;
+                
+                if (yieldContainer && !yieldContainer.classList.contains('hidden')) {
+                    const used = parseFloat(yieldContainer.querySelector('.yield-used').value) || 0;
+                    const total = parseFloat(yieldContainer.querySelector('.yield-total').value) || 1;
+                    qty = used / total;
+                } else {
+                    const qtyInput = document.querySelector(`.supply-qty[data-id="${supplyId}"]`);
+                    qty = parseFloat(qtyInput.value) || 0;
+                }
+                
+                const subtotal = unitCost * qty;
+                totalCost += subtotal;
+
+                if (subtotalEl) {
+                    if (qty > 0) {
+                        subtotalEl.textContent = `$${subtotal.toLocaleString('es-AR', {minimumFractionDigits: 2})}`;
+                        subtotalEl.classList.remove('hidden');
+                    } else {
+                        subtotalEl.classList.add('hidden');
+                    }
+                }
+            } else {
+                // Hide subtotal if not checked
+                const subtotalEl = document.querySelector(`.row-subtotal[data-id="${cb.value}"]`);
+                if (subtotalEl) subtotalEl.classList.add('hidden');
             }
         });
 
@@ -393,7 +593,11 @@ allProductLinks.forEach(link => {
     prodSelector?.addEventListener('change', async (e) => {
         const id = e.target.value;
         currentProductId = id;
+        
+        // Toggle disabled state
         costCheckboxes.forEach(cb => cb.disabled = !id);
+        supplyCheckboxes.forEach(cb => cb.disabled = !id);
+        supplyQtys.forEach(input => input.disabled = !id);
         saveProdCostsBtn.disabled = !id;
         
         if (!id) {
@@ -405,6 +609,14 @@ allProductLinks.forEach(link => {
                     cb.closest('.toggle-label').classList.remove('ring-2', 'ring-indigo-500', 'bg-indigo-50/30');
                 }
             });
+            supplyCheckboxes.forEach(cb => cb.checked = false);
+            supplyQtys.forEach(input => input.value = 0);
+            yieldToggles.forEach(btn => {
+                btn.disabled = true;
+                btn.classList.remove('text-indigo-600', 'bg-indigo-50');
+            });
+            document.querySelectorAll('.yield-container').forEach(c => c.classList.add('hidden'));
+            document.querySelectorAll('.qty-container').forEach(c => c.classList.remove('hidden'));
             return;
         }
 
@@ -415,19 +627,53 @@ allProductLinks.forEach(link => {
         prodLoading.classList.remove('hidden');
 
         try {
-            const res = await fetch(`/api/products/${id}/costs`);
-            const links = await res.json();
+            // Fetch Cost Items
+            const resCosts = await fetch(`/api/products/${id}/costs`);
+            const links = await resCosts.json();
             const linkedIds = links.map(l => l.costItemId.toString());
 
+            // Fetch Supplies
+            const resSupplies = await fetch(`/api/products/${id}/supplies`);
+            const linkedSupplies = await resSupplies.json();
+            const linkedSupplyIds = linkedSupplies.map(ls => ls.supplyId.toString());
+
+            // Update Cost Item Checkboxes
             costCheckboxes.forEach(cb => {
                 const isGlobal = cb.getAttribute('data-global') === 'true';
                 if (!isGlobal) {
                     cb.checked = linkedIds.includes(cb.value);
-                    if (cb.checked) {
-                        cb.closest('.toggle-label').classList.add('ring-2', 'ring-indigo-500', 'bg-indigo-50/30');
-                    } else {
-                        cb.closest('.toggle-label').classList.remove('ring-2', 'ring-indigo-500', 'bg-indigo-50/30');
-                    }
+                    const label = cb.closest('.toggle-label');
+                    if (cb.checked) label.classList.add('ring-2', 'ring-indigo-500', 'bg-indigo-50/30');
+                    else label.classList.remove('ring-2', 'ring-indigo-500', 'bg-indigo-50/30');
+                }
+            });
+
+            // Update Supply Checkboxes & Quantities
+            supplyCheckboxes.forEach(cb => {
+                const linked = linkedSupplies.find(ls => ls.supplyId.toString() === cb.value);
+                cb.checked = !!linked;
+                
+                const yieldBtn = document.querySelector(`.yield-toggle[data-id="${cb.value}"]`);
+                const yieldCont = document.querySelector(`.yield-container[data-id="${cb.value}"]`);
+                const qtyCont = document.querySelector(`.qty-container[data-id="${cb.value}"]`);
+                const qtyInput = document.querySelector(`.supply-qty[data-id="${cb.value}"]`);
+                
+                yieldBtn.disabled = !id;
+                
+                if (linked && linked.partsUsed && linked.partsTotal) {
+                    // Show yield mode
+                    qtyCont.classList.add('hidden');
+                    yieldCont.classList.remove('hidden');
+                    yieldBtn.classList.add('text-indigo-600', 'bg-indigo-50');
+                    
+                    yieldCont.querySelector('.yield-used').value = linked.partsUsed;
+                    yieldCont.querySelector('.yield-total').value = linked.partsTotal;
+                } else {
+                    // Standard mode
+                    qtyCont.classList.remove('hidden');
+                    yieldCont.classList.add('hidden');
+                    yieldBtn.classList.remove('text-indigo-600', 'bg-indigo-50');
+                    qtyInput.value = linked ? linked.quantity : 0;
                 }
             });
 
@@ -444,25 +690,119 @@ allProductLinks.forEach(link => {
             const label = e.target.closest('.toggle-label');
             if (e.target.checked) label.classList.add('ring-2', 'ring-indigo-500', 'bg-indigo-50/30');
             else label.classList.remove('ring-2', 'ring-indigo-500', 'bg-indigo-50/30');
-            
             recalculateImpact();
+        });
+    });
+
+    supplyCheckboxes.forEach(cb => {
+        cb.addEventListener('change', recalculateImpact);
+    });
+
+    supplyQtys.forEach(input => {
+        input.addEventListener('input', recalculateImpact);
+    });
+
+    document.querySelectorAll('.yield-used, .yield-total').forEach(input => {
+        input.addEventListener('input', recalculateImpact);
+    });
+
+    yieldToggles.forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const id = e.currentTarget.getAttribute('data-id');
+            const qtyCont = document.querySelector(`.qty-container[data-id="${id}"]`);
+            const yieldCont = document.querySelector(`.yield-container[data-id="${id}"]`);
+            
+            const isYield = qtyCont.classList.contains('hidden');
+            
+            if (isYield) {
+                // Switch to Qty
+                qtyCont.classList.remove('hidden');
+                yieldCont.classList.add('hidden');
+                e.currentTarget.classList.remove('text-indigo-600', 'bg-indigo-50');
+            } else {
+                // Switch to Yield
+                qtyCont.classList.add('hidden');
+                yieldCont.classList.remove('hidden');
+                e.currentTarget.classList.add('text-indigo-600', 'bg-indigo-50');
+            }
+            recalculateImpact();
+        });
+    });
+
+    // Expand/Collapse Logic for linking section
+    document.querySelectorAll('.supply-item-row[data-has-children="true"]').forEach(row => {
+        row.addEventListener('click', (e) => {
+            if (e.target.closest('input') || e.target.closest('button')) return;
+            
+            const id = row.getAttribute('data-id');
+            const list = document.querySelector(`.children-list[data-parent-of-list="${id}"]`);
+            const chevron = row.querySelector('.chevron-icon');
+            
+            if (list) {
+                const isHidden = list.classList.contains('hidden');
+                if (isHidden) {
+                    list.classList.remove('hidden');
+                    if (chevron) chevron.style.transform = 'rotate(90deg)';
+                } else {
+                    list.classList.add('hidden');
+                    if (chevron) chevron.style.transform = 'rotate(0deg)';
+                }
+            }
         });
     });
 
     saveProdCostsBtn?.addEventListener('click', async () => {
         if (!currentProductId) return;
-        const selectedIds = Array.from(costCheckboxes).filter(cb => cb.checked && cb.getAttribute('data-global') !== 'true').map(cb => parseInt(cb.value));
+        
+        const selectedCostIds = Array.from(costCheckboxes)
+            .filter(cb => cb.checked && cb.getAttribute('data-global') !== 'true')
+            .map(cb => parseInt(cb.value));
+
+        const selectedSupplies = Array.from(supplyCheckboxes)
+            .filter(cb => cb.checked)
+            .map(cb => {
+                const supplyId = cb.value;
+                const yieldCont = document.querySelector(`.yield-container[data-id="${supplyId}"]`);
+                const isYield = !yieldCont.classList.contains('hidden');
+                
+                if (isYield) {
+                    const used = parseFloat(yieldCont.querySelector('.yield-used').value) || 0;
+                    const total = parseFloat(yieldCont.querySelector('.yield-total').value) || 1;
+                    return {
+                        supplyId: parseInt(supplyId),
+                        quantity: used / total,
+                        partsUsed: used,
+                        partsTotal: total
+                    };
+                } else {
+                    return {
+                        supplyId: parseInt(supplyId),
+                        quantity: parseFloat(document.querySelector(`.supply-qty[data-id="${supplyId}"]`).value) || 0,
+                        partsUsed: null,
+                        partsTotal: null
+                    };
+                }
+            });
         
         saveProdCostsBtn.innerHTML = '<div class="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div> Guardando...';
         saveProdCostsBtn.disabled = true;
 
         try {
+            // 1. Save Cost Items
             await fetch(`/api/products/${currentProductId}/costs`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ costItemIds: selectedIds })
+                body: JSON.stringify({ costItemIds: selectedCostIds })
             });
-            // Show toast/success
+
+            // 2. Save Supplies
+            await fetch(`/api/products/${currentProductId}/supplies`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ supplies: selectedSupplies })
+            });
+
+            // Show success button state
             saveProdCostsBtn.innerHTML = '<svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg> Guardado!';
             saveProdCostsBtn.classList.replace('bg-gray-900', 'bg-emerald-600');
             saveProdCostsBtn.classList.replace('hover:bg-black', 'hover:bg-emerald-700');

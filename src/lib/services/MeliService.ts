@@ -1,12 +1,14 @@
 import { db } from '../db/connection';
-import { eq, desc } from 'drizzle-orm';
+import { eq, desc, and } from 'drizzle-orm';
 import {
     meliPricingConfig,
     meliItemLinks,
     meliSyncLog,
     meliOrders,
     meliCredentials,
-    products
+    products,
+    costItems,
+    productCostItems
 } from '../db/schema';
 import { getAuthUrl, exchangeCodeForToken } from '../integrations/mercadolibre/auth';
 import { calculateMeliPrice, getPriceBreakdown } from '../integrations/mercadolibre/pricing';
@@ -51,13 +53,49 @@ export class MeliService {
         const productData = await db.select().from(products).where(eq(products.id, productId)).limit(1);
         if (!productData.length) return null;
 
-        // Asumimos siempre config "global" para simplificar (ampliar a categoría luego)
+        // Obtener costos específicos del producto
+        const pCosts = await db.select({
+            name: costItems.name,
+            type: costItems.type,
+            value: costItems.value,
+            isActive: costItems.isActive
+        }).from(productCostItems)
+            .innerJoin(costItems, eq(productCostItems.costItemId, costItems.id))
+            .where(eq(productCostItems.productId, productId));
+
+        // Obtener costos globales activos
+        const gCosts = await db.select().from(costItems).where(
+            and(eq(costItems.isActive, true), eq(costItems.isGlobal, true))
+        );
+
+        // Merge: costos del producto + globales (sin duplicar por nombre)
+        let allCosts = [...pCosts.filter(c => c.isActive).map(c => ({ name: c.name, type: c.type, value: Number(c.value) }))];
+        gCosts.forEach(gc => {
+            if (!allCosts.some(p => p.name === gc.name)) {
+                allCosts.push({ name: gc.name, type: gc.type, value: Number(gc.value) });
+            }
+        });
+
+        // Calcular neto y fijo a partir del basePrice y sus costos
+        let neto = Number(productData[0].basePrice);
+        let fijo = 0;
+        allCosts.forEach(cost => {
+            if (cost.type === 'percentage') {
+                neto -= neto * (cost.value / 100);
+            } else {
+                fijo += cost.value;
+            }
+        });
+
+        const inversionTotal = neto + fijo; // Base real para cálculo ML
+
+        // Config global de ML
         const configData = await db.select().from(meliPricingConfig).where(eq(meliPricingConfig.scope, 'global')).limit(1);
         const config = configData.length > 0 ? configData[0] : null;
 
         if (!config) throw new Error("No global pricing config found");
 
-        return calculateMeliPrice(Number(productData[0].basePrice), config as MeliPricingConfigType);
+        return calculateMeliPrice(inversionTotal, config as MeliPricingConfigType);
     }
 
     // ── SYNCHRONIZATION ───────────────────────────────────────
