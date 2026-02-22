@@ -627,4 +627,17 @@ export const supplyCompositionRelations = relations(supplyComposition, ({ one })
     }),
 }));
 
+export const supplyCategories = pgTable('supply_categories', {
+    id: serial('id').primaryKey(),
+    name: varchar('name', { length: 100 }).notNull(),
+    slug: varchar('slug', { length: 100 }).notNull().unique(),
+    icon: varchar('icon', { length: 20 }),
+    order: integer('order').default(0),
+    isActive: boolean('is_active').default(true),
+    createdAt: timestamp('created_at').defaultNow(),
+    updatedAt: timestamp('updated_at').defaultNow(),
+});
 
+export const supplyCategoriesRelations = relations(supplyCategories, ({ many }) => ({
+    supplies: many(supplies),
+}));
