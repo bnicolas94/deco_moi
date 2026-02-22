@@ -124,9 +124,14 @@ const CATEGORIES = [
             </button>
         </div>
 
-        <!-- Categories -->
-        <div class="flex flex-wrap gap-2" id="category-tabs">
-            <!-- Rendered by JS -->
+        <!-- Categories & Suppliers -->
+        <div class="flex flex-col gap-3">
+            <div class="flex flex-wrap gap-2" id="category-tabs">
+                <!-- Rendered by JS -->
+            </div>
+            <div class="flex flex-wrap gap-2 min-h-[44px]" id="supplier-tabs">
+                <!-- Rendered by JS -->
+            </div>
         </div>
 
         <!-- Main Table -->
@@ -351,6 +356,7 @@ const CATEGORIES = [
         let state = {
             search: '',
             cat: 'all',
+            supplier: 'all',
             status: 'all',
             sort: 'name-asc',
             page: 1,
@@ -376,6 +382,7 @@ const CATEGORIES = [
                 list = supplies.filter(s => relevantIds.has(s.id));
             }
             if (state.cat !== 'all') list = list.filter(s => s.category === state.cat);
+            if (state.supplier !== 'all') list = list.filter(s => s.supplier === state.supplier);
             if (state.status === 'active') list = list.filter(s => s.isActive);
             if (state.status === 'inactive') list = list.filter(s => !s.isActive);
             
@@ -446,6 +453,56 @@ const CATEGORIES = [
             tabs.querySelectorAll('.cat-tab').forEach(btn => {
                 btn.addEventListener('click', () => {
                     state.cat = btn.dataset.cat;
+                    state.supplier = 'all'; // Reset supplier when category changes
+                    state.page = 1;
+                    render();
+                });
+            });
+        }
+
+        function renderSupplierTabs() {
+            const tabs = document.getElementById('supplier-tabs');
+            
+            // Get unique suppliers for CURRENT category (or all if cat is 'all')
+            const baseList = state.cat === 'all' ? supplies : supplies.filter(s => s.category === state.cat);
+            
+            // Normalize and get unique suppliers
+            const supplierMap = new Map(); // original -> normalized
+            baseList.forEach(s => {
+                if (s.supplier) {
+                    const norm = s.supplier.trim().toUpperCase();
+                    if (!supplierMap.has(norm)) {
+                        supplierMap.set(norm, s.supplier.trim());
+                    }
+                }
+            });
+            
+            const uniqueSuppliers = Array.from(supplierMap.values()).sort((a,b) => a.localeCompare(b));
+
+            if (uniqueSuppliers.length === 0) {
+                tabs.innerHTML = '';
+                return;
+            }
+
+            let html = `
+                <button class="sup-tab px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-sm active:scale-95 ${state.supplier === 'all' ? 'bg-indigo-50 text-indigo-600 border border-indigo-100 font-black' : 'bg-white text-gray-400 hover:text-gray-900 border border-transparent border-dashed hover:border-gray-200'}" data-sup="all">
+                    Todos
+                </button>
+            `;
+
+            uniqueSuppliers.forEach(sup => {
+                const isSelected = state.supplier === sup;
+                html += `
+                    <button class="sup-tab px-4 py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all shadow-sm active:scale-95 ${isSelected ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100' : 'bg-white text-gray-400 hover:text-gray-900 border border-transparent hover:border-gray-200'}" data-sup="${sup}">
+                        ${sup}
+                    </button>
+                `;
+            });
+            
+            tabs.innerHTML = html;
+            tabs.querySelectorAll('.sup-tab').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    state.supplier = btn.dataset.sup;
                     state.page = 1;
                     render();
                 });
@@ -681,6 +738,7 @@ const CATEGORIES = [
         function render() {
             renderStats();
             renderCatTabs();
+            renderSupplierTabs();
             renderTable();
         }
 
