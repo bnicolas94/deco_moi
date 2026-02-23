@@ -2,6 +2,7 @@ import type { APIRoute } from 'astro';
 import { db } from '@/lib/db/connection';
 import { supplies, supplyComposition } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
+import { PricingService } from '@/lib/services/PricingService';
 
 export const PUT: APIRoute = async ({ request, params }) => {
     try {
@@ -9,6 +10,10 @@ export const PUT: APIRoute = async ({ request, params }) => {
         if (isNaN(id)) return new Response(JSON.stringify({ error: 'Invalid ID' }), { status: 400 });
 
         const data = await request.json();
+
+        // Get old cost for recalculation
+        const oldSupply = await db.select().from(supplies).where(eq(supplies.id, id)).limit(1);
+        const oldUnitCost = oldSupply.length > 0 ? parseFloat(oldSupply[0].unitCost || '0') : 0;
 
         const updateData: any = {};
         if (data.name !== undefined) updateData.name = data.name;
@@ -129,6 +134,14 @@ export const PUT: APIRoute = async ({ request, params }) => {
         // Trigger cascade if cost or components changed
         if (data.unitCost !== undefined || data.components !== undefined) {
             await updateDescendants(id);
+
+            // After all supply costs are updated, recalculate affected products
+            const currentSupply = await db.select().from(supplies).where(eq(supplies.id, id)).limit(1);
+            const newUnitCost = currentSupply.length > 0 ? parseFloat(currentSupply[0].unitCost || '0') : 0;
+
+            if (newUnitCost !== oldUnitCost) {
+                await PricingService.recalculateProductPricesForSupplyChange(id, oldUnitCost, newUnitCost);
+            }
         }
 
         // Final step: ensure ALL objects in allUpdated have their current components
