@@ -448,6 +448,9 @@ const initialCategories = await db.select().from(supplyCategories).orderBy(asc(s
             
             if (state.showAlertsOnly) {
                 list = list.filter(s => {
+                    const isRoot = !supplies.some(p => p.id === s.parentId || (p.components && p.components.some(c => c.id === s.id)));
+                    if (!isRoot) return false;
+                    
                     const base = (s.packPrice && parseFloat(s.packPrice) > 0) ? parseFloat(s.packPrice) : parseFloat(s.unitCost);
                     return s.lastScrapedPrice && Math.abs(base - parseFloat(s.lastScrapedPrice)) > 50;
                 });
@@ -497,10 +500,14 @@ const initialCategories = await db.select().from(supplyCategories).orderBy(asc(s
                     <div class="flex items-end justify-between">
                         <div class="flex flex-col">
                             <h4 class="text-3xl font-black ${supplies.some(s => {
+                                const isRoot = !supplies.some(p => p.id === s.parentId || (p.components && p.components.some(c => c.id === s.id)));
+                                if (!isRoot) return false;
                                 const base = (s.packPrice && parseFloat(s.packPrice) > 0) ? parseFloat(s.packPrice) : parseFloat(s.unitCost);
                                 return s.lastScrapedPrice && Math.abs(base - parseFloat(s.lastScrapedPrice)) > 50;
                             }) ? 'text-rose-600 animate-pulse' : 'text-gray-900'} tabular-nums">
                                 ${supplies.filter(s => {
+                                    const isRoot = !supplies.some(p => p.id === s.parentId || (p.components && p.components.some(c => c.id === s.id)));
+                                    if (!isRoot) return false;
                                     const base = (s.packPrice && parseFloat(s.packPrice) > 0) ? parseFloat(s.packPrice) : parseFloat(s.unitCost);
                                     return s.lastScrapedPrice && Math.abs(base - parseFloat(s.lastScrapedPrice)) > 50;
                                 }).length}
@@ -652,6 +659,7 @@ const initialCategories = await db.select().from(supplyCategories).orderBy(asc(s
                         <div class="flex items-center gap-2">
                             <span class="font-mono text-xs font-bold text-gray-500">${s.packPrice ? fmt(s.packPrice) : '-'}</span>
                             ${(() => {
+                                if (depth > 0) return ''; // No alerts for children/inherited
                                 const base = (s.packPrice && parseFloat(s.packPrice) > 0) ? parseFloat(s.packPrice) : parseFloat(s.unitCost);
                                 const hasAlert = s.lastScrapedPrice && Math.abs(base - parseFloat(s.lastScrapedPrice)) > 50;
                                 if (!hasAlert) return '';
