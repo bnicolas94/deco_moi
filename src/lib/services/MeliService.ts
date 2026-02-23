@@ -10,6 +10,7 @@ import {
     costItems,
     productCostItems
 } from '../db/schema';
+import { PricingService } from './PricingService';
 import { getAuthUrl, exchangeCodeForToken } from '../integrations/mercadolibre/auth';
 import { calculateMeliPrice, getPriceBreakdown } from '../integrations/mercadolibre/pricing';
 import { getMeliItem, getListingPrices, updateMeliItem } from '../integrations/mercadolibre/items';
@@ -53,41 +54,17 @@ export class MeliService {
         const productData = await db.select().from(products).where(eq(products.id, productId)).limit(1);
         if (!productData.length) return null;
 
-        // Obtener costos específicos del producto
-        const pCosts = await db.select({
-            name: costItems.name,
-            type: costItems.type,
-            value: costItems.value,
-            isActive: costItems.isActive
-        }).from(productCostItems)
-            .innerJoin(costItems, eq(productCostItems.costItemId, costItems.id))
-            .where(eq(productCostItems.productId, productId));
+        const { totalFixed, totalPerc } = await PricingService.getProductCostBreakdown(productId);
 
-        // Obtener costos globales activos
-        const gCosts = await db.select().from(costItems).where(
-            and(eq(costItems.isActive, true), eq(costItems.isGlobal, true))
-        );
+        // Desired Net Profit logic:
+        // By tradition in this app, basePrice is the target but it ALREADY contains the costs.
+        // Wait, the logic in PricingService says:
+        // netValue = gross - totalFixed - (gross * (totalPerc / 100))
 
-        // Merge: costos del producto + globales (sin duplicar por nombre)
-        let allCosts = [...pCosts.filter(c => c.isActive).map(c => ({ name: c.name, type: c.type, value: Number(c.value) }))];
-        gCosts.forEach(gc => {
-            if (!allCosts.some(p => p.name === gc.name)) {
-                allCosts.push({ name: gc.name, type: gc.type, value: Number(gc.value) });
-            }
-        });
+        const gross = parseFloat(productData[0].basePrice.toString());
+        const netoDeseado = gross - totalFixed - (gross * (totalPerc / 100));
 
-        // Calcular neto y fijo a partir del basePrice y sus costos
-        let neto = Number(productData[0].basePrice);
-        let fijo = 0;
-        allCosts.forEach(cost => {
-            if (cost.type === 'percentage') {
-                neto -= neto * (cost.value / 100);
-            } else {
-                fijo += cost.value;
-            }
-        });
-
-        const inversionTotal = neto + fijo; // Base real para cálculo ML
+        const inversionTotal = netoDeseado + totalFixed; // Effective investment for ML basis
 
         // Config global de ML
         const configData = await db.select().from(meliPricingConfig).where(eq(meliPricingConfig.scope, 'global')).limit(1);

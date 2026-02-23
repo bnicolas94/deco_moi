@@ -109,11 +109,14 @@ export async function updateMeliItem(itemId: string, updates: {
  * Uses the /users/{userId}/items/search endpoint to get IDs,
  * then fetches the full item details.
  */
-export async function getAllSellerItems(userId: string, limit: number = 50, offset: number = 0) {
+export async function getAllSellerItems(userId: string, limit: number = 50, offset: number = 0, query: string = '') {
     const token = await getValidAccessToken();
 
     // 1. Get the item IDs
-    const searchUrl = `${API_BASE}/users/${userId}/items/search?limit=${limit}&offset=${offset}`;
+    let searchUrl = `${API_BASE}/users/${userId}/items/search?limit=${limit}&offset=${offset}`;
+    if (query) {
+        searchUrl += `&q=${encodeURIComponent(query)}`;
+    }
     const searchRes = await fetch(searchUrl, {
         headers: { Authorization: `Bearer ${token}` }
     });

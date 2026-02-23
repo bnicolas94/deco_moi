@@ -62,6 +62,14 @@ export function calculateMeliPrice(basePrice: number, config: MeliPricingConfigT
     }
 
     const strategy = config.roundingStrategy || 'round';
+
+    // Custom rounding to nearest 50 or 100
+    // Example: 8858 -> 8850 (nearer to 50), 8875 -> 8900 (nearer to 100)
+    // This is equivalent to rounding to the nearest multiple of 50.
+    if (strategy === 'nearest_50') {
+        return Math.round(finalPrice / 50) * 50;
+    }
+
     if (strategy === 'ceil') {
         return Math.ceil(finalPrice);
     } else if (strategy === 'floor') {

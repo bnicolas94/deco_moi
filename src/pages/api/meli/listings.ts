@@ -7,8 +7,9 @@ import { getAllSellerItems } from '../../../lib/integrations/mercadolibre/items'
 export async function GET({ request }: APIContext) {
     try {
         const url = new URL(request.url);
-        const limitStr = url.searchParams.get('limit') || '50';
+        const limitStr = url.searchParams.get('limit') || '100';
         const offsetStr = url.searchParams.get('offset') || '0';
+        const query = url.searchParams.get('q') || '';
 
         const limit = parseInt(limitStr, 10);
         const offset = parseInt(offsetStr, 10);
@@ -24,7 +25,7 @@ export async function GET({ request }: APIContext) {
         const userId = creds[0].mlUserId;
 
         // 2. Fetch items from ML
-        const mlData = await getAllSellerItems(userId, limit, offset);
+        const mlData = await getAllSellerItems(userId, limit, offset, query);
 
         // 3. Get existing links and local specific prices
         const links = await db.select({
@@ -101,6 +102,7 @@ export async function GET({ request }: APIContext) {
                 permalink: baseMLItem.permalink,
                 thumbnail: baseMLItem.thumbnail,
                 family_id: baseMLItem.family_id,
+                attributes: baseMLItem.attributes,
                 localData: localData
             };
         };

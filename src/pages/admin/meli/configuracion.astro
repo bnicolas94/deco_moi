@@ -89,6 +89,7 @@ const successParam = new URL(Astro.request.url).searchParams.get('success');
                 <label class="block text-sm font-medium mb-1">Estrategia de Redondeo</label>
                 <select name="roundingStrategy" class="form-select w-full">
                   <option value="round" selected={cf.roundingStrategy === 'round'}>Redondear cercano</option>
+                  <option value="nearest_50" selected={cf.roundingStrategy === 'nearest_50'}>Redondear a 50 o 100</option>
                   <option value="ceil" selected={cf.roundingStrategy === 'ceil'}>Hacia arriba</option>
                   <option value="floor" selected={cf.roundingStrategy === 'floor'}>Hacia abajo</option>
                 </select>
@@ -242,6 +243,7 @@ const successParam = new URL(Astro.request.url).searchParams.get('success');
 
         if(configObj.roundingStrategy === 'ceil') finalPrice = Math.ceil(finalPrice);
         else if(configObj.roundingStrategy === 'floor') finalPrice = Math.floor(finalPrice);
+        else if(configObj.roundingStrategy === 'nearest_50') finalPrice = Math.round(finalPrice / 50) * 50;
         else finalPrice = Math.round(finalPrice);
 
         const mlCommissionAmount = finalPrice * (Number(configObj.commissionPct)/100);
