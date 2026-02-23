@@ -50,21 +50,17 @@ export class MeliService {
 
     // ── PRICING ───────────────────────────────────────────────
 
-    static async calculateMeliPriceForProduct(productId: number): Promise<number | null> {
+    static async calculateMeliPriceForProduct(productId: number, quantity: number = 1): Promise<number | null> {
         const productData = await db.select().from(products).where(eq(products.id, productId)).limit(1);
         if (!productData.length) return null;
 
         const { totalFixed, totalPerc } = await PricingService.getProductCostBreakdown(productId);
 
-        // Desired Net Profit logic:
-        // By tradition in this app, basePrice is the target but it ALREADY contains the costs.
-        // Wait, the logic in PricingService says:
-        // netValue = gross - totalFixed - (gross * (totalPerc / 100))
-
         const gross = parseFloat(productData[0].basePrice.toString());
         const netoDeseado = gross - totalFixed - (gross * (totalPerc / 100));
 
-        const inversionTotal = netoDeseado + totalFixed; // Effective investment for ML basis
+        // Inversión base multiplicada por la cantidad del pack
+        const inversionTotal = (netoDeseado + totalFixed) * quantity;
 
         // Config global de ML
         const configData = await db.select().from(meliPricingConfig).where(eq(meliPricingConfig.scope, 'global')).limit(1);
@@ -84,10 +80,11 @@ export class MeliService {
                 return { success: false, error: 'Product not linked or sync disabled' };
             }
 
-            const newPrice = await this.calculateMeliPriceForProduct(productId);
-            if (newPrice === null) return { success: false, error: 'Product price calc failed' };
-
             for (const link of links) {
+                const quantity = link.packQuantity || 1;
+                const newPrice = await this.calculateMeliPriceForProduct(productId, quantity);
+                if (newPrice === null) continue;
+
                 await updateMeliItem(link.meliItemId, {
                     price: newPrice,
                     variationId: link.meliVariationId
@@ -239,6 +236,46 @@ export class MeliService {
             console.error(e);
             return { imported: 0, errors: 1 };
         }
+    }
+
+    static async getLatestMeliData(itemIds: string[]): Promise<Map<string, { price: number; status: string }>> {
+        if (!itemIds.length) return new Map();
+
+        const results = new Map<string, { price: number; status: string }>();
+        const uniqueIds = [...new Set(itemIds)].filter(id => id && id.trim() !== '');
+
+        if (!uniqueIds.length) return results;
+
+        // ML permite hasta 20 IDs por request en /items?ids=
+        for (let i = 0; i < uniqueIds.length; i += 20) {
+            const chunk = uniqueIds.slice(i, i + 20);
+            try {
+                const { getValidAccessToken } = await import('../integrations/mercadolibre/auth');
+                const accessToken = await getValidAccessToken();
+                const url = `https://api.mercadolibre.com/items?ids=${chunk.join(',')}`;
+
+                const response = await fetch(url, {
+                    headers: { Authorization: `Bearer ${accessToken}` }
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    data.forEach((res: any) => {
+                        if (res.code === 200 && res.body) {
+                            results.set(res.body.id, {
+                                price: res.body.price,
+                                status: res.body.status
+                            });
+                        }
+                    });
+                } else {
+                    console.error(`ML API Error (${response.status}):`, await response.text());
+                }
+            } catch (e) {
+                console.error('Error fetching live data batch:', e);
+            }
+        }
+        return results;
     }
 
 }

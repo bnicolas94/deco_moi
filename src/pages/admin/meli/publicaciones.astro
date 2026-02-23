@@ -19,6 +19,7 @@ const allLinksRaw = await db
     syncEnabled: meliItemLinks.syncEnabled,
     lastSyncedPrice: meliItemLinks.lastSyncedPrice,
     lastSyncAt: meliItemLinks.lastSyncAt,
+    packQuantity: meliItemLinks.packQuantity,
   })
   .from(meliItemLinks)
   .leftJoin(products, eq(meliItemLinks.productId, products.id))
@@ -28,7 +29,8 @@ const allLinksRaw = await db
 const allLinks = await Promise.all(allLinksRaw.map(async (link) => {
   if (!link.productId) return { ...link, inversionTotal: 0, targetPrice: null };
 
-  const targetPrice = await MeliService.calculateMeliPriceForProduct(link.productId);
+  const qty = link.packQuantity || 1;
+  const targetPrice = await MeliService.calculateMeliPriceForProduct(link.productId, qty);
 
   // Recalcular inversión total para mostrar en la columna (usando la nueva lógica de MeliService)
   // Pero para no repetir, simplemente recalculamos aquí brevemente o exponemos una función en MeliService.
@@ -63,8 +65,21 @@ const allLinks = await Promise.all(allLinksRaw.map(async (link) => {
   let totalPerc = allCosts.filter(c => c.type === 'percentage').reduce((acc, c) => acc + c.value, 0);
   let neto = gross - totalFixed - (gross * (totalPerc / 100));
 
-  return { ...link, inversionTotal: neto + totalFixed, targetPrice };
+  return { ...link, inversionTotal: (neto + totalFixed) * qty, targetPrice };
 }));
+
+// Obtener datos en vivo de ML para los links
+const liveIds = allLinks.map(l => l.meliItemId);
+const liveMeliData = await MeliService.getLatestMeliData(liveIds);
+
+const allLinksWithLive = allLinks.map(link => {
+    const live = liveMeliData.get(link.meliItemId);
+    return {
+        ...link,
+        livePrice: live ? live.price : link.lastSyncedPrice,
+        liveStatus: live ? live.status : null
+    };
+});
 
 ---
 
@@ -105,31 +120,35 @@ const allLinks = await Promise.all(allLinksRaw.map(async (link) => {
             </tr>
           </thead>
           <tbody class="text-sm divide-y divide-slate-200 dark:divide-slate-700">
-            {allLinks.length === 0 ? (
+            {allLinksWithLive.length === 0 ? (
               <tr>
                  <td colspan="6" class="px-2 py-4 text-center text-slate-500">No hay productos vinculados actualmente. Debes editar un producto para vincular su ML Item ID.</td>
               </tr>
             ) : null}
-            {allLinks.map((link) => (
+            {allLinksWithLive.map((link) => (
               <tr>
                 <td class="px-2 first:pl-5 last:pr-5 py-3 whitespace-nowrap">
-                  <div class="font-medium text-slate-800 dark:text-slate-100">{link.productName}</div>
+                  <div class="font-medium text-slate-800 dark:text-slate-100">
+                    {link.productName} 
+                    {link.packQuantity > 1 && <span class="bg-indigo-50 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-300 text-[10px] font-bold px-1.5 py-0.5 rounded ml-1 uppercase">x{link.packQuantity}u</span>}
+                  </div>
                   <div class="text-xs text-slate-500">SKU: {link.productSku || 'N/A'}</div>
                 </td>
                 <td class="px-2 first:pl-5 last:pr-5 py-3 whitespace-nowrap">
-                  <a href={`https://articulo.mercadolibre.com.ar/${link.meliItemId.replace(/([A-Z]+)(\d+)/, '$1-$2')}`} target="_blank" class="text-indigo-500 hover:text-indigo-600 underline">
+                  <a href={`https://articulo.mercadolibre.com.ar/${link.meliItemId.replace(/([A-Z]+)(\d+)/, '$1-$2')}`} target="_blank" class="text-indigo-500 hover:text-indigo-600 underline font-mono">
                     {link.meliItemId}
                   </a>
+                  {link.meliTitle && <div class="text-[10px] text-slate-400 mt-1 italic truncate max-w-[200px]" title={link.meliTitle}>{link.meliTitle}</div>}
                 </td>
                 <td class="px-2 first:pl-5 last:pr-5 py-3 whitespace-nowrap">
                   ${Number(link.inversionTotal).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </td>
                 <td class="px-2 first:pl-5 last:pr-5 py-3 whitespace-nowrap">
                   <div class="flex flex-col">
-                    <span class={link.targetPrice && Math.round(Number(link.lastSyncedPrice)) !== Math.round(Number(link.targetPrice)) ? "text-amber-600 font-bold" : "text-slate-800 dark:text-slate-100"}>
-                      {link.lastSyncedPrice ? `$${Number(link.lastSyncedPrice).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'N/A'}
+                    <span class={link.targetPrice && Math.round(Number(link.livePrice)) !== Math.round(Number(link.targetPrice)) ? "text-amber-600 font-bold" : "text-slate-800 dark:text-slate-100"}>
+                      {link.livePrice ? `$${Number(link.livePrice).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'N/A'}
                     </span>
-                    {link.targetPrice && Math.round(Number(link.lastSyncedPrice)) !== Math.round(Number(link.targetPrice)) && (
+                    {link.targetPrice && Math.round(Number(link.livePrice)) !== Math.round(Number(link.targetPrice)) && (
                       <span class="text-[10px] text-rose-500 font-bold flex items-center gap-1">
                         <span class="w-1.5 h-1.5 bg-rose-500 rounded-full animate-pulse"></span>
                         Objetivo: ${Number(link.targetPrice).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -142,16 +161,16 @@ const allLinks = await Promise.all(allLinksRaw.map(async (link) => {
                 </td>
                 <td class="px-2 first:pl-5 last:pr-5 py-3 whitespace-nowrap text-center">
                   {link.syncEnabled ? (
-                    <span class={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${link.targetPrice && Math.round(Number(link.lastSyncedPrice)) !== Math.round(Number(link.targetPrice)) ? 'bg-amber-100 text-amber-800 animate-pulse' : 'bg-emerald-100 text-emerald-800'}`}>
-                      {link.targetPrice && Math.round(Number(link.lastSyncedPrice)) !== Math.round(Number(link.targetPrice)) ? 'Desactualizado' : 'Activo'}
+                    <span class={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${link.targetPrice && Math.round(Number(link.livePrice)) !== Math.round(Number(link.targetPrice)) ? 'bg-amber-100 text-amber-800 animate-pulse' : 'bg-emerald-100 text-emerald-800'}`}>
+                      {link.targetPrice && Math.round(Number(link.livePrice)) !== Math.round(Number(link.targetPrice)) ? 'Desactualizado' : 'Activo'}
                     </span>
                   ) : (
                     <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium bg-rose-100 text-rose-800">Inactivo</span>
                   )}
                 </td>
                 <td class="px-2 first:pl-5 last:pr-5 py-3 whitespace-nowrap text-center">
-                  <button class={`btn btn-sm ${link.targetPrice && Math.round(Number(link.lastSyncedPrice)) !== Math.round(Number(link.targetPrice)) ? 'bg-indigo-500 hover:bg-indigo-600 text-white shadow-md' : 'text-indigo-500 hover:text-indigo-600'} sync-btn`} data-id={link.productId}>
-                    {link.targetPrice && Math.round(Number(link.lastSyncedPrice)) !== Math.round(Number(link.targetPrice)) ? 'Actualizar Precio' : 'Sincronizar Precio'}
+                  <button class={`btn btn-sm ${link.targetPrice && Math.round(Number(link.livePrice)) !== Math.round(Number(link.targetPrice)) ? 'bg-indigo-500 hover:bg-indigo-600 text-white shadow-md' : 'text-indigo-500 hover:text-indigo-600'} sync-btn`} data-id={link.productId}>
+                    {link.targetPrice && Math.round(Number(link.livePrice)) !== Math.round(Number(link.targetPrice)) ? 'Actualizar Precio' : 'Sincronizar Precio'}
                   </button>
                 </td>
               </tr>

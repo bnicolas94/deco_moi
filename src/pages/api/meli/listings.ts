@@ -34,6 +34,7 @@ export async function GET({ request }: APIContext) {
             meliVariationId: meliItemLinks.meliVariationId,
             productId: meliItemLinks.productId,
             syncEnabled: meliItemLinks.syncEnabled,
+            packQuantity: meliItemLinks.packQuantity,
             productName: products.name,
             productSku: products.sku,
             basePrice: products.basePrice
@@ -81,15 +82,31 @@ export async function GET({ request }: APIContext) {
                         fijo += cost.value;
                     }
                 });
-                inversionTotal = neto + fijo;
+                inversionTotal = (neto + fijo) * (link.packQuantity || 1);
 
                 localData = {
                     productId: link.productId,
                     productName: link.productName,
                     productSku: link.productSku,
                     inversionTotal: inversionTotal,
-                    syncEnabled: link.syncEnabled
+                    syncEnabled: link.syncEnabled,
+                    packQuantity: link.packQuantity || 1
                 };
+            }
+
+            // Auto-detect pack quantity from ML attributes if not provided by link
+            let mlPackQuantity = 1;
+            if (baseMLItem.attributes) {
+                const unitsAttr = baseMLItem.attributes.find((a: any) => a.id === 'UNITS_PER_PACK' || a.id === 'PACKAGE_QUANTITY');
+                if (unitsAttr && unitsAttr.value_name) {
+                    const val = parseInt(unitsAttr.value_name, 10);
+                    if (!isNaN(val)) mlPackQuantity = val;
+                }
+            }
+            // If still 1, try parsing from title suffix like "(25u)"
+            if (mlPackQuantity === 1) {
+                const match = baseMLItem.title.match(/\((\d+)u\)$/i);
+                if (match) mlPackQuantity = parseInt(match[1], 10);
             }
 
             return {
@@ -103,6 +120,7 @@ export async function GET({ request }: APIContext) {
                 thumbnail: baseMLItem.thumbnail,
                 family_id: baseMLItem.family_id,
                 attributes: baseMLItem.attributes,
+                mlPackQuantity: mlPackQuantity,
                 localData: localData
             };
         };

@@ -7,7 +7,7 @@ import { getMeliItem } from '../../../lib/integrations/mercadolibre/items';
 export async function POST({ request }: APIContext) {
     try {
         const body = await request.json();
-        const { meliItemId, meliVariationId, productId, syncEnabled } = body;
+        const { meliItemId, meliVariationId, productId, syncEnabled, packQuantity } = body;
 
         if (!meliItemId || !productId) {
             return new Response(JSON.stringify({ success: false, error: 'Faltan parámetros: meliItemId o productId' }), {
@@ -15,6 +15,8 @@ export async function POST({ request }: APIContext) {
                 headers: { 'Content-Type': 'application/json' }
             });
         }
+
+        const quantity = Number(packQuantity) || 1;
 
         // Obtener info del item en ML para guardar el título también
         let meliTitle = '';
@@ -27,8 +29,6 @@ export async function POST({ request }: APIContext) {
         }
 
         // Buscar si ya existe este vínculo específico (meliItemId, meliVariationId)
-        // Usamos and() para asegurar que buscamos la combinación exacta.
-        // Si meliVariationId es null, buscamos donde sea null en la DB.
         const existing = await db.select()
             .from(meliItemLinks)
             .where(
@@ -47,6 +47,7 @@ export async function POST({ request }: APIContext) {
                 productId: Number(productId),
                 meliTitle: meliTitle || existing[0].meliTitle,
                 syncEnabled: applySync,
+                packQuantity: quantity,
                 updatedAt: new Date(),
             }).where(eq(meliItemLinks.id, existing[0].id));
         } else {
@@ -56,7 +57,8 @@ export async function POST({ request }: APIContext) {
                 meliItemId,
                 meliVariationId: meliVariationId || null,
                 meliTitle,
-                syncEnabled: applySync
+                syncEnabled: applySync,
+                packQuantity: quantity
             });
         }
 

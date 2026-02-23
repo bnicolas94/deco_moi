@@ -284,7 +284,7 @@ const allProducts = await db
         <div class="flex-grow">
           <div class="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1 uppercase tracking-wider">
             <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
-            Vinculado
+            Vinculado${item.localData.packQuantity > 1 ? ` (x${item.localData.packQuantity}u)` : ''}
           </div>
           <div class="text-[11px] text-slate-600 dark:text-slate-300 truncate max-w-48 font-medium">${item.localData.productName}</div>
         </div>
@@ -293,10 +293,18 @@ const allProducts = await db
         </button>
       </div>
     ` : `
-      <select class="form-select w-full text-[11px] py-1 h-8 product-select bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-700 rounded shadow-sm focus:ring-indigo-500" data-dom-id="${domId}">
-        <option value="">-- Vincular Producto --</option>
-        ${allProducts.map(p => `<option value="${p.id}">${p.name} (${p.sku || 'N/A'})</option>`).join('')}
-      </select>
+      <div class="flex flex-col gap-1">
+        <select class="form-select w-full text-[11px] py-1 h-8 product-select bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-700 rounded shadow-sm focus:ring-indigo-500" data-dom-id="${domId}">
+          <option value="">-- Vincular Producto --</option>
+          ${allProducts.map(p => `<option value="${p.id}">${p.name} (${p.sku || 'N/A'})</option>`).join('')}
+        </select>
+        ${item.mlPackQuantity > 1 ? `
+          <div class="flex items-center gap-1.5 px-1">
+            <span class="text-[9px] text-slate-400 font-bold uppercase tracking-tighter">Pack detectado:</span>
+            <input type="number" class="w-10 text-[10px] py-0 px-1 border-none bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-300 rounded font-bold pack-qty-input" value="${item.mlPackQuantity}" data-dom-id="${domId}" />
+          </div>
+        ` : ''}
+      </div>
     `;
 
     const typeBadge = item.variationId 
@@ -387,6 +395,9 @@ const allProducts = await db
         btn.disabled = true;
         btn.innerText = 'Sync...';
 
+        const qtyInput = document.querySelector(`.pack-qty-input[data-dom-id="${domId}"]`);
+        const packQuantity = qtyInput ? qtyInput.value : (item.mlPackQuantity || 1);
+
         try {
           const res = await fetch('/api/meli/link-listing', {
             method: 'POST',
@@ -395,6 +406,7 @@ const allProducts = await db
               meliItemId: item.id, 
               meliVariationId: item.variationId,
               productId, 
+              packQuantity: packQuantity,
               syncEnabled: true 
             })
           });

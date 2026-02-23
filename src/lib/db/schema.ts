@@ -484,6 +484,7 @@ export const meliItemLinks = pgTable('meli_item_links', {
     meliListingType: varchar('meli_listing_type', { length: 50 }), // 'gold_special' | 'gold_pro' | 'free'
     lastSyncAt: timestamp('last_sync_at'),
     syncEnabled: boolean('sync_enabled').default(true),
+    packQuantity: integer('pack_quantity').default(1),
     lastSyncedPrice: decimal('last_synced_price', { precision: 10, scale: 2 }),
     lastSyncedStock: integer('last_synced_stock'),
     createdAt: timestamp('created_at').defaultNow(),
