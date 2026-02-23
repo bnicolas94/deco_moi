@@ -420,6 +420,7 @@ const initialCategories = await db.select().from(supplyCategories).orderBy(asc(s
             sort: 'name-asc',
             page: 1,
             perPage: 12,
+            showAlertsOnly: false,
         };
 
         function getFiltered() {
@@ -445,6 +446,13 @@ const initialCategories = await db.select().from(supplyCategories).orderBy(asc(s
             if (state.status === 'active') list = list.filter(s => s.isActive);
             if (state.status === 'inactive') list = list.filter(s => !s.isActive);
             
+            if (state.showAlertsOnly) {
+                list = list.filter(s => {
+                    const base = (s.packPrice && parseFloat(s.packPrice) > 0) ? parseFloat(s.packPrice) : parseFloat(s.unitCost);
+                    return s.lastScrapedPrice && Math.abs(base - parseFloat(s.lastScrapedPrice)) > 50;
+                });
+            }
+
             list.sort((a, b) => {
                 const costA = parseFloat(a.unitCost || 0);
                 const costB = parseFloat(b.unitCost || 0);
@@ -484,18 +492,23 @@ const initialCategories = await db.select().from(supplyCategories).orderBy(asc(s
                         <span class="text-[10px] font-black text-rose-400 uppercase tracking-widest bg-rose-50 px-2 py-1 rounded-lg">FALTANTES</span>
                     </div>
                 </div>
-                <div class="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 hover:border-emerald-100 transition-all group">
+                <div class="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 hover:border-emerald-100 transition-all group relative overflow-hidden">
                     <p class="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-2 group-hover:text-emerald-500 transition-colors">Alertas de Precio</p>
                     <div class="flex items-end justify-between">
-                        <h4 class="text-3xl font-black ${supplies.some(s => {
-                            const base = (s.packPrice && parseFloat(s.packPrice) > 0) ? parseFloat(s.packPrice) : parseFloat(s.unitCost);
-                            return s.lastScrapedPrice && Math.abs(base - parseFloat(s.lastScrapedPrice)) > 50;
-                        }) ? 'text-rose-600 animate-pulse' : 'text-gray-900'} tabular-nums">
-                            ${supplies.filter(s => {
+                        <div class="flex flex-col">
+                            <h4 class="text-3xl font-black ${supplies.some(s => {
                                 const base = (s.packPrice && parseFloat(s.packPrice) > 0) ? parseFloat(s.packPrice) : parseFloat(s.unitCost);
                                 return s.lastScrapedPrice && Math.abs(base - parseFloat(s.lastScrapedPrice)) > 50;
-                            }).length}
-                        </h4>
+                            }) ? 'text-rose-600 animate-pulse' : 'text-gray-900'} tabular-nums">
+                                ${supplies.filter(s => {
+                                    const base = (s.packPrice && parseFloat(s.packPrice) > 0) ? parseFloat(s.packPrice) : parseFloat(s.unitCost);
+                                    return s.lastScrapedPrice && Math.abs(base - parseFloat(s.lastScrapedPrice)) > 50;
+                                }).length}
+                            </h4>
+                            <button id="btn-filter-alerts" class="mt-2 text-[10px] font-black ${state.showAlertsOnly ? 'text-rose-600 bg-rose-50' : 'text-indigo-600 bg-indigo-50'} px-3 py-1.5 rounded-xl hover:shadow-sm transition-all uppercase tracking-widest whitespace-nowrap">
+                                ${state.showAlertsOnly ? 'Quitar Filtro' : 'Ver Listado'}
+                            </button>
+                        </div>
                         <span class="text-[10px] font-black text-emerald-600 bg-emerald-50 px-2 py-1 rounded-lg uppercase tracking-tight">EN LINKS</span>
                     </div>
                 </div>
@@ -1254,6 +1267,16 @@ const initialCategories = await db.select().from(supplyCategories).orderBy(asc(s
         document.getElementById('modal-close').addEventListener('click', closeModal);
         document.getElementById('modal-cancel').addEventListener('click', closeModal);
         document.getElementById('modal-save').addEventListener('click', saveSupply);
+
+        // Price Alert Filter delegation
+        document.getElementById('stats-row').addEventListener('click', (e) => {
+            const btn = e.target.closest('#btn-filter-alerts');
+            if (btn) {
+                state.showAlertsOnly = !state.showAlertsOnly;
+                state.page = 1;
+                render();
+            }
+        });
         
         document.getElementById('search-input').addEventListener('input', (e) => {
             state.search = e.target.value;
