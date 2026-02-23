@@ -49,6 +49,10 @@ const initialCategories = await db.select().from(supplyCategories).orderBy(asc(s
             </div>
             
             <div class="flex items-center gap-3">
+                <button id="btn-scan-prices" class="inline-flex items-center px-4 py-2 bg-emerald-50 border border-emerald-100 text-emerald-700 text-sm font-bold rounded-xl hover:bg-emerald-100 transition-colors shadow-sm group">
+                    <Search className="w-4 h-4 mr-2 group-hover:scale-110 transition-transform" />
+                    Verificar Precios
+                </button>
                 <button id="btn-manage-cats" class="inline-flex items-center px-4 py-2 bg-white border border-indigo-200 text-indigo-600 text-sm font-bold rounded-xl hover:bg-indigo-50 transition-colors shadow-sm">
                     <TrendingUp className="w-4 h-4 mr-2" />
                     Categorías
@@ -302,6 +306,20 @@ const initialCategories = await db.select().from(supplyCategories).orderBy(asc(s
                             <label class="block text-xs font-black text-gray-500 uppercase tracking-wider">Nombre del Proveedor</label>
                             <input type="text" id="f-supplier" placeholder="Ej: Indubox, Papelería X" class="block w-full rounded-2xl border-gray-100 bg-gray-50 focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-50 font-medium sm:text-sm h-12 border transition-all px-4" />
                         </div>
+                        <div class="p-6 bg-amber-50/50 rounded-2xl border border-amber-100 space-y-3 hidden" id="price-alert-box">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center gap-2">
+                                    <AlertCircle className="w-4 h-4 text-amber-600" />
+                                    <span class="text-[10px] font-black text-amber-700 uppercase tracking-widest">Precio en web detectado</span>
+                                </div>
+                                <span class="text-xs font-mono font-black text-amber-700" id="alert-detected-price">$ 0.00</span>
+                            </div>
+                            <div class="flex items-center justify-between text-[10px] text-amber-600/70 font-bold uppercase tracking-tighter">
+                                <span id="alert-detected-date">Visto el: --/--/----</span>
+                                <button type="button" id="btn-accept-price" class="px-3 py-1 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors shadow-sm">Actualizar a este precio</button>
+                            </div>
+                        </div>
+
                         <div class="space-y-2">
                             <label class="block text-xs font-black text-gray-500 uppercase tracking-wider">Link de compra / Referencia</label>
                             <div class="relative group">
@@ -309,6 +327,7 @@ const initialCategories = await db.select().from(supplyCategories).orderBy(asc(s
                                 <input type="url" id="f-link" placeholder="https://..." class="block w-full pl-11 rounded-2xl border-gray-100 bg-gray-50 focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-50 font-medium sm:text-sm h-12 border transition-all" />
                             </div>
                         </div>
+
                         <div class="space-y-2">
                             <label class="block text-xs font-black text-gray-500 uppercase tracking-wider">Notas internas</label>
                             <textarea id="f-notes" rows="2" placeholder="Observaciones adicionales, tiempos de entrega, etc." class="block w-full rounded-2xl border-gray-100 bg-gray-50 focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-50 font-medium sm:text-sm border transition-all p-4"></textarea>
@@ -466,8 +485,19 @@ const initialCategories = await db.select().from(supplyCategories).orderBy(asc(s
                     </div>
                 </div>
                 <div class="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 hover:border-emerald-100 transition-all group">
-                    <p class="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-2 group-hover:text-emerald-500 transition-colors">Costo Promedio</p>
-                    <h4 class="text-3xl font-black text-gray-900 tabular-nums" style="font-size:1.5rem">${fmt(avgCost)}</h4>
+                    <p class="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-2 group-hover:text-emerald-500 transition-colors">Alertas de Precio</p>
+                    <div class="flex items-end justify-between">
+                        <h4 class="text-3xl font-black ${supplies.some(s => {
+                            const base = (s.packPrice && parseFloat(s.packPrice) > 0) ? parseFloat(s.packPrice) : parseFloat(s.unitCost);
+                            return s.lastScrapedPrice && Math.abs(base - parseFloat(s.lastScrapedPrice)) > 50;
+                        }) ? 'text-rose-600 animate-pulse' : 'text-gray-900'} tabular-nums">
+                            ${supplies.filter(s => {
+                                const base = (s.packPrice && parseFloat(s.packPrice) > 0) ? parseFloat(s.packPrice) : parseFloat(s.unitCost);
+                                return s.lastScrapedPrice && Math.abs(base - parseFloat(s.lastScrapedPrice)) > 50;
+                            }).length}
+                        </h4>
+                        <span class="text-[10px] font-black text-emerald-600 bg-emerald-50 px-2 py-1 rounded-lg uppercase tracking-tight">EN LINKS</span>
+                    </div>
                 </div>
             `;
         }
@@ -601,10 +631,27 @@ const initialCategories = await db.select().from(supplyCategories).orderBy(asc(s
                         <span class="font-mono text-xs font-black text-gray-400 bg-gray-100 px-2 py-0.5 rounded-lg">${s.unit}</span>
                     </td>
                     <td class="p-5">
-                        <span class="font-mono text-sm font-black text-indigo-600">${fmt(s.unitCost)}</span>
+                        <div class="flex items-center gap-2">
+                            <span class="font-mono text-sm font-black text-indigo-600">${fmt(s.unitCost)}</span>
+                        </div>
                     </td>
                     <td class="p-5 whitespace-nowrap">
-                        <span class="font-mono text-xs font-bold text-gray-500">${s.packPrice ? fmt(s.packPrice) : '-'}</span>
+                        <div class="flex items-center gap-2">
+                            <span class="font-mono text-xs font-bold text-gray-500">${s.packPrice ? fmt(s.packPrice) : '-'}</span>
+                            ${(() => {
+                                const base = (s.packPrice && parseFloat(s.packPrice) > 0) ? parseFloat(s.packPrice) : parseFloat(s.unitCost);
+                                const hasAlert = s.lastScrapedPrice && Math.abs(base - parseFloat(s.lastScrapedPrice)) > 50;
+                                if (!hasAlert) return '';
+                                return `
+                                    <div class="group/alert relative">
+                                        <span class="text-rose-500 animate-bounce cursor-help" title="Desajuste de precio detectado: ${fmt(s.lastScrapedPrice)}">⚠️</span>
+                                        <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-[10px] font-bold rounded-xl opacity-0 group-hover/alert:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50 shadow-xl">
+                                            Detectado: ${fmt(s.lastScrapedPrice)} (vs ${fmt(base)})
+                                        </div>
+                                    </div>
+                                `;
+                            })()}
+                        </div>
                     </td>
                     <td class="p-5">
                         <div class="flex items-center gap-2">
@@ -919,10 +966,58 @@ const initialCategories = await db.select().from(supplyCategories).orderBy(asc(s
             document.getElementById('supply-id').value = '';
             document.getElementById('f-active').checked = true;
             document.getElementById('f-min-stock').value = '20';
+            document.getElementById('f-pack-price').value = '';
+            document.getElementById('f-pack-qty').value = '';
+            document.getElementById('price-alert-box').classList.add('hidden');
             modalTitle.textContent = 'Nuevo Insumo';
             compContainer.innerHTML = '';
             compEmpty.classList.remove('hidden');
         }
+
+        // Price Monitor Logic
+        const btnScanPrices = document.getElementById('btn-scan-prices');
+        btnScanPrices.addEventListener('click', async () => {
+            if (btnScanPrices.disabled) return;
+            btnScanPrices.disabled = true;
+            const originalIcon = btnScanPrices.innerHTML;
+            btnScanPrices.innerHTML = `Verificando...`;
+            
+            try {
+                const res = await fetch('/api/supplies/scan-prices', { method: 'POST' });
+                const data = await res.json();
+                if (res.ok) {
+                    window.showToast(`Escaneo completado: ${data.scanned} procesados`);
+                    const refreshRes = await fetch('/api/supplies');
+                    supplies = await refreshRes.json();
+                    render();
+                } else {
+                    window.showToast('Error: ' + (data.error || 'Server error'), 'error');
+                }
+            } catch (err) {
+                window.showToast('Error al escanear precios', 'error');
+            } finally {
+                btnScanPrices.disabled = false;
+                btnScanPrices.innerHTML = originalIcon;
+                // Since we lost the Lucide icon on innerHTML change, 
+                // we reload only if necessary or keep it simple.
+                // For a premium feel, let's reload to reset Lucide components.
+                location.reload();
+            }
+        });
+
+        document.getElementById('btn-accept-price').addEventListener('click', (e) => {
+            const isPack = e.target.dataset.isPack === 'true';
+            const detectedStr = document.getElementById('alert-detected-price').textContent
+                .replace('$', '')
+                .replace(/\./g, '')
+                .replace(',', '.')
+                .trim();
+            
+            const targetField = isPack ? document.getElementById('f-pack-price') : document.getElementById('f-cost');
+            targetField.value = parseFloat(detectedStr);
+            targetField.dispatchEvent(new Event('input')); // Recalculate everything
+            window.showToast('Precio actualizado en el formulario');
+        });
 
         function openEdit(id) {
             const s = supplies.find(x => x.id === id);
@@ -939,6 +1034,18 @@ const initialCategories = await db.select().from(supplyCategories).orderBy(asc(s
             document.getElementById('f-link').value = s.link || '';
             document.getElementById('f-notes').value = s.notes || '';
             document.getElementById('f-active').checked = s.isActive;
+            
+            // Price Alert logic
+            const alertBox = document.getElementById('price-alert-box');
+            const alertBase = (s.packPrice && parseFloat(s.packPrice) > 0) ? parseFloat(s.packPrice) : parseFloat(s.unitCost);
+            if (s.lastScrapedPrice && Math.abs(alertBase - parseFloat(s.lastScrapedPrice)) > 50) {
+                alertBox.classList.remove('hidden');
+                document.getElementById('alert-detected-price').textContent = fmt(s.lastScrapedPrice);
+                document.getElementById('alert-detected-date').textContent = `Visto el: ${new Date(s.lastScrapedAt).toLocaleDateString('es-AR')} ${new Date(s.lastScrapedAt).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}`;
+                document.getElementById('btn-accept-price').dataset.isPack = (s.packPrice && parseFloat(s.packPrice) > 0) ? 'true' : 'false';
+            } else {
+                alertBox.classList.add('hidden');
+            }
             
             // Phase 11 fields
             document.getElementById('f-pack-price').value = s.packPrice ? parseFloat(s.packPrice) : '';
