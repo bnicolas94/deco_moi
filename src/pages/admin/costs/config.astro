@@ -2,13 +2,13 @@
 import AdminLayout from '@/layouts/AdminLayout.astro';
 import { db } from '@/lib/db/connection';
 import { costItems, shippingRealCosts, products, productCostItems, supplies } from '@/lib/db/schema';
-import { Calculator, Truck, Package, Plus, Trash2, Save, Archive, ExternalLink } from 'lucide-react';
+import { Calculator, Truck, Package, Plus, Trash2, Save, Archive, ExternalLink, Pencil } from 'lucide-react';
 import { eq, inArray, and } from 'drizzle-orm';
 
 // Fetch initial data
 const allCostItems = await db.select().from(costItems).orderBy(costItems.name);
 const allShippingCosts = await db.select().from(shippingRealCosts).orderBy(shippingRealCosts.zone);
-const allProducts = await db.select().from(products).where(eq(products.isActive, true)).orderBy(products.name);
+const allProducts = await db.select().from(products).orderBy(products.name);
 const allSupplies = await db.select().from(supplies).where(eq(supplies.isActive, true)).orderBy(supplies.name);
 
 // Extract unique supply categories for tabs
@@ -71,7 +71,7 @@ allProductLinks.forEach(link => {
             <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
                 <div class="p-6 border-b border-gray-50 flex items-center justify-between">
                     <h2 class="text-lg font-bold text-gray-900 flex items-center gap-2.5">Ítems de Costo</h2>
-                    <button type="button" onclick="document.getElementById('modal-cost-item').classList.remove('hidden')" class="inline-flex items-center px-4 py-2 bg-indigo-600 text-white text-sm font-bold rounded-xl hover:bg-indigo-700 transition-colors shadow-sm focus:ring-4 focus:ring-indigo-100">
+                    <button type="button" onclick="openCreateCostModal()" class="inline-flex items-center px-4 py-2 bg-indigo-600 text-white text-sm font-bold rounded-xl hover:bg-indigo-700 transition-colors shadow-sm focus:ring-4 focus:ring-indigo-100">
                         <Plus className="w-4 h-4 mr-2" />
                         Nuevo Ítem
                     </button>
@@ -115,7 +115,10 @@ allProductLinks.forEach(link => {
                                             <span class={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${item.isActive ? 'translate-x-6' : 'translate-x-1'}`} />
                                         </button>
                                     </td>
-                                    <td class="p-4 text-right">
+                                    <td class="p-4 text-right flex justify-end gap-1">
+                                        <button onclick={`openEditCostModal(${JSON.stringify(item)})`} class="p-2 text-indigo-500 hover:bg-indigo-50 rounded-lg transition-colors inline-flex">
+                                            <Pencil className="w-4 h-4" />
+                                        </button>
                                         <button onclick={`deleteCostItem(${item.id})`} class="p-2 text-rose-500 hover:bg-rose-50 rounded-lg transition-colors inline-flex">
                                             <Trash2 className="w-4 h-4" />
                                         </button>
@@ -219,45 +222,47 @@ allProductLinks.forEach(link => {
                                         <p class="text-sm text-gray-400 italic">No hay insumos activos.</p>
                                     ) : (
                                         <div class="grid grid-cols-1 gap-3">
-                                            {rootSupplies.map(root => {
-                                                const children = suppliesByParent.get(root.id) || [];
+                                            {allSupplies.map(s => {
+                                                const children = suppliesByParent.get(s.id) || [];
                                                 const hasChildren = children.length > 0;
-                                                const isActualChild = !!root.parentId && allSupplies.some(p => p.id === root.parentId);
+                                                const isChild = !!s.parentId && allSupplies.some(p => p.id === s.parentId);
                                                 
-                                                // If this is a root item because it is an orphan, treat it as a normal item
                                                 return (
-                                                    <div class="supply-group border border-gray-100 rounded-2xl overflow-hidden bg-white shadow-sm" data-category={root.category}>
+                                                    <div class={`supply-group border border-gray-100 rounded-2xl overflow-hidden bg-white shadow-sm ${isChild ? 'hidden' : ''}`} data-category={s.category} data-is-child={isChild ? "true" : "false"}>
                                                         <!-- Item Row -->
-                                                        <div class={`supply-item-row flex items-center justify-between p-4 bg-white hover:bg-gray-50/50 transition-colors ${hasChildren ? 'cursor-pointer' : ''}`} data-id={root.id} data-has-children={hasChildren ? "true" : "false"}>
+                                                        <div class={`supply-item-row flex items-center justify-between p-4 bg-white hover:bg-gray-50/50 transition-colors ${hasChildren ? 'cursor-pointer' : ''}`} data-id={s.id} data-has-children={hasChildren ? "true" : "false"}>
                                                             <div class="flex items-center gap-3">
-                                                                <input type="checkbox" name="supply_ids[]" value={root.id} data-cost={root.unitCost} class="supply-checkbox h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed" disabled />
+                                                                <input type="checkbox" name="supply_ids[]" value={s.id} data-cost={s.unitCost} class="supply-checkbox h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed" disabled />
                                                                 <div class="flex-1">
                                                                     <div class="flex items-center gap-2">
                                                                         {hasChildren && (
-                                                                            <svg class="w-3 h-3 text-gray-400 transform transition-transform duration-200 chevron-icon" data-id={root.id} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M9 5l7 7-7 7"></path></svg>
+                                                                            <svg class="w-3 h-3 text-gray-400 transform transition-transform duration-200 chevron-icon" data-id={s.id} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M9 5l7 7-7 7"></path></svg>
                                                                         )}
-                                                                        <div class="text-sm font-bold text-gray-900">{root.name}</div>
+                                                                        <div class="text-sm font-bold text-gray-900">{s.name}</div>
                                                                     </div>
                                                                     <div class="flex items-center gap-2">
-                                                                        <div class="text-[10px] text-gray-400 uppercase font-bold tracking-wider">${Number(root.unitCost).toLocaleString('es-AR')} / {root.unit}</div>
-                                                                        <div class="row-subtotal hidden text-[10px] font-black text-rose-500 bg-rose-50 px-1.5 py-0.5 rounded border border-rose-100" data-id={root.id}>
+                                                                        <div class="text-[10px] text-gray-400 uppercase font-bold tracking-wider">${Number(s.unitCost).toLocaleString('es-AR')} / {s.unit}</div>
+                                                                        <div class="row-subtotal hidden text-[10px] font-black text-rose-500 bg-rose-50 px-1.5 py-0.5 rounded border border-rose-100" data-id={s.id}>
                                                                             $0.00
                                                                         </div>
                                                                     </div>
                                                                 </div>
                                                             </div>
                                                             <div class="flex items-center gap-3">
-                                                                <button type="button" class="yield-toggle p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all disabled:opacity-30" title="Calculadora de Rinde" data-id={root.id} disabled>
+                                                                <a href={`/admin/costs/supplies?edit=${s.id}`} target="_blank" class="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all" title="Ver/Editar Insumo">
+                                                                    <ExternalLink className="w-3.5 h-3.5" />
+                                                                </a>
+                                                                <button type="button" class="yield-toggle p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all disabled:opacity-30" title="Calculadora de Rinde" data-id={s.id} disabled>
                                                                     <Calculator className="w-3.5 h-3.5" />
                                                                 </button>
                                                                 <div class="flex items-center gap-2">
-                                                                    <div class="qty-container" data-id={root.id}>
-                                                                        <input type="number" step="0.001" min="0" value="0" data-id={root.id} class="supply-qty w-20 h-9 rounded-lg border-gray-200 text-sm font-bold text-center focus:ring-indigo-500 focus:border-indigo-500 disabled:opacity-50" disabled />
+                                                                    <div class="qty-container" data-id={s.id}>
+                                                                        <input type="number" step="0.001" min="0" value="0" data-id={s.id} class="supply-qty w-20 h-9 rounded-lg border-gray-200 text-sm font-bold text-center focus:ring-indigo-500 focus:border-indigo-500 disabled:opacity-50" disabled />
                                                                     </div>
-                                                                    <div class="yield-container hidden flex items-center gap-1.5 p-1 bg-indigo-50 rounded-lg border border-indigo-100" data-id={root.id}>
-                                                                        <input type="number" placeholder="Uso" data-id={root.id} class="yield-used w-12 h-7 bg-white rounded border-indigo-100 text-[11px] font-bold text-center focus:ring-indigo-500 focus:border-indigo-500" />
+                                                                    <div class="yield-container hidden flex items-center gap-1.5 p-1 bg-indigo-50 rounded-lg border border-indigo-100" data-id={s.id}>
+                                                                        <input type="number" placeholder="Uso" data-id={s.id} class="yield-used w-12 h-7 bg-white rounded border-indigo-100 text-[11px] font-bold text-center focus:ring-indigo-500 focus:border-indigo-500" />
                                                                         <span class="text-[10px] font-bold text-indigo-400 uppercase">de</span>
-                                                                        <input type="number" placeholder="Total" data-id={root.id} class="yield-total w-12 h-7 bg-white rounded border-indigo-100 text-[11px] font-bold text-center focus:ring-indigo-500 focus:border-indigo-500" />
+                                                                        <input type="number" placeholder="Total" data-id={s.id} class="yield-total w-12 h-7 bg-white rounded border-indigo-100 text-[11px] font-bold text-center focus:ring-indigo-500 focus:border-indigo-500" />
                                                                     </div>
                                                                 </div>
                                                             </div>
@@ -265,7 +270,7 @@ allProductLinks.forEach(link => {
 
                                                         <!-- Children Container -->
                                                         {hasChildren && (
-                                                            <div class="children-list hidden border-t border-gray-50 bg-gray-50/30" data-parent-of-list={root.id}>
+                                                            <div class="children-list hidden border-t border-gray-50 bg-gray-50/30" data-parent-of-list={s.id}>
                                                                 {children.map(child => (
                                                                     <div class="supply-item-row flex items-center justify-between p-3 pl-10 border-b border-gray-50 last:border-0 hover:bg-gray-100/50 transition-colors" data-id={child.id} data-category={child.category}>
                                                                         <div class="flex items-center gap-3">
@@ -281,6 +286,9 @@ allProductLinks.forEach(link => {
                                                                             </div>
                                                                         </div>
                                                                         <div class="flex items-center gap-3">
+                                                                            <a href={`/admin/costs/supplies?edit=${child.id}`} target="_blank" class="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all" title="Ver/Editar Insumo">
+                                                                                <ExternalLink className="w-3.5 h-3.5" />
+                                                                            </a>
                                                                             <button type="button" class="yield-toggle p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all disabled:opacity-30" title="Calculadora de Rinde" data-id={child.id} disabled>
                                                                                 <Calculator className="w-3.5 h-3.5" />
                                                                             </button>
@@ -375,12 +383,13 @@ allProductLinks.forEach(link => {
     <div id="modal-cost-item" class="fixed inset-0 bg-slate-900/50 z-50 flex items-center justify-center hidden backdrop-blur-sm">
         <div class="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4 overflow-hidden transform transition-all">
             <div class="p-6 border-b border-gray-100 flex justify-between items-center">
-                <h3 class="text-lg font-bold text-gray-900">Crear Ítem de Costo</h3>
-                <button type="button" onclick="document.getElementById('modal-cost-item').classList.add('hidden')" class="text-gray-400 hover:text-gray-600">
+                <h3 class="text-lg font-bold text-gray-900" id="modal-cost-title">Crear Ítem de Costo</h3>
+                <button type="button" onclick="closeCostModal()" class="text-gray-400 hover:text-gray-600">
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                 </button>
             </div>
             <form id="create-cost-item-form" class="p-6 space-y-4">
+                <input type="hidden" name="id" id="edit-cost-id" />
                 <div class="space-y-1">
                     <label class="block text-sm font-bold text-gray-700">Nombre</label>
                     <input type="text" name="name" required placeholder="Ej: IIBB, Packaging..." class="block w-full rounded-xl border-gray-200 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm h-11 border px-3" />
@@ -410,8 +419,8 @@ allProductLinks.forEach(link => {
                     </label>
                 </div>
                 <div class="pt-4 mt-4 text-right border-t border-gray-50 flex justify-end gap-3">
-                    <button type="button" onclick="document.getElementById('modal-cost-item').classList.add('hidden')" class="px-5 py-2.5 text-gray-600 font-bold hover:bg-gray-100 rounded-xl transition-colors">Cancelar</button>
-                    <button type="submit" class="px-5 py-2.5 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-colors shadow-sm">Guardar Ítem</button>
+                    <button type="button" onclick="closeCostModal()" class="px-5 py-2.5 text-gray-600 font-bold hover:bg-gray-100 rounded-xl transition-colors">Cancelar</button>
+                    <button type="submit" class="px-5 py-2.5 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-colors shadow-sm" id="modal-cost-submit">Guardar Ítem</button>
                 </div>
             </form>
         </div>
@@ -449,33 +458,82 @@ allProductLinks.forEach(link => {
 
             // Filter Rows
             document.querySelectorAll('.supply-group').forEach(group => {
-                if (cat === 'ALL' || group.dataset.category === cat) {
-                    group.classList.remove('hidden');
+                const isChild = group.dataset.isChild === 'true';
+                if (cat === 'ALL') {
+                    // En modo ALL, ocultamos los hijos directos (ya aparecerán anidados)
+                    if (isChild) {
+                        group.classList.add('hidden');
+                    } else {
+                        group.classList.remove('hidden');
+                    }
                 } else {
-                    group.classList.add('hidden');
+                    // En modo Categoría, mostramos todo lo que coincida, sea hijo o no
+                    if (group.dataset.category === cat) {
+                        group.classList.remove('hidden');
+                    } else {
+                        group.classList.add('hidden');
+                    }
                 }
             });
         });
     });
 
-    // COST ITEM CREATION
+    // COST ITEM MODAL LOGIC (CREATE & EDIT)
+    window.openCreateCostModal = function() {
+        const modal = document.getElementById('modal-cost-item');
+        const form = document.getElementById('create-cost-item-form');
+        const title = document.getElementById('modal-cost-title');
+        const submitBtn = document.getElementById('modal-cost-submit');
+        
+        form.reset();
+        document.getElementById('edit-cost-id').value = '';
+        title.textContent = 'Crear Ítem de Costo';
+        submitBtn.textContent = 'Guardar Ítem';
+        modal.classList.remove('hidden');
+    }
+
+    window.openEditCostModal = function(item) {
+        const modal = document.getElementById('modal-cost-item');
+        const form = document.getElementById('create-cost-item-form');
+        const title = document.getElementById('modal-cost-title');
+        const submitBtn = document.getElementById('modal-cost-submit');
+        
+        form.elements['id'].value = item.id;
+        form.elements['name'].value = item.name;
+        form.elements['type'].value = item.type;
+        form.elements['value'].value = item.value;
+        form.elements['isGlobal'].checked = item.isGlobal;
+        
+        title.textContent = 'Editar Ítem de Costo';
+        submitBtn.textContent = 'Actualizar Ítem';
+        modal.classList.remove('hidden');
+    }
+
+    window.closeCostModal = function() {
+        document.getElementById('modal-cost-item').classList.add('hidden');
+    }
+
     document.getElementById('create-cost-item-form')?.addEventListener('submit', async (e) => {
         e.preventDefault();
         const fd = new FormData(e.target);
         const data = Object.fromEntries(fd.entries());
         data.isActive = true;
         data.isGlobal = fd.has('isGlobal');
+        
+        const id = data.id;
+        const method = id ? 'PUT' : 'POST';
+        const url = id ? `/api/costs/items/${id}` : '/api/costs/items';
 
         try {
-            const res = await fetch('/api/costs/items', {
-                method: 'POST',
+            const res = await fetch(url, {
+                method: method,
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data)
             });
             if (res.ok) {
                 window.location.reload();
             } else {
-                alert('Error al crear el ítem');
+                alert(`Error al ${id ? 'actualizar' : 'crear'} el ítem`);
             }
         } catch (error) {
             console.error(error);

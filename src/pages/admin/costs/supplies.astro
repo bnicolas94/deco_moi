@@ -1330,5 +1330,14 @@ const initialCategories = await db.select().from(supplyCategories).orderBy(asc(s
         });
 
         render();
+
+        // Initial check for deep link edit
+        const urlParams = new URLSearchParams(window.location.search);
+        const editId = urlParams.get('edit');
+        if (editId) {
+            setTimeout(() => {
+                openEdit(parseInt(editId));
+            }, 500);
+        }
     </script>
 </AdminLayout>

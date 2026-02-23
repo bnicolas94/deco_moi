@@ -1,6 +1,6 @@
 import type { APIRoute } from 'astro';
 import { db } from '@/lib/db/connection';
-import { products, productVariants, meliItemLinks } from '@/lib/db/schema';
+import { products, productVariants, meliItemLinks, productionTimeRules, productCostItems, productSupplies, priceRules, mockupTemplates } from '@/lib/db/schema';
 import { eq, and, notInArray } from 'drizzle-orm';
 import { writeFile, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -198,10 +198,22 @@ export const DELETE: APIRoute = async (context) => {
     }
     const id = parseInt(context.params.id!);
     try {
-        await db.delete(products).where(eq(products.id, id));
+        await db.transaction(async (tx) => {
+            // Eliminar registros relacionados antes de borrar el producto
+            await tx.delete(meliItemLinks).where(eq(meliItemLinks.productId, id));
+            await tx.delete(productionTimeRules).where(eq(productionTimeRules.productId, id));
+            await tx.delete(priceRules).where(eq(priceRules.productId, id));
+            await tx.delete(mockupTemplates).where(eq(mockupTemplates.productId, id));
+            await tx.delete(productVariants).where(eq(productVariants.productId, id));
+            await tx.delete(productCostItems).where(eq(productCostItems.productId, id));
+            await tx.delete(productSupplies).where(eq(productSupplies.productId, id));
+
+            // Finalmente borrar el producto
+            await tx.delete(products).where(eq(products.id, id));
+        });
         return new Response(JSON.stringify({ success: true }), { status: 200 });
     } catch (e) {
-        console.error(e);
-        return new Response('Error al eliminar producto', { status: 500 });
+        console.error('Error deleting product:', e);
+        return new Response(JSON.stringify({ error: 'Error al eliminar producto' }), { status: 500 });
     }
 };

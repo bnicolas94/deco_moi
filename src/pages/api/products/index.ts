@@ -17,7 +17,7 @@ export const POST: APIRoute = async (context) => {
     const stock = parseInt(formData.get('stock')?.toString() || '0');
     const categoryId = parseInt(formData.get('categoryId')?.toString() || '0');
     const description = formData.get('description')?.toString();
-    const sku = formData.get('sku')?.toString();
+    const sku = formData.get('sku')?.toString() || null;
     const isActive = formData.get('isActive') === 'true'; // Checkbox boolean
     const isFeatured = formData.get('isFeatured') === 'true';
 
