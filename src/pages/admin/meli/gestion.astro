@@ -16,6 +16,42 @@ const allProducts = await db
 
 ---
 
+<style is:global>
+  /* Estilos para el switch de toggle */
+  .form-switch {
+    position: relative;
+    display: inline-flex;
+    cursor: pointer;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+  }
+  .form-switch label {
+    display: block;
+    width: 44px;
+    height: 24px;
+    border-radius: 9999px;
+    transition: background-color 0.15s ease-in-out;
+  }
+  .form-switch input:checked + label {
+    background-color: #4f46e5;
+  }
+  .form-switch input:checked + label span {
+    transform: translateX(20px);
+  }
+  .form-switch label span {
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 20px;
+    height: 20px;
+    border-radius: 9999px;
+    transition: transform 0.15s ease-in-out;
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  }
+</style>
+
 <AdminLayout title="Gestión Externa MercadoLibre">
   <div class="px-4 sm:px-6 lg:px-8 py-8 w-full max-w-9xl mx-auto">
     <div class="sm:flex sm:justify-between sm:items-center mb-8">
@@ -31,13 +67,31 @@ const allProducts = await db
     </div>
 
     <!-- Filtros -->
-    <div class="mb-4 sm:flex items-center justify-between">
-      <div class="mb-4 sm:mb-0">
-        <input id="searchInput" class="form-input w-full sm:w-80" type="search" placeholder="Buscar publicación de ML..." />
+    <div class="mb-4 sm:flex items-center justify-between gap-4">
+      <div class="flex flex-col sm:flex-row items-center gap-4 flex-grow">
+        <div class="relative w-full sm:w-80">
+          <input id="searchInput" class="form-input w-full pl-9" type="search" placeholder="Buscar publicación de ML..." />
+          <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+          </div>
+        </div>
+        
+        <!-- Toggle Mostrar Pausados -->
+        <div class="flex items-center">
+            <div class="form-switch">
+                <input type="checkbox" id="showPaused" class="sr-only" />
+                <label class="bg-slate-400 dark:bg-slate-700" for="showPaused">
+                    <span class="bg-white" aria-hidden="true"></span>
+                    <span class="sr-only">Mostrar Pausados</span>
+                </label>
+            </div>
+            <div class="text-sm text-slate-400 font-medium ml-2 uppercase tracking-wider text-[10px]">Mostrar Pausados</div>
+        </div>
       </div>
-      <div>
-         <button id="btnReload" class="btn bg-white border-slate-200 text-slate-600 hover:border-slate-300">
-            <span id="reloadText">Recargar Listado</span>
+
+      <div class="flex items-center gap-2 mt-4 sm:mt-0">
+         <button id="btnReload" class="btn bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:border-slate-300 shadow-sm transition-all">
+            <span id="reloadText" class="text-xs font-bold uppercase tracking-wider">Recargar Listado</span>
          </button>
       </div>
     </div>
@@ -123,16 +177,26 @@ const allProducts = await db
     return t.trim();
   }
 
+  const showPausedToggle = document.getElementById('showPaused');
+
   function renderItems(items) {
-    if (items.length === 0) {
-      listingsBody.innerHTML = '<tr><td colspan="6" class="px-2 py-4 text-center text-slate-500">No se encontraron publicaciones.</td></tr>';
+    // --- NUEVO: FILTRO DE ESTADO ---
+    const showPaused = showPausedToggle.checked;
+    let filteredItems = items;
+    
+    if (!showPaused) {
+      filteredItems = items.filter(i => i.status === 'active');
+    }
+
+    if (filteredItems.length === 0) {
+      listingsBody.innerHTML = '<tr><td colspan="6" class="px-2 py-8 text-center text-slate-500 animate-pulse font-medium">No hay publicaciones activas para mostrar.</td></tr>';
       return;
     }
 
     // --- LOGICA DE AGRUPAMIENTO DINAMICA ---
     // Agrupamos por family_id + BaseTitle
     const groups = {};
-    items.forEach(item => {
+    filteredItems.forEach(item => {
       const baseTitle = normalizeTitle(item.title);
       const gId = item.family_id ? `family-${item.family_id}-${baseTitle}` : `item-${item.id}`;
       
@@ -381,24 +445,26 @@ const allProducts = await db
     });
   }
 
+  showPausedToggle.onchange = () => renderItems(allItems);
+
   let searchTimeout;
   searchInput.oninput = (e) => {
     const q = e.target.value;
     
-    // Primero filtramos localmente lo que ya tenemos
+    // Filtramos localmente sobre allItems (la data cruda del server)
     const localQ = q.toLowerCase();
     const filtered = allItems.filter(i => 
       i.title.toLowerCase().includes(localQ) || 
       i.id.toString().toLowerCase().includes(localQ) ||
       (i.localData && i.localData.productName.toLowerCase().includes(localQ))
     );
+    // renderItems ya se encarga de filtrar por estado internamente
     renderItems(filtered);
 
-    // Si no hay resultados locales y el query es largo, o si el usuario deja de escribir, buscamos en el servidor
+    // Búsqueda en servidor con debounce
     clearTimeout(searchTimeout);
     if (q.length > 3) {
       searchTimeout = setTimeout(() => {
-        // Solo buscamos en el servidor si no hay muchos resultados locales o si queremos actualizar
         loadListings(q);
       }, 1000);
     } else if (q.length === 0) {
