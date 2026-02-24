@@ -128,8 +128,9 @@ export const GET: APIRoute = async ({ request }) => {
                     metadata: { notes: `Auto-detectado de MP: DNI ${senderDni}` }
                 });
 
-                // Enviar email de confirmación de pago
+                // Enviar email de confirmación de pago al cliente y notificación de venta al admin
                 EmailService.sendPaymentConfirmedEmail(matchedOrder.id).catch(err => console.error(err));
+                EmailService.sendOrderConfirmationEmails(matchedOrder.id, { skipClient: true }).catch(err => console.error(err));
 
                 stats.matched++;
             } else {

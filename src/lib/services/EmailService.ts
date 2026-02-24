@@ -86,7 +86,7 @@ export class EmailService {
         return false;
     }
 
-    public static async sendOrderConfirmationEmails(orderId: string) {
+    public static async sendOrderConfirmationEmails(orderId: string, options?: { skipAdmin?: boolean; skipClient?: boolean }) {
         try {
             // 1. Fetch Order Details
             const orderData = await db.select().from(orders).where(eq(orders.id, orderId));
@@ -141,31 +141,35 @@ export class EmailService {
             const dispatchPromises: Promise<any>[] = [];
 
             // Client Email
-            if (customer.email) {
-                dispatchPromises.push(
-                    this.sendWithRetry(
-                        orderId,
-                        'client',
-                        customer.email,
-                        clientSubject,
-                        clientHtml,
-                        adminEmail // ReplyTo admin for client
-                    )
-                );
-            } else {
-                console.warn(`EmailService: No customer email found for order ${orderId}`);
+            if (!options?.skipClient) {
+                if (customer.email) {
+                    dispatchPromises.push(
+                        this.sendWithRetry(
+                            orderId,
+                            'client',
+                            customer.email,
+                            clientSubject,
+                            clientHtml,
+                            adminEmail // ReplyTo admin for client
+                        )
+                    );
+                } else {
+                    console.warn(`EmailService: No customer email found for order ${orderId}`);
+                }
             }
 
             // Admin Email
-            dispatchPromises.push(
-                this.sendWithRetry(
-                    orderId,
-                    'admin',
-                    adminEmail,
-                    adminSubject,
-                    adminHtml
-                )
-            );
+            if (!options?.skipAdmin) {
+                dispatchPromises.push(
+                    this.sendWithRetry(
+                        orderId,
+                        'admin',
+                        adminEmail,
+                        adminSubject,
+                        adminHtml
+                    )
+                );
+            }
 
             await Promise.allSettled(dispatchPromises);
 

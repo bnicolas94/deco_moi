@@ -124,7 +124,7 @@ export const POST: APIRoute = async (context) => {
 
         if (paymentMethod === 'transfer') {
             import('@/lib/services/EmailService').then(({ EmailService }) => {
-                EmailService.sendOrderConfirmationEmails(newOrder.id).catch(err => console.error(err));
+                EmailService.sendOrderConfirmationEmails(newOrder.id, { skipAdmin: true }).catch(err => console.error(err));
             });
         }
 

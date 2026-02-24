@@ -1,0 +1,449 @@
+{
+  "id": "MLA2865136030",
+  "site_id": "MLA",
+  "title": "Mini Recuerdo Detalles Empresariales Dia De La Mujer/ Madre",
+  "family_name": "Mini Recuerdo Detalles Empresariales Dia De La Mujer/ Madre",
+  "family_id": 4466680629372316,
+  "seller_id": 201933453,
+  "category_id": "MLA10056",
+  "user_product_id": "MLAU3792396603",
+  "official_store_id": null,
+  "price": 25900,
+  "base_price": 25900,
+  "original_price": null,
+  "inventory_id": null,
+  "currency_id": "ARS",
+  "initial_quantity": 100,
+  "available_quantity": 100,
+  "sold_quantity": 0,
+  "sale_terms": [
+    {
+      "id": "WARRANTY_TYPE",
+      "name": "Tipo de garantía",
+      "value_id": "6150835",
+      "value_name": "Sin garantía",
+      "value_struct": null,
+      "values": [
+        {
+          "id": "6150835",
+          "name": "Sin garantía",
+          "struct": null
+        }
+      ],
+      "value_type": "list"
+    }
+  ],
+  "buying_mode": "buy_it_now",
+  "listing_type_id": "gold_special",
+  "start_time": "2026-02-17T20:27:16.250Z",
+  "stop_time": "2046-02-12T04:00:00.000Z",
+  "end_time": "2046-02-12T04:00:00.000Z",
+  "expiration_time": "2026-05-12T01:19:34.248Z",
+  "condition": "new",
+  "permalink": "https://articulo.mercadolibre.com.ar/MLA-2865136030-mini-recuerdo-detalles-empresariales-dia-de-la-mujer-madre-_JM",
+  "thumbnail_id": "754924-MLA106665245786_022026",
+  "thumbnail": "http://http2.mlstatic.com/D_754924-MLA106665245786_022026-I.jpg",
+  "pictures": [
+    {
+      "id": "754924-MLA106665245786_022026",
+      "url": "http://http2.mlstatic.com/D_754924-MLA106665245786_022026-O.jpg",
+      "secure_url": "https://http2.mlstatic.com/D_754924-MLA106665245786_022026-O.jpg",
+      "size": "445x500",
+      "max_size": "890x998",
+      "quality": ""
+    },
+    {
+      "id": "886389-MLA107320305361_022026",
+      "url": "http://http2.mlstatic.com/D_886389-MLA107320305361_022026-O.jpg",
+      "secure_url": "https://http2.mlstatic.com/D_886389-MLA107320305361_022026-O.jpg",
+      "size": "447x500",
+      "max_size": "1074x1200",
+      "quality": ""
+    },
+    {
+      "id": "653248-MLA107320566593_022026",
+      "url": "http://http2.mlstatic.com/D_653248-MLA107320566593_022026-O.jpg",
+      "secure_url": "https://http2.mlstatic.com/D_653248-MLA107320566593_022026-O.jpg",
+      "size": "500x500",
+      "max_size": "1200x1200",
+      "quality": ""
+    },
+    {
+      "id": "602561-MLA107320625963_022026",
+      "url": "http://http2.mlstatic.com/D_602561-MLA107320625963_022026-O.jpg",
+      "secure_url": "https://http2.mlstatic.com/D_602561-MLA107320625963_022026-O.jpg",
+      "size": "500x500",
+      "max_size": "1200x1200",
+      "quality": ""
+    },
+    {
+      "id": "702781-MLA106665036284_022026",
+      "url": "http://http2.mlstatic.com/D_702781-MLA106665036284_022026-O.jpg",
+      "secure_url": "https://http2.mlstatic.com/D_702781-MLA106665036284_022026-O.jpg",
+      "size": "500x500",
+      "max_size": "1200x1200",
+      "quality": ""
+    },
+    {
+      "id": "750664-MLA107320275447_022026",
+      "url": "http://http2.mlstatic.com/D_750664-MLA107320275447_022026-O.jpg",
+      "secure_url": "https://http2.mlstatic.com/D_750664-MLA107320275447_022026-O.jpg",
+      "size": "500x500",
+      "max_size": "1200x1200",
+      "quality": ""
+    }
+  ],
+  "video_id": null,
+  "descriptions": [],
+  "accepts_mercadopago": true,
+  "non_mercado_pago_payment_methods": [],
+  "shipping": {
+    "mode": "me2",
+    "methods": [],
+    "tags": [
+      "self_service_in"
+    ],
+    "dimensions": null,
+    "local_pick_up": true,
+    "free_shipping": false,
+    "logistic_type": "xd_drop_off",
+    "store_pick_up": false
+  },
+  "international_delivery_mode": "none",
+  "seller_address": {
+    "comment": "Referencia: Rejas negras, en caso de no recibir respuesta llamar al telefono porque el timbre no siempre se escucha (casa al fondo)",
+    "address_line": "Lincoln 1242",
+    "zip_code": "1875",
+    "city": {
+      "name": "Wilde"
+    },
+    "state": {
+      "id": "AR-B",
+      "name": "Buenos Aires"
+    },
+    "country": {
+      "id": "AR",
+      "name": "Argentina"
+    },
+    "search_location": {
+      "city": {
+        "id": "TUxBQ0FWRTc5OTQ1",
+        "name": "Avellaneda"
+      },
+      "state": {
+        "id": "TUxBUEdSQXJlMDNm",
+        "name": "Bs.As. G.B.A. Sur"
+      }
+    },
+    "latitude": -34.6960764,
+    "longitude": -58.3020054,
+    "id": 1014827066
+  },
+  "seller_contact": null,
+  "location": {},
+  "geolocation": {
+    "latitude": -34.6960764,
+    "longitude": -58.3020054
+  },
+  "coverage_areas": [],
+  "attributes": [
+    {
+      "id": "GIFTABLE",
+      "name": "Regalable",
+      "value_id": "54973164",
+      "value_name": "vppfull",
+      "values": [
+        {
+          "id": "54973164",
+          "name": "vppfull",
+          "struct": null
+        }
+      ],
+      "value_type": "string"
+    },
+    {
+      "id": "BRAND",
+      "name": "Marca",
+      "value_id": "46151479",
+      "value_name": "Deco Moi",
+      "values": [
+        {
+          "id": "46151479",
+          "name": "Deco Moi",
+          "struct": null
+        }
+      ],
+      "value_type": "string"
+    },
+    {
+      "id": "EMPTY_GTIN_REASON",
+      "name": "Motivo de GTIN vacío",
+      "value_id": "17055158",
+      "value_name": "El producto es una pieza artesanal",
+      "values": [
+        {
+          "id": "17055158",
+          "name": "El producto es una pieza artesanal",
+          "struct": null
+        }
+      ],
+      "value_type": "list"
+    },
+    {
+      "id": "IS_DECORATIVE",
+      "name": "Es decorativo",
+      "value_id": "242085",
+      "value_name": "Sí",
+      "values": [
+        {
+          "id": "242085",
+          "name": "Sí",
+          "struct": null
+        }
+      ],
+      "value_type": "boolean"
+    },
+    {
+      "id": "IS_EDIBLE",
+      "name": "Es comestible",
+      "value_id": "242085",
+      "value_name": "Sí",
+      "values": [
+        {
+          "id": "242085",
+          "name": "Sí",
+          "struct": null
+        }
+      ],
+      "value_type": "boolean"
+    },
+    {
+      "id": "IS_HIGHLIGHT_BRAND",
+      "name": "Es marca destacada",
+      "value_id": "242084",
+      "value_name": "No",
+      "values": [
+        {
+          "id": "242084",
+          "name": "No",
+          "struct": null
+        }
+      ],
+      "value_type": "boolean"
+    },
+    {
+      "id": "IS_TOM_BRAND",
+      "name": "Es marca TOM",
+      "value_id": "242084",
+      "value_name": "No",
+      "values": [
+        {
+          "id": "242084",
+          "name": "No",
+          "struct": null
+        }
+      ],
+      "value_type": "boolean"
+    },
+    {
+      "id": "ITEM_CONDITION",
+      "name": "Condición del ítem",
+      "value_id": "2230284",
+      "value_name": "Nuevo",
+      "values": [
+        {
+          "id": "2230284",
+          "name": "Nuevo",
+          "struct": null
+        }
+      ],
+      "value_type": "list"
+    },
+    {
+      "id": "OCCASIONS",
+      "name": "Ocasiones",
+      "value_id": null,
+      "value_name": "Baby shower,Bautismos,Bodas,Cumpleaños,Graduaciones,Nacimiento,XV,comuniones",
+      "values": [
+        {
+          "id": "3769476",
+          "name": "Baby shower",
+          "struct": null
+        },
+        {
+          "id": "60365113",
+          "name": "Bautismos",
+          "struct": null
+        },
+        {
+          "id": "72435932",
+          "name": "Bodas",
+          "struct": null
+        },
+        {
+          "id": "5767946",
+          "name": "Cumpleaños",
+          "struct": null
+        },
+        {
+          "id": null,
+          "name": "Graduaciones",
+          "struct": null
+        },
+        {
+          "id": "7589916",
+          "name": "Nacimiento",
+          "struct": null
+        },
+        {
+          "id": "28654557",
+          "name": "XV",
+          "struct": null
+        },
+        {
+          "id": "73033321",
+          "name": "comuniones",
+          "struct": null
+        }
+      ],
+      "value_type": "string"
+    },
+    {
+      "id": "SALE_FORMAT",
+      "name": "Formato de venta",
+      "value_id": "1359392",
+      "value_name": "Pack",
+      "values": [
+        {
+          "id": "1359392",
+          "name": "Pack",
+          "struct": null
+        }
+      ],
+      "value_type": "list"
+    },
+    {
+      "id": "SELLER_PACKAGE_HEIGHT",
+      "name": "Altura del paquete del seller",
+      "value_id": null,
+      "value_name": "25 cm",
+      "values": [
+        {
+          "id": null,
+          "name": "25 cm",
+          "struct": {
+            "number": 25,
+            "unit": "cm"
+          }
+        }
+      ],
+      "value_type": "number_unit"
+    },
+    {
+      "id": "SELLER_PACKAGE_LENGTH",
+      "name": "Largo del paquete del seller",
+      "value_id": null,
+      "value_name": "14 cm",
+      "values": [
+        {
+          "id": null,
+          "name": "14 cm",
+          "struct": {
+            "number": 14,
+            "unit": "cm"
+          }
+        }
+      ],
+      "value_type": "number_unit"
+    },
+    {
+      "id": "SELLER_PACKAGE_WEIGHT",
+      "name": "Peso del paquete del seller",
+      "value_id": null,
+      "value_name": "1042 g",
+      "values": [
+        {
+          "id": null,
+          "name": "1042 g",
+          "struct": {
+            "number": 1042,
+            "unit": "g"
+          }
+        }
+      ],
+      "value_type": "number_unit"
+    },
+    {
+      "id": "SELLER_PACKAGE_WIDTH",
+      "name": "Ancho del paquete del seller",
+      "value_id": null,
+      "value_name": "21 cm",
+      "values": [
+        {
+          "id": null,
+          "name": "21 cm",
+          "struct": {
+            "number": 21,
+            "unit": "cm"
+          }
+        }
+      ],
+      "value_type": "number_unit"
+    },
+    {
+      "id": "SOUVENIR_FORMAT",
+      "name": "Formato del souvenir",
+      "value_id": "6785972",
+      "value_name": "Tarjeta",
+      "values": [
+        {
+          "id": "6785972",
+          "name": "Tarjeta",
+          "struct": null
+        }
+      ],
+      "value_type": "string"
+    },
+    {
+      "id": "UNITS_PER_PACK",
+      "name": "Unidades por pack",
+      "value_id": null,
+      "value_name": "20",
+      "values": [
+        {
+          "id": null,
+          "name": "20",
+          "struct": null
+        }
+      ],
+      "value_type": "number"
+    }
+  ],
+  "warnings": [],
+  "listing_source": "",
+  "variations": [],
+  "status": "active",
+  "sub_status": [],
+  "tags": [
+    "user_product_listing",
+    "good_quality_thumbnail",
+    "immediate_payment",
+    "cart_eligible"
+  ],
+  "warranty": "Sin garantía",
+  "catalog_product_id": null,
+  "domain_id": "MLA-SOUVENIRS",
+  "seller_custom_field": null,
+  "parent_item_id": null,
+  "differential_pricing": null,
+  "deal_ids": [],
+  "automatic_relist": false,
+  "date_created": "2026-02-17T20:27:16.428Z",
+  "last_updated": "2026-02-21T01:19:36.249Z",
+  "health": null,
+  "catalog_listing": false,
+  "item_relations": [],
+  "channels": [
+    "marketplace"
+  ]
+}
