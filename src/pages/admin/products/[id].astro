@@ -242,16 +242,7 @@ const currentImages = product?.images || [];
                                         class="block w-full pl-8 rounded-xl border-gray-200 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm h-11 border transition-all"
                                     />
                                 </div>
-                                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 mt-1">
-                                    <p class="text-[10px] text-gray-400 italic">Precio final al público.</p>
-                                    <div class="flex flex-wrap gap-1">
-                                        {allCosts.filter(c => c.type === 'percentage').map(c => (
-                                            <span class="inline-flex items-center px-1 py-0.5 rounded text-[9px] font-bold bg-indigo-50 text-indigo-500 border border-indigo-100" title="Costo Porcentual">
-                                                {c.name}: {c.value}%
-                                            </span>
-                                        ))}
-                                    </div>
-                                </div>
+                                <p class="text-[10px] text-gray-400 italic mt-1">Precio final al público.</p>
                             </div>
                             <div class="space-y-2">
                                 <label class="block text-sm font-bold text-gray-700">Inventario Inicial</label>
@@ -328,37 +319,66 @@ const currentImages = product?.images || [];
                             </div>
                         </div>
 
-                        <!-- Fixed Costs Indicator & Multiplier -->
-                        <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-3 p-3 bg-rose-50/50 border border-rose-100/50 rounded-xl mt-2 animate-in fade-in slide-in-from-top-1">
-                            <div class="flex flex-col gap-2">
-                                <div class="text-sm font-bold text-rose-500 flex items-center gap-1.5">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-calculator"><rect width="16" height="20" x="4" y="2" rx="2"/><line x1="8" x2="16" y1="6" y2="6"/><line x1="16" x2="16" y1="14" y2="18"/><path d="M16 10h.01"/><path d="M12 10h.01"/><path d="M8 10h.01"/><path d="M12 14h.01"/><path d="M8 14h.01"/><path d="M12 18h.01"/><path d="M8 18h.01"/></svg>
-                                    <span>Costo Fijo Total: <span id="totalFixedLabel">$ 0.00</span></span>
+                        <!-- Unified Costs Indicator & Multiplier -->
+                        <div class="flex flex-col gap-3 p-4 bg-rose-50/50 border border-rose-100/50 rounded-xl mt-2 animate-in fade-in slide-in-from-top-1">
+                            <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+                                
+                                <div class="flex flex-col gap-2 w-full flex-1">
+                                    <!-- Header -->
+                                    <div class="text-sm font-black text-rose-600 flex items-center gap-1.5 border-b border-rose-100/50 pb-2">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-calculator"><rect width="16" height="20" x="4" y="2" rx="2"/><line x1="8" x2="16" y1="6" y2="6"/><line x1="16" x2="16" y1="14" y2="18"/><path d="M16 10h.01"/><path d="M12 10h.01"/><path d="M8 10h.01"/><path d="M12 14h.01"/><path d="M8 14h.01"/><path d="M12 18h.01"/><path d="M8 18h.01"/></svg>
+                                        <span>Costos Totales del Producto: <span id="totalUnifiedCostLabel">$ 0.00</span></span>
+                                    </div>
+                                    
+                                    <!-- Breakdowns -->
+                                    <div class="flex flex-col gap-2 mt-1">
+                                        <!-- Fixed Costs Row -->
+                                        <div class="flex items-start gap-2">
+                                            <span class="text-[10px] font-bold text-rose-400 uppercase tracking-wider w-16 mt-0.5">Fijos:</span>
+                                            <div class="flex flex-wrap gap-1.5 flex-1">
+                                                {allCosts.filter(c => c.type === 'fixed').map(c => (
+                                                    <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-700">
+                                                        {c.name}: ${Number(c.value).toFixed(2)}
+                                                    </span>
+                                                ))}
+                                                {allCosts.filter(c => c.type === 'fixed').length === 0 && <span class="text-[10px] text-gray-400 italic">No hay costos fijos</span>}
+                                            </div>
+                                        </div>
+
+                                        <!-- Variable Costs Row (Dynamically calculated by JS) -->
+                                        <div class="flex items-start gap-2">
+                                            <span class="text-[10px] font-bold text-rose-400 uppercase tracking-wider w-16 mt-0.5">Variables:</span>
+                                            <div class="flex flex-wrap gap-1.5 flex-1" id="dyn-perc-tags-container">
+                                                <!-- Populated by JS so they update when the Base Price changes -->
+                                                {allCosts.filter(c => c.type === 'percentage').map(c => (
+                                                    <span class="dyn-perc-tag inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-700" data-name={c.name} data-percent={c.value}>
+                                                        {c.name}: $0.00
+                                                    </span>
+                                                ))}
+                                                {allCosts.filter(c => c.type === 'percentage').length === 0 && <span class="text-[10px] text-gray-400 italic">No hay costos variables</span>}
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
-                                <div class="flex flex-wrap gap-1.5 sm:ml-5">
-                                    {allCosts.filter(c => c.type === 'fixed').map(c => (
-                                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-700">
-                                            {c.name}: ${Number(c.value).toFixed(2)}
-                                        </span>
-                                    ))}
-                                </div>
-                            </div>
-                            <div class="flex items-center gap-2 self-start sm:self-center">
-                                <span class="text-[10px] text-rose-400 font-medium mr-1 uppercase tracking-widest hidden sm:inline-block">Multiplicador:</span>
-                                <div class="flex items-center bg-white border border-rose-100 rounded-lg p-0.5 shadow-sm">
-                                    <button type="button" class="multiplier-btn px-2.5 py-1 hover:bg-rose-50 text-rose-600 font-bold text-xs rounded-md transition-all active:scale-95" data-multiply="2">x2</button>
-                                    <button type="button" class="multiplier-btn px-2.5 py-1 hover:bg-rose-50 text-rose-600 font-bold text-xs rounded-md transition-all active:scale-95" data-multiply="3">x3</button>
-                                    <button type="button" class="multiplier-btn px-2.5 py-1 hover:bg-rose-50 text-rose-600 font-bold text-xs rounded-md transition-all active:scale-95" data-multiply="4">x4</button>
-                                    <div class="w-px h-4 bg-rose-100 mx-1"></div>
-                                    <div class="relative flex items-center">
-                                        <span class="absolute left-1.5 text-[10px] font-bold text-rose-400">x</span>
-                                        <input 
-                                            type="number" 
-                                            step="0.1" 
-                                            id="manualMultiplier" 
-                                            placeholder="Personalizado" 
-                                            class="w-16 pl-4 pr-1 py-1 text-xs font-bold text-rose-600 border-none focus:ring-0 placeholder:text-rose-200 placeholder:font-medium"
-                                        />
+
+                                <!-- Multiplier -->
+                                <div class="flex flex-col items-start gap-1 sm:items-end w-full sm:w-auto mt-2 sm:mt-0 pt-3 sm:pt-0 border-t border-rose-100/50 sm:border-0 pl-0 sm:pl-3">
+                                    <span class="text-[10px] text-rose-400 font-bold uppercase tracking-widest hidden sm:inline-block">Multiplicador Fijo</span>
+                                    <div class="flex items-center bg-white border border-rose-100 rounded-lg p-0.5 shadow-sm">
+                                        <button type="button" class="multiplier-btn px-2.5 py-1 hover:bg-rose-50 text-rose-600 font-bold text-xs rounded-md transition-all active:scale-95" data-multiply="2">x2</button>
+                                        <button type="button" class="multiplier-btn px-2.5 py-1 hover:bg-rose-50 text-rose-600 font-bold text-xs rounded-md transition-all active:scale-95" data-multiply="3">x3</button>
+                                        <button type="button" class="multiplier-btn px-2.5 py-1 hover:bg-rose-50 text-rose-600 font-bold text-xs rounded-md transition-all active:scale-95" data-multiply="4">x4</button>
+                                        <div class="w-px h-4 bg-rose-100 mx-1"></div>
+                                        <div class="relative flex items-center">
+                                            <span class="absolute left-1.5 text-[10px] font-bold text-rose-400">x</span>
+                                            <input 
+                                                type="number" 
+                                                step="0.1" 
+                                                id="manualMultiplier" 
+                                                placeholder="Pers." 
+                                                class="w-14 pl-3.5 pr-1 py-1 text-[10px] font-bold text-rose-600 border-none focus:ring-0 placeholder:text-rose-300"
+                                            />
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -749,6 +769,21 @@ const currentImages = product?.images || [];
         });
         document.getElementById('bd-total-perc').textContent = `${totalPerc.toFixed(2)}%`;
         
+        // Update Dynamic Variable Tags and Unified Total Cost
+        const dynTags = document.querySelectorAll('.dyn-perc-tag');
+        let calculatedVariableTotal = 0;
+        dynTags.forEach(tag => {
+            const percent = parseFloat(tag.getAttribute('data-percent'));
+            const cost = gross * (percent / 100);
+            calculatedVariableTotal += cost;
+            tag.textContent = `${tag.getAttribute('data-name')}: $${cost.toFixed(2)}`;
+        });
+        
+        const unifiedLabel = document.getElementById('totalUnifiedCostLabel');
+        if (unifiedLabel) {
+            unifiedLabel.textContent = `$ ${(totalFixed + calculatedVariableTotal).toLocaleString('es-AR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+        }
+        
         // Totals
         const investment = net + totalFixed;
         const divisor = 1 - (totalPerc / 100);
@@ -793,10 +828,8 @@ const currentImages = product?.images || [];
     }
     
     // Fixed Costs Logic
-    const fixedLabel = document.getElementById('totalFixedLabel');
-    if (fixedLabel) {
-        fixedLabel.textContent = `$ ${totalFixed.toFixed(2)}`;
-    }
+    // We trigger a visual update initially to ensure JS dynamic tags render correctly
+    updateVisualBreakdown(parseFloat(netInput.value) || 0, parseFloat(baseInput.value) || 0);
     
     document.querySelectorAll('.multiplier-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
