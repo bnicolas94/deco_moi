@@ -222,13 +222,13 @@ allProductLinks.forEach(link => {
                                         <p class="text-sm text-gray-400 italic">No hay insumos activos.</p>
                                     ) : (
                                         <div class="grid grid-cols-1 gap-3">
-                                            {allSupplies.map(s => {
+                                            {rootSupplies.map(s => {
                                                 const children = suppliesByParent.get(s.id) || [];
                                                 const hasChildren = children.length > 0;
-                                                const isChild = !!s.parentId && allSupplies.some(p => p.id === s.parentId);
+                                                const isChild = false;
                                                 
                                                 return (
-                                                    <div class={`supply-group border border-gray-100 rounded-2xl overflow-hidden bg-white shadow-sm ${isChild ? 'hidden' : ''}`} data-category={s.category} data-is-child={isChild ? "true" : "false"}>
+                                                    <div class="supply-group border border-gray-100 rounded-2xl overflow-hidden bg-white shadow-sm" data-category={s.category} data-is-child="false">
                                                         <!-- Item Row -->
                                                         <div class={`supply-item-row flex items-center justify-between p-4 bg-white hover:bg-gray-50/50 transition-colors ${hasChildren ? 'cursor-pointer' : ''}`} data-id={s.id} data-has-children={hasChildren ? "true" : "false"}>
                                                             <div class="flex items-center gap-3">

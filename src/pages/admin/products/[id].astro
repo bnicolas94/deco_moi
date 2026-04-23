@@ -242,7 +242,16 @@ const currentImages = product?.images || [];
                                         class="block w-full pl-8 rounded-xl border-gray-200 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm h-11 border transition-all"
                                     />
                                 </div>
-                                <p class="text-[10px] text-gray-400 italic">Precio final al público.</p>
+                                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 mt-1">
+                                    <p class="text-[10px] text-gray-400 italic">Precio final al público.</p>
+                                    <div class="flex flex-wrap gap-1">
+                                        {allCosts.filter(c => c.type === 'percentage').map(c => (
+                                            <span class="inline-flex items-center px-1 py-0.5 rounded text-[9px] font-bold bg-indigo-50 text-indigo-500 border border-indigo-100" title="Costo Porcentual">
+                                                {c.name}: {c.value}%
+                                            </span>
+                                        ))}
+                                    </div>
+                                </div>
                             </div>
                             <div class="space-y-2">
                                 <label class="block text-sm font-bold text-gray-700">Inventario Inicial</label>
