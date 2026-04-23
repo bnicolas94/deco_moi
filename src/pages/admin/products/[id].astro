@@ -210,7 +210,7 @@ const currentImages = product?.images || [];
                     <div class="p-6 space-y-6">
                         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                             <div class="space-y-2 group lg:col-span-1">
-                                <label class="block text-sm font-bold text-gray-700 group-focus-within:text-emerald-600 transition-colors">Neto Deseado</label>
+                                <label class="block text-sm font-bold text-gray-700 group-focus-within:text-emerald-600 transition-colors">Ganancia Deseada</label>
                                 <div class="relative">
                                     <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center text-gray-400 font-bold">$</span>
                                     <input 
@@ -221,7 +221,7 @@ const currentImages = product?.images || [];
                                         class="block w-full pl-8 rounded-xl border-emerald-200 bg-emerald-50/30 shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm h-11 border transition-all"
                                     />
                                 </div>
-                                <p class="text-[10px] text-gray-400 italic">Beneficio real estimado.</p>
+                                <p class="text-[10px] text-gray-400 italic">Ganancia libre de costos y comisiones.</p>
                             </div>
                             <div class="space-y-2 group lg:col-span-1">
                                 <div class="flex items-center justify-between">
@@ -320,12 +320,21 @@ const currentImages = product?.images || [];
                         </div>
 
                         <!-- Fixed Costs Indicator & Multiplier -->
-                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 bg-rose-50/50 border border-rose-100/50 rounded-xl mt-2 animate-in fade-in slide-in-from-top-1">
-                            <div class="text-sm font-bold text-rose-500 flex items-center gap-1.5">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-calculator"><rect width="16" height="20" x="4" y="2" rx="2"/><line x1="8" x2="16" y1="6" y2="6"/><line x1="16" x2="16" y1="14" y2="18"/><path d="M16 10h.01"/><path d="M12 10h.01"/><path d="M8 10h.01"/><path d="M12 14h.01"/><path d="M8 14h.01"/><path d="M12 18h.01"/><path d="M8 18h.01"/></svg>
-                                <span>Costo Fijo Total: <span id="totalFixedLabel">$ 0.00</span></span>
+                        <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-3 p-3 bg-rose-50/50 border border-rose-100/50 rounded-xl mt-2 animate-in fade-in slide-in-from-top-1">
+                            <div class="flex flex-col gap-2">
+                                <div class="text-sm font-bold text-rose-500 flex items-center gap-1.5">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-calculator"><rect width="16" height="20" x="4" y="2" rx="2"/><line x1="8" x2="16" y1="6" y2="6"/><line x1="16" x2="16" y1="14" y2="18"/><path d="M16 10h.01"/><path d="M12 10h.01"/><path d="M8 10h.01"/><path d="M12 14h.01"/><path d="M8 14h.01"/><path d="M12 18h.01"/><path d="M8 18h.01"/></svg>
+                                    <span>Costo Fijo Total: <span id="totalFixedLabel">$ 0.00</span></span>
+                                </div>
+                                <div class="flex flex-wrap gap-1.5 sm:ml-5">
+                                    {allCosts.filter(c => c.type === 'fixed').map(c => (
+                                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-700">
+                                            {c.name}: ${Number(c.value).toFixed(2)}
+                                        </span>
+                                    ))}
+                                </div>
                             </div>
-                            <div class="flex items-center gap-2">
+                            <div class="flex items-center gap-2 self-start sm:self-center">
                                 <span class="text-[10px] text-rose-400 font-medium mr-1 uppercase tracking-widest hidden sm:inline-block">Multiplicador:</span>
                                 <div class="flex items-center bg-white border border-rose-100 rounded-lg p-0.5 shadow-sm">
                                     <button type="button" class="multiplier-btn px-2.5 py-1 hover:bg-rose-50 text-rose-600 font-bold text-xs rounded-md transition-all active:scale-95" data-multiply="2">x2</button>
@@ -768,8 +777,10 @@ const currentImages = product?.images || [];
     });
     
     // Initial Calc
-    if (baseInput?.value) {
+    if (baseInput && baseInput.value) {
         netInput.value = calculateNetFromGross(parseFloat(baseInput.value));
+    } else {
+        updateVisualBreakdown(0, 0);
     }
     
     // Fixed Costs Logic
