@@ -93,6 +93,39 @@ const allTemplates = await db.select().from(mockupTemplates).orderBy(mockupTempl
 
 // Process images to identify cover (first one)
 const currentImages = product?.images || [];
+
+// --- COSTOS E INSUMOS ---
+const allSupplies = await db.select().from(supplies).where(eq(supplies.isActive, true)).orderBy(supplies.name);
+const parsedId = !isNew && id ? parseInt(id) : 0;
+
+const linkedSuppliesData = isNew ? [] : await db.select({
+    supplyId: productSupplies.supplyId,
+    quantity: productSupplies.quantity,
+    partsUsed: productSupplies.partsUsed,
+    partsTotal: productSupplies.partsTotal,
+}).from(productSupplies).where(eq(productSupplies.productId, parsedId));
+
+const allCostItems = await db.select().from(costItems).where(eq(costItems.isActive, true)).orderBy(costItems.name);
+
+const linkedCostItemIds = isNew ? [] : (await db.select({ id: productCostItems.costItemId })
+    .from(productCostItems)
+    .where(eq(productCostItems.productId, parsedId)))
+    .map(r => r.id);
+
+const rootSupplies = allSupplies.filter(s => !s.parentId || !allSupplies.some(p => p.id === s.parentId));
+const suppliesByParent = new Map();
+allSupplies.forEach(s => {
+    if (s.parentId) {
+        if (!suppliesByParent.has(s.parentId)) suppliesByParent.set(s.parentId, []);
+        suppliesByParent.get(s.parentId).push(s);
+    }
+});
+
+const supplyCategs = [...new Set(allSupplies.map(s => s.category))].sort();
+const SUPPLY_ICONS: Record<string, string> = {
+    'chocolates': '🍫', 'hojas': '📄', 'velas': '🕯️', 'cajas': '📦', 'extras': '✨', 'tejidos': '🧵', 'packaging': '📫', 'etiquetas': '🏷️'
+};
+// --- FIN COSTOS E INSUMOS ---
 ---
 
 <AdminLayout title={isNew ? "Nuevo Producto" : `Editar: ${product.name}`}>
@@ -200,11 +233,11 @@ const currentImages = product?.images || [];
                 </div>
 
                 <!-- 2. Pricing & Logistics -->
-                <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                <div class="bg-white rounded-2xl shadow-sm border border-gray-100 relative">
                     <div class="p-6 border-b border-gray-50">
                         <h2 class="text-lg font-bold text-gray-900 flex items-center gap-2.5">
                             <span class="w-2 h-6 bg-emerald-500 rounded-full"></span>
-                            Precios y Logística
+                            Precios, Costos e Insumos
                         </h2>
                     </div>
                     <div class="p-6 space-y-6">
@@ -319,43 +352,38 @@ const currentImages = product?.images || [];
                             </div>
                         </div>
 
-                        <!-- Unified Costs Indicator & Multiplier -->
-                        <div class="flex flex-col gap-3 p-4 bg-rose-50/50 border border-rose-100/50 rounded-xl mt-2 animate-in fade-in slide-in-from-top-1">
+                        <!-- Dynamic Impact & Multiplier -->
+                        <div id="product-calc-card" data-costs={JSON.stringify(allCostItems.filter(c => c.isGlobal || linkedCostItemIds.includes(c.id)))} class="sticky top-6 z-20 flex flex-col gap-3 p-4 bg-rose-50/95 backdrop-blur-md border border-rose-200 shadow-xl shadow-rose-900/5 rounded-xl mt-4 animate-in fade-in slide-in-from-top-1 transition-all">
                             <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
                                 
                                 <div class="flex flex-col gap-2 w-full flex-1">
                                     <!-- Header -->
-                                    <div class="text-sm font-black text-rose-600 flex items-center gap-1.5 border-b border-rose-100/50 pb-2">
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-calculator"><rect width="16" height="20" x="4" y="2" rx="2"/><line x1="8" x2="16" y1="6" y2="6"/><line x1="16" x2="16" y1="14" y2="18"/><path d="M16 10h.01"/><path d="M12 10h.01"/><path d="M8 10h.01"/><path d="M12 14h.01"/><path d="M8 14h.01"/><path d="M12 18h.01"/><path d="M8 18h.01"/></svg>
-                                        <span>Costos Totales del Producto: <span id="totalUnifiedCostLabel">$ 0.00</span></span>
+                                    <div class="text-sm font-black text-rose-600 flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-rose-100/50 pb-2">
+                                        <div class="flex items-center gap-1.5">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-calculator"><rect width="16" height="20" x="4" y="2" rx="2"/><line x1="8" x2="16" y1="6" y2="6"/><line x1="16" x2="16" y1="14" y2="18"/><path d="M16 10h.01"/><path d="M12 10h.01"/><path d="M8 10h.01"/><path d="M12 14h.01"/><path d="M8 14h.01"/><path d="M12 18h.01"/><path d="M8 18h.01"/></svg>
+                                            <span>Costos Totales del Producto: <span id="calc-costs">$ 0.00</span></span>
+                                        </div>
+                                        <div class="flex items-center gap-1.5 text-indigo-700 ml-auto mr-4">
+                                            <span>Margen Bruto: <span id="calc-margin">$ 0.00</span></span>
+                                            <span class="text-xs bg-indigo-100 px-1.5 py-0.5 rounded" id="calc-percent">0%</span>
+                                        </div>
                                     </div>
                                     
                                     <!-- Breakdowns -->
                                     <div class="flex flex-col gap-2 mt-1">
-                                        <!-- Fixed Costs Row -->
+                                        <!-- Insumos Row -->
                                         <div class="flex items-start gap-2">
-                                            <span class="text-[10px] font-bold text-rose-400 uppercase tracking-wider w-16 mt-0.5">Fijos:</span>
-                                            <div class="flex flex-wrap gap-1.5 flex-1">
-                                                {allCosts.filter(c => c.type === 'fixed').map(c => (
-                                                    <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-700">
-                                                        {c.name}: ${Number(c.value).toFixed(2)}
-                                                    </span>
-                                                ))}
-                                                {allCosts.filter(c => c.type === 'fixed').length === 0 && <span class="text-[10px] text-gray-400 italic">No hay costos fijos</span>}
+                                            <span class="text-[10px] font-bold text-rose-400 uppercase tracking-wider w-16 mt-0.5">Insumos:</span>
+                                            <div class="flex flex-wrap gap-1.5 flex-1" id="top-insumos-list">
+                                                <!-- Populated by JS -->
                                             </div>
                                         </div>
 
-                                        <!-- Variable Costs Row (Dynamically calculated by JS) -->
+                                        <!-- Comisiones/Variables Row -->
                                         <div class="flex items-start gap-2">
-                                            <span class="text-[10px] font-bold text-rose-400 uppercase tracking-wider w-16 mt-0.5">Variables:</span>
-                                            <div class="flex flex-wrap gap-1.5 flex-1" id="dyn-perc-tags-container">
-                                                <!-- Populated by JS so they update when the Base Price changes -->
-                                                {allCosts.filter(c => c.type === 'percentage').map(c => (
-                                                    <span class="dyn-perc-tag inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-700" data-name={c.name} data-percent={c.value}>
-                                                        {c.name}: $0.00
-                                                    </span>
-                                                ))}
-                                                {allCosts.filter(c => c.type === 'percentage').length === 0 && <span class="text-[10px] text-gray-400 italic">No hay costos variables</span>}
+                                            <span class="text-[10px] font-bold text-rose-400 uppercase tracking-wider w-16 mt-0.5">Globales:</span>
+                                            <div class="flex flex-wrap gap-1.5 flex-1" id="top-global-costs-list">
+                                                <!-- Populated by JS -->
                                             </div>
                                         </div>
                                     </div>
@@ -383,6 +411,121 @@ const currentImages = product?.images || [];
                                 </div>
                             </div>
                         </div>
+
+<!-- Parte 2: Insumos Utilizados -->
+                                <div class="space-y-4">
+                                    <h3 class="text-sm font-bold text-gray-900 border-b border-gray-100 pb-2">Insumos Utilizados</h3>
+                                    
+                                    <div class="flex flex-wrap gap-2 mb-4" id="supply-category-tabs">
+                                        <button type="button" class="supply-tab-btn px-4 py-2 rounded-full text-xs font-bold transition-all border bg-indigo-600 text-white border-indigo-600 shadow-sm flex items-center gap-2" data-category="ALL">
+                                            <span>🏷️</span>
+                                            TODOS ({allSupplies.length})
+                                        </button>
+                                        {supplyCategs.map(cat => (
+                                            <button type="button" class="supply-tab-btn px-4 py-2 rounded-full text-xs font-bold transition-all border bg-white text-gray-500 border-gray-200 hover:bg-gray-50 flex items-center gap-2" data-category={cat}>
+                                                <span>{SUPPLY_ICONS[cat.toLowerCase()] || '📦'}</span>
+                                                {cat.toUpperCase()} ({allSupplies.filter(s => s.category === cat).length})
+                                            </button>
+                                        ))}
+                                    </div>
+
+                                    <div class="space-y-3" id="product-supplies-list">
+                                        {allSupplies.length === 0 ? (
+                                            <p class="text-sm text-gray-400 italic">No hay insumos activos.</p>
+                                        ) : (
+                                            <div class="grid grid-cols-1 gap-3">
+                                                {rootSupplies.map(s => {
+                                                    const children = suppliesByParent.get(s.id) || [];
+                                                    const hasChildren = children.length > 0;
+                                                    const linked = linkedSuppliesData.find(ls => ls.supplyId === s.id);
+                                                    const isChecked = !!linked;
+                                                    const hasYield = linked && linked.partsUsed && linked.partsTotal;
+                                                    
+                                                    return (
+                                                        <div class="supply-group border border-gray-100 rounded-2xl overflow-hidden bg-white shadow-sm" data-category={s.category} data-is-child="false">
+                                                            <div class={`supply-item-row flex items-center justify-between p-4 bg-white hover:bg-gray-50/50 transition-colors ${hasChildren ? 'cursor-pointer' : ''}`} data-id={s.id} data-has-children={hasChildren ? "true" : "false"}>
+                                                                <div class="flex items-center gap-3">
+                                                                    <input type="checkbox" name="supply_ids[]" value={s.id} data-cost={s.unitCost} data-name={s.name} class="supply-checkbox h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500" checked={isChecked} />
+                                                                    <div class="flex-1">
+                                                                        <div class="flex items-center gap-2">
+                                                                            {hasChildren && (
+                                                                                <svg class="w-3 h-3 text-gray-400 transform transition-transform duration-200 chevron-icon" data-id={s.id} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M9 5l7 7-7 7"></path></svg>
+                                                                            )}
+                                                                            <div class="text-sm font-bold text-gray-900">{s.name}</div>
+                                                                        </div>
+                                                                        <div class="flex items-center gap-2">
+                                                                            <div class="text-[10px] text-gray-400 uppercase font-bold tracking-wider">${Number(s.unitCost).toLocaleString('es-AR')} / {s.unit}</div>
+                                                                            <div class={`row-subtotal text-[10px] font-black text-rose-500 bg-rose-50 px-1.5 py-0.5 rounded border border-rose-100 ${isChecked ? '' : 'hidden'}`} data-id={s.id}>
+                                                                                $0.00
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                                <div class="flex items-center gap-3">
+                                                                    <button type="button" class={`yield-toggle p-1.5 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all ${hasYield ? 'text-indigo-600 bg-indigo-50' : 'text-gray-400'}`} title="Calculadora de Rinde" data-id={s.id}>
+                                                                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="16" height="20" x="4" y="2" rx="2"/><line x1="8" x2="16" y1="6" y2="6"/><line x1="16" x2="16" y1="14" y2="18"/><path d="M16 10h.01"/><path d="M12 10h.01"/><path d="M8 10h.01"/><path d="M12 14h.01"/><path d="M8 14h.01"/><path d="M12 18h.01"/><path d="M8 18h.01"/></svg>
+                                                                    </button>
+                                                                    <div class="flex items-center gap-2">
+                                                                        <div class={`qty-container ${hasYield ? 'hidden' : ''}`} data-id={s.id}>
+                                                                            <input type="number" step="0.001" min="0" value={linked && !hasYield ? linked.quantity : 0} data-id={s.id} class="supply-qty w-20 h-9 rounded-lg border-gray-200 text-sm font-bold text-center focus:ring-indigo-500 focus:border-indigo-500 disabled:opacity-50" disabled={!isChecked} />
+                                                                        </div>
+                                                                        <div class={`yield-container flex items-center gap-1.5 p-1 bg-indigo-50 rounded-lg border border-indigo-100 ${hasYield ? '' : 'hidden'}`} data-id={s.id}>
+                                                                            <input type="number" placeholder="Uso" value={hasYield ? linked.partsUsed : ''} data-id={s.id} class="yield-used w-12 h-7 bg-white rounded border-indigo-100 text-[11px] font-bold text-center focus:ring-indigo-500 focus:border-indigo-500 disabled:opacity-50" disabled={!isChecked} />
+                                                                            <span class="text-[10px] font-bold text-indigo-400 uppercase">de</span>
+                                                                            <input type="number" placeholder="Total" value={hasYield ? linked.partsTotal : ''} data-id={s.id} class="yield-total w-12 h-7 bg-white rounded border-indigo-100 text-[11px] font-bold text-center focus:ring-indigo-500 focus:border-indigo-500 disabled:opacity-50" disabled={!isChecked} />
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+
+                                                            {hasChildren && (
+                                                                <div class="children-list hidden border-t border-gray-50 bg-gray-50/30" data-parent-of-list={s.id}>
+                                                                    {children.map(child => {
+                                                                        const linkedChild = linkedSuppliesData.find(ls => ls.supplyId === child.id);
+                                                                        const isChildChecked = !!linkedChild;
+                                                                        const hasChildYield = linkedChild && linkedChild.partsUsed && linkedChild.partsTotal;
+                                                                        return (
+                                                                            <div class="supply-item-row flex items-center justify-between p-3 pl-10 border-b border-gray-50 last:border-0 hover:bg-gray-100/50 transition-colors" data-id={child.id} data-category={child.category}>
+                                                                                <div class="flex items-center gap-3">
+                                                                                    <input type="checkbox" name="supply_ids[]" value={child.id} data-cost={child.unitCost} data-name={child.name} class="supply-checkbox h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500" checked={isChildChecked} />
+                                                                                    <div class="flex-1">
+                                                                                        <div class="text-sm font-bold text-gray-700">{child.name}</div>
+                                                                                        <div class="flex items-center gap-2">
+                                                                                            <div class="text-[10px] text-gray-400 font-bold uppercase tracking-wider">${Number(child.unitCost).toLocaleString('es-AR')} / {child.unit}</div>
+                                                                                            <div class={`row-subtotal text-[10px] font-black text-rose-500 bg-rose-50 px-1.5 py-0.5 rounded border border-rose-100 ${isChildChecked ? '' : 'hidden'}`} data-id={child.id}>
+                                                                                                $0.00
+                                                                                            </div>
+                                                                                        </div>
+                                                                                    </div>
+                                                                                </div>
+                                                                                <div class="flex items-center gap-3">
+                                                                                    <button type="button" class={`yield-toggle p-1.5 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all ${hasChildYield ? 'text-indigo-600 bg-indigo-50' : 'text-gray-400'}`} title="Calculadora de Rinde" data-id={child.id}>
+                                                                                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="16" height="20" x="4" y="2" rx="2"/><line x1="8" x2="16" y1="6" y2="6"/><line x1="16" x2="16" y1="14" y2="18"/><path d="M16 10h.01"/><path d="M12 10h.01"/><path d="M8 10h.01"/><path d="M12 14h.01"/><path d="M8 14h.01"/><path d="M12 18h.01"/><path d="M8 18h.01"/></svg>
+                                                                                    </button>
+                                                                                    <div class="flex items-center gap-2">
+                                                                                        <div class={`qty-container ${hasChildYield ? 'hidden' : ''}`} data-id={child.id}>
+                                                                                            <input type="number" step="0.001" min="0" value={linkedChild && !hasChildYield ? linkedChild.quantity : 0} data-id={child.id} class="supply-qty w-20 h-9 rounded-lg border-gray-200 text-sm font-bold text-center focus:ring-indigo-500 focus:border-indigo-500 disabled:opacity-50" disabled={!isChildChecked} />
+                                                                                        </div>
+                                                                                        <div class={`yield-container flex items-center gap-1.5 p-1 bg-indigo-50 rounded-lg border border-indigo-100 ${hasChildYield ? '' : 'hidden'}`} data-id={child.id}>
+                                                                                            <input type="number" placeholder="Uso" value={hasChildYield ? linkedChild.partsUsed : ''} data-id={child.id} class="yield-used w-12 h-7 bg-white rounded border-indigo-100 text-[11px] font-bold text-center focus:ring-indigo-500 focus:border-indigo-500 disabled:opacity-50" disabled={!isChildChecked} />
+                                                                                            <span class="text-[10px] font-bold text-indigo-400 uppercase">de</span>
+                                                                                            <input type="number" placeholder="Total" value={hasChildYield ? linkedChild.partsTotal : ''} data-id={child.id} class="yield-total w-12 h-7 bg-white rounded border-indigo-100 text-[11px] font-bold text-center focus:ring-indigo-500 focus:border-indigo-500 disabled:opacity-50" disabled={!isChildChecked} />
+                                                                                        </div>
+                                                                                    </div>
+                                                                                </div>
+                                                                            </div>
+                                                                        );
+                                                                    })}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            
 
                         <div class="grid grid-cols-1 gap-6 pt-4 border-t border-gray-50">
                             <div class="space-y-2">
@@ -719,6 +862,28 @@ const currentImages = product?.images || [];
             slugInput.value = slug;
         }
     });
+
+    function getTotalInsumos() {
+        let insumosCost = 0;
+        document.querySelectorAll('.supply-checkbox').forEach(cb => {
+            if (cb.checked) {
+                const supplyId = cb.value;
+                const unitCost = parseFloat(cb.getAttribute('data-cost')) || 0;
+                const yieldContainer = document.querySelector(`.yield-container[data-id="${supplyId}"]`);
+                let qty = 0;
+                if (yieldContainer && !yieldContainer.classList.contains('hidden')) {
+                    const used = parseFloat(yieldContainer.querySelector('.yield-used').value) || 0;
+                    const total = parseFloat(yieldContainer.querySelector('.yield-total').value) || 1;
+                    qty = used / total;
+                } else {
+                    const qtyInput = document.querySelector(`.supply-qty[data-id="${supplyId}"]`);
+                    qty = parseFloat(qtyInput?.value) || 0;
+                }
+                insumosCost += (unitCost * qty);
+            }
+        });
+        return insumosCost;
+    }
 
     // --- Reverse Price Logic ---
     const netInput = document.getElementById('netPrice');
@@ -1212,6 +1377,41 @@ const currentImages = product?.images || [];
                     body: JSON.stringify({ rules: timeRules }),
                 });
 
+                // --- SAVE COSTOS E INSUMOS ---
+                const selectedSupplies = Array.from(document.querySelectorAll('.supply-checkbox'))
+                    .filter(cb => cb.checked)
+                    .map(cb => {
+                        const supplyId = cb.value;
+                        const yieldCont = document.querySelector(`.yield-container[data-id="${supplyId}"]`);
+                        const isYield = yieldCont && !yieldCont.classList.contains('hidden');
+                        
+                        if (isYield) {
+                            const used = parseFloat(yieldCont.querySelector('.yield-used').value) || 0;
+                            const total = parseFloat(yieldCont.querySelector('.yield-total').value) || 1;
+                            return {
+                                supplyId: parseInt(supplyId),
+                                quantity: used / total,
+                                partsUsed: used,
+                                partsTotal: total
+                            };
+                        } else {
+                            const qtyInput = document.querySelector(`.supply-qty[data-id="${supplyId}"]`);
+                            return {
+                                supplyId: parseInt(supplyId),
+                                quantity: parseFloat(qtyInput?.value) || 0,
+                                partsUsed: null,
+                                partsTotal: null
+                            };
+                        }
+                    });
+
+                await fetch(`/api/products/${productId}/supplies`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ supplies: selectedSupplies })
+                });
+                // --- FIN SAVE COSTOS E INSUMOS ---
+
                 if (!timeResp.ok) {
                     const errData = await timeResp.json().catch(() => ({}));
                     if(window.showToast) window.showToast('Producto guardado, pero error en reglas de tiempo: ' + (errData.error || 'Error desconocido'), 'error');
@@ -1233,5 +1433,231 @@ const currentImages = product?.images || [];
             alert('Error de red al guardar el producto');
         }
     }
+
+    // --- COSTOS E INSUMOS LOGIC ---
+    const supplyCheckboxes = document.querySelectorAll('.supply-checkbox');
+    const supplyQtys = document.querySelectorAll('.supply-qty');
+    const yieldToggles = document.querySelectorAll('.yield-toggle');
+    const yieldUseds = document.querySelectorAll('.yield-used');
+    const yieldTotals = document.querySelectorAll('.yield-total');
+    
+    // UI Calculation els
+    const calcBase = document.getElementById('calc-base');
+    const calcCosts = document.getElementById('calc-costs');
+    const calcMargin = document.getElementById('calc-margin');
+    const calcPercent = document.getElementById('calc-percent');
+
+    function recalculateImpact() {
+        const bpValue = parseFloat(document.getElementById('basePrice').value) || 0;
+        let totalCost = 0;
+        
+        const topInsumosList = document.getElementById('top-insumos-list');
+        const topGlobalList = document.getElementById('top-global-costs-list');
+        
+        if (topInsumosList) topInsumosList.innerHTML = '';
+        if (topGlobalList) topGlobalList.innerHTML = '';
+
+        // 1. Fixed and Percentage Costs (Global/Linked)
+        const calcCard = document.getElementById('product-calc-card');
+        if (calcCard && calcCard.dataset.costs) {
+            try {
+                const activeCosts = JSON.parse(calcCard.dataset.costs);
+                activeCosts.forEach(cost => {
+                    let costVal = 0;
+                    if (cost.type === 'percentage') {
+                        costVal = (bpValue * (cost.value / 100));
+                    } else {
+                        costVal = Number(cost.value);
+                    }
+                    totalCost += costVal;
+                    
+                    if (topGlobalList && costVal > 0) {
+                        topGlobalList.innerHTML += `<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-100 text-indigo-700">${cost.name}: $${costVal.toLocaleString('es-AR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>`;
+                    }
+                });
+            } catch(e) {}
+        }
+
+        // 2. Supplies
+        supplyCheckboxes.forEach(cb => {
+            if (cb.checked) {
+                const supplyId = cb.value;
+                const unitCost = parseFloat(cb.getAttribute('data-cost')) || 0;
+                const name = cb.getAttribute('data-name');
+                
+                const yieldContainer = document.querySelector(`.yield-container[data-id="${supplyId}"]`);
+                const subtotalEl = document.querySelector(`.row-subtotal[data-id="${supplyId}"]`);
+                let qty = 0;
+                
+                if (yieldContainer && !yieldContainer.classList.contains('hidden')) {
+                    const used = parseFloat(yieldContainer.querySelector('.yield-used').value) || 0;
+                    const total = parseFloat(yieldContainer.querySelector('.yield-total').value) || 1;
+                    qty = used / total;
+                } else {
+                    const qtyInput = document.querySelector(`.supply-qty[data-id="${supplyId}"]`);
+                    qty = parseFloat(qtyInput?.value) || 0;
+                }
+                
+                const subtotal = unitCost * qty;
+                totalCost += subtotal;
+
+                if (subtotalEl) {
+                    if (qty > 0) {
+                        subtotalEl.textContent = `$${subtotal.toLocaleString('es-AR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+                        subtotalEl.classList.remove('hidden');
+                    } else {
+                        subtotalEl.classList.add('hidden');
+                    }
+                }
+
+                if (topInsumosList && subtotal > 0) {
+                    topInsumosList.innerHTML += `<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-700">${name}: $${subtotal.toLocaleString('es-AR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>`;
+                }
+            } else {
+                const subtotalEl = document.querySelector(`.row-subtotal[data-id="${cb.value}"]`);
+                if (subtotalEl) subtotalEl.classList.add('hidden');
+            }
+        });
+        
+        if (topInsumosList && topInsumosList.innerHTML === '') {
+            topInsumosList.innerHTML = `<span class="text-[10px] text-gray-400 italic">No hay insumos seleccionados</span>`;
+        }
+        if (topGlobalList && topGlobalList.innerHTML === '') {
+            topGlobalList.innerHTML = `<span class="text-[10px] text-gray-400 italic">No hay costos globales</span>`;
+        }
+
+        const margin = bpValue - totalCost;
+        const roi = bpValue > 0 ? ((margin / bpValue) * 100).toFixed(1) : 0;
+
+        if (calcCosts) calcCosts.textContent = `$${totalCost.toLocaleString('es-AR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+        
+        const netPriceEl = document.getElementById('netPrice');
+        if (netPriceEl && document.activeElement !== netPriceEl && document.activeElement !== document.getElementById('basePrice')) {
+            netPriceEl.value = margin.toFixed(2);
+        }
+        if (calcMargin) {
+            calcMargin.textContent = `$${margin.toLocaleString('es-AR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+            calcMargin.parentElement.className = margin >= 0 ? "flex items-center gap-1.5 text-emerald-600" : "flex items-center gap-1.5 text-rose-600";
+        }
+        if (calcPercent) {
+            calcPercent.textContent = `${roi}%`;
+            calcPercent.className = margin >= 0 ? "text-xs bg-emerald-100 px-1.5 py-0.5 rounded" : "text-xs bg-rose-100 px-1.5 py-0.5 rounded";
+        }
+    }
+
+    document.getElementById('basePrice')?.addEventListener('input', recalculateImpact);
+
+    supplyCheckboxes.forEach(cb => {
+        cb.addEventListener('change', (e) => {
+            const supplyId = e.target.value;
+            const isChecked = e.target.checked;
+            
+            // Enable/disable inputs and auto-fill 1 if empty
+            const qtyInput = document.querySelector(`.supply-qty[data-id="${supplyId}"]`);
+            const yieldUsed = document.querySelector(`.yield-used[data-id="${supplyId}"]`);
+            const yieldTotal = document.querySelector(`.yield-total[data-id="${supplyId}"]`);
+            
+            if(qtyInput) {
+                qtyInput.disabled = !isChecked;
+                if (isChecked && (!qtyInput.value || parseFloat(qtyInput.value) === 0)) qtyInput.value = 1;
+            }
+            if(yieldUsed) {
+                yieldUsed.disabled = !isChecked;
+                if (isChecked && (!yieldUsed.value || parseFloat(yieldUsed.value) === 0)) yieldUsed.value = 1;
+            }
+            if(yieldTotal) {
+                yieldTotal.disabled = !isChecked;
+                if (isChecked && (!yieldTotal.value || parseFloat(yieldTotal.value) === 0)) yieldTotal.value = 1;
+            }
+
+            recalculateImpact();
+        });
+    });
+
+    supplyQtys.forEach(input => input.addEventListener('input', recalculateImpact));
+    yieldUseds.forEach(input => input.addEventListener('input', recalculateImpact));
+    yieldTotals.forEach(input => input.addEventListener('input', recalculateImpact));
+
+    yieldToggles.forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const id = e.currentTarget.getAttribute('data-id');
+            const qtyCont = document.querySelector(`.qty-container[data-id="${id}"]`);
+            const yieldCont = document.querySelector(`.yield-container[data-id="${id}"]`);
+            
+            const isYield = qtyCont.classList.contains('hidden');
+            
+            if (isYield) {
+                qtyCont.classList.remove('hidden');
+                yieldCont.classList.add('hidden');
+                e.currentTarget.classList.remove('text-indigo-600', 'bg-indigo-50');
+                e.currentTarget.classList.add('text-gray-400');
+            } else {
+                qtyCont.classList.add('hidden');
+                yieldCont.classList.remove('hidden');
+                e.currentTarget.classList.add('text-indigo-600', 'bg-indigo-50');
+                e.currentTarget.classList.remove('text-gray-400');
+            }
+            recalculateImpact();
+        });
+    });
+
+    // SUPPLY CATEGORY TABS LOGIC
+    document.querySelectorAll('.supply-tab-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const cat = e.currentTarget.getAttribute('data-category');
+            
+            document.querySelectorAll('.supply-tab-btn').forEach(b => {
+                b.classList.remove('bg-indigo-600', 'text-white', 'border-indigo-600', 'shadow-sm');
+                b.classList.add('bg-white', 'text-gray-500', 'border-gray-200');
+            });
+            e.currentTarget.classList.remove('bg-white', 'text-gray-500', 'border-gray-200');
+            e.currentTarget.classList.add('bg-indigo-600', 'text-white', 'border-indigo-600', 'shadow-sm');
+
+            document.querySelectorAll('.supply-group').forEach(group => {
+                const isChild = group.dataset.isChild === 'true';
+                if (cat === 'ALL') {
+                    if (isChild) {
+                        group.classList.add('hidden');
+                    } else {
+                        group.classList.remove('hidden');
+                    }
+                } else {
+                    if (group.dataset.category === cat) {
+                        group.classList.remove('hidden');
+                    } else {
+                        group.classList.add('hidden');
+                    }
+                }
+            });
+        });
+    });
+
+    // Expand/Collapse Logic for linking section
+    document.querySelectorAll('.supply-item-row[data-has-children="true"]').forEach(row => {
+        row.addEventListener('click', (e) => {
+            if (e.target.closest('input') || e.target.closest('button')) return;
+            
+            const id = row.getAttribute('data-id');
+            const list = document.querySelector(`.children-list[data-parent-of-list="${id}"]`);
+            const chevron = row.querySelector('.chevron-icon');
+            
+            if (list) {
+                const isHidden = list.classList.contains('hidden');
+                if (isHidden) {
+                    list.classList.remove('hidden');
+                    if (chevron) chevron.style.transform = 'rotate(90deg)';
+                } else {
+                    list.classList.add('hidden');
+                    if (chevron) chevron.style.transform = 'rotate(0deg)';
+                }
+            }
+        });
+    });
+
+    // Initial calculation
+    document.addEventListener('DOMContentLoaded', () => {
+        recalculateImpact();
+    });
+    // --- FIN COSTOS E INSUMOS LOGIC ---
 </script>
 
