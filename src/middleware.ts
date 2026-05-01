@@ -41,6 +41,7 @@ export const onRequest = defineMiddleware(async (context, next) => {
     const pathname = context.url.pathname;
     const isStaticAsset = pathname.startsWith('/_astro') ||
         pathname.startsWith('/images') ||
+        pathname.startsWith('/uploads') ||
         pathname.startsWith('/fonts') ||
         pathname.startsWith('/favicon') ||
         pathname.endsWith('.css') ||
