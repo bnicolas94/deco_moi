@@ -73,7 +73,7 @@ export const POST: APIRoute = async (context) => {
             const buffer = await imageFile.arrayBuffer();
             const ext = imageFile.name.split('.').pop();
             const fileName = `cat-${randomUUID()}.${ext}`;
-            const uploadDir = join(process.cwd(), 'public', 'uploads', 'categories');
+            const uploadDir = join(process.cwd(), 'uploads', 'categories');
             await mkdir(uploadDir, { recursive: true });
             await writeFile(join(uploadDir, fileName), new Uint8Array(buffer));
             imageUrl = `/uploads/categories/${fileName}`;

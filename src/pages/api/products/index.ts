@@ -10,7 +10,13 @@ export const POST: APIRoute = async (context) => {
         return new Response('No autorizado', { status: 401 });
     }
 
-    const formData = await context.request.formData();
+    let formData: FormData;
+    try {
+        formData = await context.request.formData();
+    } catch (e) {
+        console.error('Error parsing FormData:', e);
+        return new Response('Error parsing form data', { status: 400 });
+    }
     const name = formData.get('name')?.toString();
     const slug = formData.get('slug')?.toString();
     const price = parseFloat(formData.get('basePrice')?.toString() || '0');
@@ -25,17 +31,22 @@ export const POST: APIRoute = async (context) => {
     let imageUrls: string[] = [];
 
     if (imageFiles && imageFiles.length > 0) {
-        const uploadDir = join(process.cwd(), 'public', 'uploads', 'products');
+        const uploadDir = join(process.cwd(), 'uploads', 'products');
         await mkdir(uploadDir, { recursive: true });
 
         for (const imageFile of imageFiles) {
             if (imageFile.size > 0 && imageFile.name) {
-                const buffer = await imageFile.arrayBuffer();
-                const ext = imageFile.name.split('.').pop();
-                const fileName = `${randomUUID()}.${ext}`;
-
-                await writeFile(join(uploadDir, fileName), new Uint8Array(buffer));
-                imageUrls.push(`/uploads/products/${fileName}`);
+                try {
+                    const buffer = await imageFile.arrayBuffer();
+                    const ext = imageFile.name.split('.').pop();
+                    const fileName = `${randomUUID()}.${ext}`;
+                    
+                    await writeFile(join(uploadDir, fileName), new Uint8Array(buffer));
+                    
+                    imageUrls.push(`/uploads/products/${fileName}`);
+                } catch (err) {
+                    console.error('Error saving image file:', err);
+                }
             }
         }
     }
@@ -48,7 +59,7 @@ export const POST: APIRoute = async (context) => {
             const buffer = await file.arrayBuffer();
             const ext = file.name.split('.').pop();
             const fileName = `variant-${randomUUID()}.${ext}`;
-            const uploadDir = join(process.cwd(), 'public', 'uploads', 'products');
+            const uploadDir = join(process.cwd(), 'uploads', 'products');
             await mkdir(uploadDir, { recursive: true });
             await writeFile(join(uploadDir, fileName), new Uint8Array(buffer));
             return `/uploads/products/${fileName}`;

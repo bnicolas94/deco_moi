@@ -75,13 +75,11 @@ export class PricingService {
     }
 
     /**
-     * Recalculates product prices when a supply's unit cost changes.
-     * Formula to maintain net profit (margin):
-     * NewGross = (DesiredNet + NewTotalFixed) / (1 - (TotalPerc / 100))
+     * Handles changes in supply unit costs.
+     * NEW LOGIC: When costs change, the final price (basePrice) remains STATIC.
+     * The profit margin decreases (or increases) accordingly.
      * 
-     * Since DesiredNet is implicit (calculated from oldGross - oldCosts),
-     * the change in Gross relates to change in Fixed costs:
-     * DeltaGross = DeltaFixed / (1 - (TotalPerc / 100))
+     * Previously, this maintained net profit by adjusting basePrice.
      */
     static async recalculateProductPricesForSupplyChange(supplyId: number, oldUnitCost: number, newUnitCost: number) {
         const delta = newUnitCost - oldUnitCost;
@@ -113,20 +111,13 @@ export class PricingService {
             const deltaFixed = delta * qty;
             const divisor = 1 - (breakdown.totalPerc / 100);
 
-            if (divisor <= 0) continue; // Safety check
+            if (divisor <= 0) continue; 
 
-            const deltaGross = deltaFixed / divisor;
-            const newBasePrice = (parseFloat(product.basePrice.toString()) + deltaGross).toFixed(2);
-
-            // Update product
-            await db.update(products)
-                .set({
-                    basePrice: newBasePrice,
-                    updatedAt: new Date()
-                })
-                .where(eq(products.id, product.id));
-
-            console.log(`Updated Product ${product.id} price from ${product.basePrice} to ${newBasePrice} (delta: ${deltaGross})`);
+            const deltaGrossNeeded = deltaFixed / divisor;
+            
+            // LOG the impact, but DO NOT update the basePrice anymore.
+            // The user wants the price to remain the same while the margin absorbs the cost change.
+            console.log(`Supply ${supplyId} change impact on Product ${product.id}: Cost delta: ${deltaFixed.toFixed(2)}. (Recommended price adjustment was: ${deltaGrossNeeded.toFixed(2)} but price remains at ${product.basePrice})`);
         }
     }
 }

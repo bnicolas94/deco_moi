@@ -19,7 +19,6 @@ export const PUT: APIRoute = async (context) => {
     let formData: FormData;
     try {
         formData = await context.request.formData();
-        console.log('FormData received keys:', [...formData.keys()]);
     } catch (e) {
         console.error('Error parsing FormData:', e);
         return new Response('Error parsing form data', { status: 400 });
@@ -47,16 +46,18 @@ export const PUT: APIRoute = async (context) => {
 
     if (imageFiles && imageFiles.length > 0) {
         console.log(`Processing ${imageFiles.length} new images`);
+        const uploadDir = join(process.cwd(), 'uploads', 'products');
+        await mkdir(uploadDir, { recursive: true });
+
         for (const imageFile of imageFiles) {
             if (imageFile.size > 0 && imageFile.name) {
                 try {
                     const buffer = await imageFile.arrayBuffer();
                     const ext = imageFile.name.split('.').pop();
                     const fileName = `${randomUUID()}.${ext}`;
-                    const uploadDir = join(process.cwd(), 'public', 'uploads', 'products');
-                    await mkdir(uploadDir, { recursive: true });
-
+                    
                     await writeFile(join(uploadDir, fileName), new Uint8Array(buffer));
+                    
                     newImages.push(`/uploads/products/${fileName}`);
                     console.log(`Saved new image: ${fileName}`);
                 } catch (err) {
@@ -74,7 +75,7 @@ export const PUT: APIRoute = async (context) => {
             const buffer = await file.arrayBuffer();
             const ext = file.name.split('.').pop();
             const fileName = `variant-${randomUUID()}.${ext}`;
-            const uploadDir = join(process.cwd(), 'public', 'uploads', 'products');
+            const uploadDir = join(process.cwd(), 'uploads', 'products');
             await mkdir(uploadDir, { recursive: true });
             await writeFile(join(uploadDir, fileName), new Uint8Array(buffer));
             console.log(`Saved variant image: ${fileName}`);
