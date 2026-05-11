@@ -111,18 +111,28 @@ export const PUT: APIRoute = async (context) => {
                 })
                 .where(eq(products.id, id));
 
-            // 2. Handle Variants (with image support)
+            // 2. Handle Variants (with multiple images support)
             const variantsData = formData.get('variants_json');
             if (variantsData) {
                 const variants = JSON.parse(variantsData.toString());
                 const variantIdsToKeep: number[] = [];
+                console.log('Processing variants:', variants);
 
                 for (const v of variants) {
-                    // Determine image for this variant
-                    let variantImage: string | null = v.existingImage || null;
-                    if (v.hasNewImage && v.imageFieldName) {
-                        const uploadedUrl = await uploadVariantImage(v.imageFieldName);
-                        if (uploadedUrl) variantImage = uploadedUrl;
+                    // Determine images for this variant
+                    let variantImages: string[] = v.existingImages || [];
+                    
+                    if (v.imageFieldNames && v.imageFieldNames.length > 0) {
+                        console.log(`Uploading ${v.imageFieldNames.length} new images for variant ${v.name}`);
+                        for (const fieldName of v.imageFieldNames) {
+                            const uploadedUrl = await uploadVariantImage(fieldName);
+                            if (uploadedUrl) {
+                                console.log(`  Uploaded: ${uploadedUrl}`);
+                                variantImages.push(uploadedUrl);
+                            } else {
+                                console.log(`  Failed to upload field: ${fieldName}`);
+                            }
+                        }
                     }
 
                     if (v.id) {
@@ -133,21 +143,23 @@ export const PUT: APIRoute = async (context) => {
                                 sku: v.sku,
                                 price: v.price ? v.price.toString() : null,
                                 stock: v.stock,
-                                image: variantImage,
+                                images: variantImages,
                                 updatedAt: new Date(),
                             })
                             .where(eq(productVariants.id, parseInt(v.id)));
                         variantIdsToKeep.push(parseInt(v.id));
                     } else {
-                        // Create new variant
-                        const [newV] = await tx.insert(productVariants).values({
-                            productId: id,
-                            name: v.name,
-                            sku: v.sku,
-                            price: v.price ? v.price.toString() : null,
-                            stock: v.stock,
-                            image: variantImage,
-                        }).returning({ id: productVariants.id });
+                        // Insert new variant
+                        const [newV] = await tx.insert(productVariants)
+                            .values({
+                                productId: id,
+                                name: v.name,
+                                sku: v.sku,
+                                price: v.price ? v.price.toString() : null,
+                                stock: v.stock,
+                                images: variantImages,
+                            })
+                            .returning({ id: productVariants.id });
                         variantIdsToKeep.push(newV.id);
                     }
                 }

@@ -1,6 +1,6 @@
 ---
 import type { Product } from '@/types/product';
-import { formatPrice } from '@/lib/utils/formatters';
+import { formatPrice, stripHtml } from '@/lib/utils/formatters';
 
 interface Props {
   product: Product;
@@ -64,7 +64,7 @@ const mainImage = product.images?.[0] || null;
     </h3>
 
     {product.shortDescription && (
-      <p class="text-2xs text-gray-400 mb-2 line-clamp-1">{product.shortDescription}</p>
+      <p class="text-2xs text-gray-400 mb-2 line-clamp-1">{stripHtml(product.shortDescription)}</p>
     )}
 
     <div class="mb-1">

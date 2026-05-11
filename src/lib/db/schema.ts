@@ -26,7 +26,7 @@ export const products = pgTable('products', {
     name: varchar('name', { length: 200 }).notNull(),
     slug: varchar('slug', { length: 200 }).notNull().unique(),
     description: text('description'),
-    shortDescription: varchar('short_description', { length: 500 }),
+    shortDescription: text('short_description'),
     sku: varchar('sku', { length: 50 }).unique(),
     basePrice: decimal('base_price', { precision: 10, scale: 2 }).notNull(),
     categoryId: integer('category_id').notNull(),
@@ -86,7 +86,7 @@ export const productVariants = pgTable('product_variants', {
     name: varchar('name', { length: 100 }).notNull(), // Ej: "Rojo / XL"
     sku: varchar('sku', { length: 50 }).unique(),
     price: decimal('price', { precision: 10, scale: 2 }), // Opcional, si difiere del base
-    image: varchar('image', { length: 500 }), // Imagen opcional de la variante
+    images: json('images').$type<string[]>().default([]), // Imágenes opcionales de la variante
     stock: integer('stock').default(0),
     isActive: boolean('is_active').default(true),
     createdAt: timestamp('created_at').defaultNow(),

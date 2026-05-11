@@ -12,6 +12,7 @@ if (!slug) return Astro.redirect('/productos');
 
 const product = await getProductBySlug(slug);
 if (!product) return Astro.redirect('/productos');
+console.log('RENDER PRODUCT SHORT DESCRIPTION:', JSON.stringify(product.shortDescription));
 
 const relatedProducts = await getRelatedProducts(product.id, product.categoryId, 4);
 const productReviews = await getProductReviews(product.id);
@@ -107,21 +108,19 @@ const initialProductionTime = productionTimeRules.length > 0
         </div>
 
         {/* Thumbnails */}
-        {images.length > 1 && (
-          <div class="flex gap-3 overflow-x-auto pb-2">
-            {images.map((img: string, i: number) => (
-              <button
-                class:list={[
-                  "product-thumb w-20 h-20 rounded-lg overflow-hidden flex-shrink-0 border-2 transition-all",
-                  i === 0 ? "border-primary" : "border-transparent hover:border-primary/50"
-                ]}
-                data-src={img}
-              >
-                <img src={img} alt={`${product.name} ${i + 1}`} class="w-full h-full object-cover" />
-              </button>
-            ))}
-          </div>
-        )}
+        <div id="product-thumbnails" class="flex gap-3 overflow-x-auto pb-2">
+          {images.length > 1 && images.map((img: string, i: number) => (
+            <button
+              class:list={[
+                "product-thumb w-20 h-20 rounded-lg overflow-hidden flex-shrink-0 border-2 transition-all",
+                i === 0 ? "border-primary" : "border-transparent hover:border-primary/50"
+              ]}
+              data-src={img}
+            >
+              <img src={img} alt={`${product.name} ${i + 1}`} class="w-full h-full object-cover" />
+            </button>
+          ))}
+        </div>
       </div>
 
       <!-- Info del producto -->
@@ -178,7 +177,7 @@ const initialProductionTime = productionTimeRules.length > 0
 
         {/* Descripción corta */}
         {product.shortDescription && (
-          <p class="text-dark-gray mb-6 leading-relaxed">{product.shortDescription}</p>
+          <div class="rich-text-content text-dark-gray mb-6 leading-relaxed prose prose-sm max-w-none" set:html={product.shortDescription} />
         )}
 
         <!-- Variantes -->
@@ -200,7 +199,7 @@ const initialProductionTime = productionTimeRules.length > 0
                   data-variant-sku={v.sku || product.sku}
                   data-variant-price={v.price ? Number(v.price) : finalPrice}
                   data-variant-stock={v.stock}
-                  data-variant-image={v.image || ''}
+                  data-variant-images={JSON.stringify(v.images || [])}
                 >
                   <span class="text-sm font-semibold mb-0.5 transition-colors group-hover:text-brand-black">
                     {v.name}
@@ -378,7 +377,7 @@ const initialProductionTime = productionTimeRules.length > 0
 
       <!-- Tab: Descripción -->
       <div class="tab-content" data-tab-content="descripcion">
-        <div class="prose prose-sm max-w-none" set:html={product.description} />
+        <div class="rich-text-content prose prose-sm max-w-none" set:html={product.description} />
       </div>
 
       <!-- Tab: Precios -->
@@ -469,6 +468,17 @@ const initialProductionTime = productionTimeRules.length > 0
   </div>
 </BaseLayout>
 
+<style is:global>
+  .rich-text-content p { margin-bottom: 1rem; }
+  .rich-text-content strong { font-weight: 700; color: inherit; }
+  .rich-text-content em { font-style: italic; }
+  .rich-text-content u { text-decoration: underline; }
+  .rich-text-content ul { list-style-type: disc; margin-left: 1.5rem; margin-bottom: 1rem; }
+  .rich-text-content ol { list-style-type: decimal; margin-left: 1.5rem; margin-bottom: 1rem; }
+  .rich-text-content li { margin-bottom: 0.25rem; }
+  .rich-text-content a { color: #4f46e5; text-decoration: underline; }
+</style>
+
 <script>
   // Tabs
   document.querySelectorAll('.tab-btn').forEach((btn) => {
@@ -488,7 +498,7 @@ const initialProductionTime = productionTimeRules.length > 0
   });
 
   // Formato de precio helper
-  const formatPrice = (price: number) => {
+  const formatPrice = (price) => {
     return new Intl.NumberFormat('es-AR', {
       style: 'currency',
       currency: 'ARS',
@@ -498,14 +508,14 @@ const initialProductionTime = productionTimeRules.length > 0
 
   // Variantes
   const variantSelector = document.getElementById('variant-selector');
-  const mainAddToCartBtn = document.getElementById('add-to-cart-main') as HTMLButtonElement | null;
-  const buyNowBtn = document.getElementById('buy-now-btn') as HTMLButtonElement | null;
+  const mainAddToCartBtn = document.getElementById('add-to-cart-main');
+  const buyNowBtn = document.getElementById('buy-now-btn');
   const priceDisplay = document.querySelector('.text-3xl.font-heading.bold') || document.querySelector('.text-3xl.font-heading.font-bold');
   const skuDisplay = document.querySelector('.text-xs.text-gray-400:last-of-type');
   const transferPriceDisplay = document.querySelector('.text-sm.text-success.font-medium');
 
   variantSelector?.addEventListener('click', (e) => {
-    const btn = (e.target as HTMLElement).closest('button');
+    const btn = e.target.closest('button');
     if (!btn || !btn.classList.contains('variant-btn')) return;
 
         // Resetear estilos de todos los botones
@@ -539,30 +549,45 @@ const initialProductionTime = productionTimeRules.length > 0
     const variantSku = btn.getAttribute('data-variant-sku');
     const variantPrice = parseFloat(btn.getAttribute('data-variant-price') || '0');
     const variantStock = parseInt(btn.getAttribute('data-variant-stock') || '0');
-    const variantImage = btn.getAttribute('data-variant-image');
-
-    // Swap main image if variant has an image
-    const mainImage = document.getElementById('main-image') as HTMLImageElement;
-    const placeholder = document.getElementById('main-image-placeholder');
+    const variantImagesStr = btn.getAttribute('data-variant-images');
+    const variantImages = variantImagesStr ? JSON.parse(variantImagesStr) : [];
     
-    if (variantImage) {
+    // Gallery elements
+    const mainImage = document.getElementById('main-image');
+    const placeholder = document.getElementById('main-image-placeholder');
+    const thumbnailsContainer = document.getElementById('product-thumbnails');
+
+    if (variantImages && variantImages.length > 0) {
+      // Update Main Image
       if (mainImage) {
-        mainImage.src = variantImage;
+        mainImage.src = variantImages[0];
       } else if (placeholder) {
-        // Create an img element to replace the placeholder
         const img = document.createElement('img');
         img.id = 'main-image';
-        img.src = variantImage;
+        img.src = variantImages[0];
         img.alt = variantName || 'Variante';
         img.className = 'w-full h-full object-cover';
         placeholder.replaceWith(img);
       }
       
-      // Update thumbnail active states
-      document.querySelectorAll('.product-thumb').forEach((t) => {
-        t.classList.remove('border-primary');
-        t.classList.add('border-transparent');
-      });
+      // Rebuild Thumbnails
+      if (thumbnailsContainer) {
+        if (variantImages.length > 1) {
+          thumbnailsContainer.innerHTML = variantImages.map((img, i) => `
+            <button
+              class="product-thumb w-20 h-20 rounded-lg overflow-hidden flex-shrink-0 border-2 transition-all ${i === 0 ? 'border-primary' : 'border-transparent hover:border-primary/50'}"
+              data-src="${img}"
+            >
+              <img src="${img}" alt="${variantName} ${i + 1}" class="w-full h-full object-cover" />
+            </button>
+          `).join('');
+          
+          // Re-attach thumbnail listeners
+          attachThumbnailListeners();
+        } else {
+          thumbnailsContainer.innerHTML = '';
+        }
+      }
     }
 
     // Actualizar atributos del botón de carrito
@@ -615,20 +640,28 @@ const initialProductionTime = productionTimeRules.length > 0
   });
 
   // Galería de thumbnails
-  document.querySelectorAll('.product-thumb').forEach((thumb) => {
-    thumb.addEventListener('click', () => {
-      const src = thumb.getAttribute('data-src');
-      const mainImage = document.getElementById('main-image') as HTMLImageElement;
-      if (mainImage && src) mainImage.src = src;
+  function attachThumbnailListeners() {
+    document.querySelectorAll('.product-thumb').forEach((thumb) => {
+      // Clone to remove old listeners if re-attaching
+      const newThumb = thumb.cloneNode(true);
+      thumb.parentNode?.replaceChild(newThumb, thumb);
 
-      document.querySelectorAll('.product-thumb').forEach((t) => {
-        t.classList.remove('border-primary');
-        t.classList.add('border-transparent');
+      newThumb.addEventListener('click', () => {
+        const src = newThumb.getAttribute('data-src');
+        const mainImg = document.getElementById('main-image');
+        if (mainImg && src) mainImg.src = src;
+
+        document.querySelectorAll('.product-thumb').forEach((t) => {
+          t.classList.remove('border-primary');
+          t.classList.add('border-transparent');
+        });
+        newThumb.classList.add('border-primary');
+        newThumb.classList.remove('border-transparent');
       });
-      thumb.classList.add('border-primary');
-      thumb.classList.remove('border-transparent');
     });
-  });
+  }
+
+  attachThumbnailListeners();
 
   // Cantidad
   const qtyInput = document.getElementById('qty-input') as HTMLInputElement;

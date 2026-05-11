@@ -63,3 +63,11 @@ export function calculateDiscountPercentage(original: number, discounted: number
     if (original <= 0) return 0;
     return Math.round(((original - discounted) / original) * 100);
 }
+
+/**
+ * Elimina las etiquetas HTML de un string
+ */
+export function stripHtml(html: string): string {
+    if (!html) return '';
+    return html.replace(/<[^>]*>?/gm, '');
+}

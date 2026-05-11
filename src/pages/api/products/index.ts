@@ -81,18 +81,22 @@ export const POST: APIRoute = async (context) => {
                 const variants = JSON.parse(variantsData.toString());
                 if (variants.length > 0) {
                     for (const v of variants) {
-                        let variantImage: string | null = v.existingImage || null;
-                        if (v.hasNewImage && v.imageFieldName) {
-                            const uploadedUrl = await uploadVariantImage(v.imageFieldName);
-                            if (uploadedUrl) variantImage = uploadedUrl;
+                        let variantImages: string[] = [];
+                        
+                        if (v.imageFieldNames && v.imageFieldNames.length > 0) {
+                            for (const fieldName of v.imageFieldNames) {
+                                const uploadedUrl = await uploadVariantImage(fieldName);
+                                if (uploadedUrl) variantImages.push(uploadedUrl);
+                            }
                         }
+
                         await tx.insert(productVariants).values({
                             productId: newProduct.id,
                             name: v.name,
                             sku: v.sku,
                             price: v.price ? v.price.toString() : null,
                             stock: v.stock,
-                            image: variantImage,
+                            images: variantImages,
                         });
                     }
                 }

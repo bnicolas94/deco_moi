@@ -4,6 +4,7 @@ import { db } from '@/lib/db/connection';
 import { products, categories, mockupTemplates, productionTimeRules, meliItemLinks, costItems, productCostItems, productSupplies, supplies } from '@/lib/db/schema';
 import { eq, asc, and } from 'drizzle-orm';
 import { Save, ArrowLeft, Image as ImageIcon, Trash2, Star, Plus, Clock } from 'lucide-react';
+import RichTextEditor from '@/components/admin/RichTextEditor';
 
 const { id } = Astro.params;
 const isNew = id === 'new';
@@ -211,29 +212,30 @@ const SUPPLY_ICONS: Record<string, string> = {
 
                         <div class="space-y-2">
                             <label class="block text-sm font-bold text-gray-700">Descripción Corta</label>
-                            <input 
-                                type="text" 
+                            <RichTextEditor 
+                                client:only="react" 
                                 name="shortDescription" 
-                                value={product?.shortDescription} 
+                                initialValue={product?.shortDescription || ''} 
                                 placeholder="Breve resumen para el catálogo..."
-                                class="block w-full rounded-xl border-gray-200 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm h-11 border px-4 transition-all"
+                                minHeight="450px"
                             />
                         </div>
 
                         <div class="space-y-2">
                             <label class="block text-sm font-bold text-gray-700">Descripción Detallada</label>
-                            <textarea 
+                            <RichTextEditor 
+                                client:only="react" 
                                 name="description" 
-                                rows="5" 
-                                class="block w-full rounded-xl border-gray-200 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-4 transition-all"
+                                initialValue={product?.description || ''} 
                                 placeholder="Escribe las características, beneficios y detalles del producto..."
-                            >{product?.description}</textarea>
+                                minHeight="450px"
+                            />
                         </div>
                     </div>
                 </div>
 
                 <!-- 2. Pricing & Logistics -->
-                <div class="bg-white rounded-2xl shadow-sm border border-gray-100 relative">
+                <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
                     <div class="p-6 border-b border-gray-50">
                         <h2 class="text-lg font-bold text-gray-900 flex items-center gap-2.5">
                             <span class="w-2 h-6 bg-emerald-500 rounded-full"></span>
@@ -241,11 +243,11 @@ const SUPPLY_ICONS: Record<string, string> = {
                         </h2>
                     </div>
                     <div class="p-6 space-y-6">
-                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                             <div class="space-y-2 group lg:col-span-1">
-                                <label class="block text-sm font-bold text-gray-700 group-focus-within:text-emerald-600 transition-colors">Ganancia Deseada</label>
+                                <label class="block text-sm font-bold text-gray-700 group-focus-within:text-emerald-600 transition-colors">Precio Neto Sugerido</label>
                                 <div class="relative">
-                                    <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center text-gray-400 font-bold">$</span>
+                                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-medium">$</span>
                                     <input 
                                         type="number" 
                                         step="0.01" 
@@ -657,7 +659,7 @@ const SUPPLY_ICONS: Record<string, string> = {
                                 variants.map((v, idx) => (
                                     <div class="variant-item grid grid-cols-1 md:grid-cols-12 gap-4 p-4 bg-gray-50/50 rounded-2xl border border-gray-100 relative group animate-in fade-in slide-in-from-top-2">
                                         <input type="hidden" name={`variant_id_${idx}`} value={v.id} />
-                                        <input type="hidden" name={`variant_existing_image_${idx}`} value={v.image || ''} />
+                                        <input type="hidden" name={`variant_existing_images_${idx}`} value={JSON.stringify(v.images || [])} />
                                         <div class="md:col-span-3">
                                             <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Nombre / Atributos</label>
                                             <input type="text" name={`variant_name_${idx}`} value={v.name} placeholder="Ej: Rojo / XL" class="w-full rounded-lg border-gray-200 text-sm h-10 border px-3 focus:ring-indigo-500" required />
@@ -675,18 +677,19 @@ const SUPPLY_ICONS: Record<string, string> = {
                                             <input type="number" name={`variant_stock_${idx}`} value={v.stock} class="w-full rounded-lg border-gray-200 text-sm h-10 border px-3 focus:ring-indigo-500" required />
                                         </div>
                                         <div class="md:col-span-3">
-                                            <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Imagen Opc.</label>
-                                            <div class="flex items-center gap-2">
-                                                {v.image ? (
-                                                    <img src={v.image} class="w-10 h-10 object-cover rounded-lg border border-gray-200" alt={v.name} />
-                                                ) : (
-                                                    <div class="w-10 h-10 rounded-lg border-2 border-dashed border-gray-200 flex items-center justify-center">
-                                                        <ImageIcon className="w-4 h-4 text-gray-300" />
+                                            <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Imágenes Varias</label>
+                                            <div class="flex flex-wrap gap-2 mb-2 variant-images-preview" data-idx={idx}>
+                                                {(v.images || []).map((img, imgIdx) => (
+                                                    <div class="relative group/img w-10 h-10">
+                                                        <img src={img} class="w-10 h-10 object-cover rounded-lg border border-gray-200" alt={v.name} />
+                                                        <button type="button" class="remove-variant-existing-img absolute -top-1 -right-1 bg-rose-500 text-white rounded-full p-0.5 opacity-0 group-hover/img:opacity-100 transition-opacity z-10" data-idx={idx} data-img-idx={imgIdx}>
+                                                            <Plus className="w-2.5 h-2.5 rotate-45" />
+                                                        </button>
                                                     </div>
-                                                )}
-                                                <label class="flex-1 cursor-pointer">
-                                                    <span class="text-[10px] text-indigo-500 font-bold hover:text-indigo-700 transition-colors">{v.image ? 'Cambiar' : 'Subir'}</span>
-                                                    <input type="file" accept="image/*" name={`variant_image_${idx}`} class="hidden variant-image-input" />
+                                                ))}
+                                                <label class="w-10 h-10 rounded-lg border-2 border-dashed border-gray-200 flex items-center justify-center cursor-pointer hover:border-indigo-400 hover:bg-indigo-50 transition-all">
+                                                    <Plus className="w-4 h-4 text-gray-300" />
+                                                    <input type="file" accept="image/*" name={`variant_images_${idx}`} multiple class="hidden variant-image-input" data-idx={idx} />
                                                 </label>
                                             </div>
                                         </div>
@@ -1063,6 +1066,35 @@ const SUPPLY_ICONS: Record<string, string> = {
                     removeExistingImage(imageId);
                 }
             }
+
+            // Remove existing variant image
+            const variantRemoveBtn = e.target.closest('.remove-variant-existing-img');
+            if (variantRemoveBtn) {
+                const imgIdx = parseInt(variantRemoveBtn.getAttribute('data-img-idx'));
+                const item = variantRemoveBtn.closest('.variant-item');
+                const input = item.querySelector('input[name^="variant_existing_images_"]');
+                
+                if (input) {
+                    const images = JSON.parse(input.value);
+                    images.splice(imgIdx, 1);
+                    input.value = JSON.stringify(images);
+                    
+                    // Remove UI element
+                    variantRemoveBtn.closest('.relative').remove();
+                    
+                    // Update indices of remaining buttons in this variant
+                    const container = item.querySelector('.variant-images-preview');
+                    container.querySelectorAll('.remove-variant-existing-img').forEach((b, i) => {
+                        b.setAttribute('data-img-idx', i);
+                    });
+                }
+            }
+
+            // Remove new variant image preview
+            const newVariantRemoveBtn = e.target.closest('.remove-variant-new-img');
+            if (newVariantRemoveBtn) {
+                newVariantRemoveBtn.closest('.relative').remove();
+            }
         });
 
         // Image Upload Preview
@@ -1146,7 +1178,7 @@ const SUPPLY_ICONS: Record<string, string> = {
             const div = document.createElement('div');
             div.className = 'variant-item grid grid-cols-1 md:grid-cols-12 gap-4 p-4 bg-gray-50/50 rounded-2xl border border-gray-100 relative group animate-in fade-in slide-in-from-top-2';
             div.innerHTML = `
-                <input type="hidden" name="variant_existing_image_${variantIdx}" value="" />
+                <input type="hidden" name="variant_existing_images_${variantIdx}" value="[]" />
                 <div class="md:col-span-3">
                     <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Nombre / Atributos</label>
                     <input type="text" name="variant_name_${variantIdx}" placeholder="Ej: Rojo / XL" class="w-full rounded-lg border-gray-200 text-sm h-10 border px-3 focus:ring-indigo-500" required />
@@ -1164,14 +1196,11 @@ const SUPPLY_ICONS: Record<string, string> = {
                     <input type="number" name="variant_stock_${variantIdx}" value="0" class="w-full rounded-lg border-gray-200 text-sm h-10 border px-3 focus:ring-indigo-500" required />
                 </div>
                 <div class="md:col-span-3">
-                    <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Imagen Opc.</label>
-                    <div class="flex items-center gap-2">
-                        <div class="variant-img-preview w-10 h-10 rounded-lg border-2 border-dashed border-gray-200 flex items-center justify-center">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-gray-300"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
-                        </div>
-                        <label class="flex-1 cursor-pointer">
-                            <span class="text-[10px] text-indigo-500 font-bold hover:text-indigo-700 transition-colors">Subir</span>
-                            <input type="file" accept="image/*" name="variant_image_${variantIdx}" class="hidden variant-image-input" />
+                    <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Imágenes Varias</label>
+                    <div class="flex flex-wrap gap-2 mb-2 variant-images-preview" data-idx="${variantIdx}">
+                        <label class="w-10 h-10 rounded-lg border-2 border-dashed border-gray-200 flex items-center justify-center cursor-pointer hover:border-indigo-400 hover:bg-indigo-50 transition-all">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-gray-300"><line x1="12" x2="12" y1="5" y2="19"/><line x1="5" x2="19" y1="12" y2="12"/></svg>
+                            <input type="file" accept="image/*" name="variant_images_${variantIdx}" multiple class="hidden variant-image-input" data-idx="${variantIdx}" />
                         </label>
                     </div>
                 </div>
@@ -1248,25 +1277,31 @@ const SUPPLY_ICONS: Record<string, string> = {
     function attachVariantImagePreview(input) {
         if (!input) return;
         input.addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if (!file) return;
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                const container = input.closest('.flex');
-                const preview = container.querySelector('.variant-img-preview, img');
-                if (preview && preview.tagName === 'IMG') {
-                    preview.src = reader.result;
-                } else if (preview) {
-                    const img = document.createElement('img');
-                    img.src = reader.result;
-                    img.className = 'w-10 h-10 object-cover rounded-lg border border-gray-200';
-                    preview.replaceWith(img);
-                }
-                // Update label text
-                const label = container.querySelector('span');
-                if (label) label.textContent = 'Cambiar';
-            };
-            reader.readAsDataURL(file);
+            const files = e.target.files;
+            if (!files || files.length === 0) return;
+            
+            const idx = input.getAttribute('data-idx');
+            const previewContainer = input.closest('.variant-images-preview');
+
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                    const div = document.createElement('div');
+                    div.className = 'relative group/img w-10 h-10';
+                    div.innerHTML = `
+                        <img src="${reader.result}" class="w-10 h-10 object-cover rounded-lg border border-indigo-200" />
+                        <div class="absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 group-hover/img:opacity-100 transition-opacity rounded-lg">
+                            <button type="button" class="remove-variant-new-img bg-rose-500 text-white rounded-full p-0.5">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                            </button>
+                        </div>
+                    `;
+                    // Insert before the label (the plus button)
+                    previewContainer.insertBefore(div, input.parentElement);
+                };
+                reader.readAsDataURL(file);
+            }
         });
     }
 
@@ -1316,25 +1351,31 @@ const SUPPLY_ICONS: Record<string, string> = {
             const sku = item.querySelector(`input[name^="variant_sku_"]`)?.value;
             const price = item.querySelector(`input[name^="variant_price_"]`)?.value;
             const stock = item.querySelector(`input[name^="variant_stock_"]`)?.value;
-            const existingImage = item.querySelector(`input[name^="variant_existing_image_"]`)?.value;
-            const imageInput = item.querySelector(`input[name^="variant_image_"]`);
-            const hasNewImage = imageInput && imageInput.files && imageInput.files.length > 0;
+            const existingImagesStr = item.querySelector(`input[name^="variant_existing_images_"]`)?.value;
+            const existingImages = existingImagesStr ? JSON.parse(existingImagesStr) : [];
+            
+            const imageInput = item.querySelector(`.variant-image-input`);
+            const files = imageInput ? imageInput.files : [];
             
             if (name) {
+                const imageFieldNames = [];
+                if (files && files.length > 0) {
+                    for (let i = 0; i < files.length; i++) {
+                        const fieldName = `variant_file_${index}_${i}_${Date.now()}`;
+                        formData.append(fieldName, files[i]);
+                        imageFieldNames.push(fieldName);
+                    }
+                }
+
                 variants.push({ 
                     id: id || null, 
                     name, 
                     sku: sku || null, 
                     price: price ? parseFloat(price) : null, 
                     stock: parseInt(stock) || 0,
-                    existingImage: existingImage || null,
-                    hasNewImage: hasNewImage,
-                    imageFieldName: hasNewImage ? `variant_image_file_${index}` : null 
+                    existingImages: existingImages,
+                    imageFieldNames: imageFieldNames
                 });
-                // Add the image file to formData with a predictable name
-                if (hasNewImage) {
-                    formData.append(`variant_image_file_${index}`, imageInput.files[0]);
-                }
             }
         });
         formData.append('variants_json', JSON.stringify(variants));
