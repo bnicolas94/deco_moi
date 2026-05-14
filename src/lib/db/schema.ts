@@ -644,3 +644,15 @@ export const supplyCategories = pgTable('supply_categories', {
 export const supplyCategoriesRelations = relations(supplyCategories, ({ many }) => ({
     supplies: many(supplies),
 }));
+// ============================================
+// HOME BLOCKS (Constructor de Inicio)
+// ============================================
+export const homeBlocks = pgTable('home_blocks', {
+    id: serial('id').primaryKey(),
+    type: varchar('type', { length: 50 }).notNull(), // 'hero' | 'categories' | 'featured_products' | 'testimonials' | 'cta' | 'rich_text'
+    settings: json('settings').$type<any>().default({}),
+    order: integer('order').default(0),
+    isActive: boolean('is_active').default(true),
+    createdAt: timestamp('created_at').defaultNow(),
+    updatedAt: timestamp('updated_at').defaultNow(),
+});

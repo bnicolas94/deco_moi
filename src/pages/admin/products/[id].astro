@@ -164,10 +164,11 @@ const SUPPLY_ICONS: Record<string, string> = {
                 <button 
                     type="submit" 
                     form="product-form"
-                    class="flex-1 md:flex-none inline-flex items-center justify-center px-8 py-2.5 bg-gray-900 hover:bg-black text-white font-bold rounded-xl shadow-lg shadow-gray-200 transition-all transform active:scale-95"
+                    class="save-btn flex-1 md:flex-none inline-flex items-center justify-center px-8 py-2.5 bg-gray-900 hover:bg-black text-white font-bold rounded-xl shadow-lg shadow-gray-200 transition-all transform active:scale-95 disabled:opacity-50 disabled:pointer-events-none"
                 >
-                    <Save className="w-5 h-5 mr-2" />
-                    Guardar Cambios
+                    <div class="save-spinner hidden animate-spin w-4 h-4 border-2 border-white/30 border-t-white rounded-full mr-2"></div>
+                    <Save className="w-5 h-5 mr-2 save-icon" />
+                    <span class="save-text">Guardar Cambios</span>
                 </button>
             </div>
         </div>
@@ -175,13 +176,23 @@ const SUPPLY_ICONS: Record<string, string> = {
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
             <div class="lg:col-span-8 space-y-8">
                 <!-- 1. General Information -->
-                <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-                    <div class="p-6 border-b border-gray-50">
-                        <h2 class="text-lg font-bold text-gray-900 flex items-center gap-2.5">
-                            <span class="w-2 h-6 bg-indigo-500 rounded-full"></span>
-                            Información General
-                        </h2>
-                    </div>
+                <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden accordion-section active" data-section="general">
+                    <button type="button" class="w-full p-6 flex items-center justify-between hover:bg-gray-50/50 transition-colors accordion-toggle">
+                        <div class="flex items-center gap-4">
+                            <div class="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600">
+                                <span class="w-2.5 h-6 bg-indigo-500 rounded-full"></span>
+                            </div>
+                            <div class="text-left">
+                                <h2 class="text-lg font-bold text-gray-900">Información General</h2>
+                                <p class="text-xs text-gray-400 font-medium italic">Nombre, slug y descripciones detalladas</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <span class="section-badge px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-600 text-[10px] font-black uppercase opacity-0 transition-opacity">Completado</span>
+                            <Plus className="w-5 h-5 text-gray-400 transition-transform duration-300 accordion-chevron rotate-45" />
+                        </div>
+                    </button>
+                    <div class="accordion-content transition-all duration-300 ease-in-out">
                     <div class="p-6 space-y-6">
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div class="space-y-2">
@@ -233,15 +244,28 @@ const SUPPLY_ICONS: Record<string, string> = {
                         </div>
                     </div>
                 </div>
+            </div>
 
                 <!-- 2. Pricing & Logistics -->
-                <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-                    <div class="p-6 border-b border-gray-50">
-                        <h2 class="text-lg font-bold text-gray-900 flex items-center gap-2.5">
-                            <span class="w-2 h-6 bg-emerald-500 rounded-full"></span>
-                            Precios, Costos e Insumos
-                        </h2>
-                    </div>
+                <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden accordion-section" data-section="pricing">
+                    <button type="button" class="w-full p-6 flex items-center justify-between hover:bg-gray-50/50 transition-colors accordion-toggle">
+                        <div class="flex items-center gap-4">
+                            <div class="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600">
+                                <span class="w-2.5 h-6 bg-emerald-500 rounded-full"></span>
+                            </div>
+                            <div class="text-left">
+                                <h2 class="text-lg font-bold text-gray-900">Precios, Costos e Insumos</h2>
+                                <p class="text-xs text-gray-400 font-medium italic">Cálculo de márgenes, insumos vinculados y transparencia</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <div id="pricing-summary-badge" class="flex gap-1.5">
+                                <span class="px-2 py-0.5 rounded-full bg-gray-100 text-gray-400 text-[10px] font-black uppercase">Calculando...</span>
+                            </div>
+                            <Plus className="w-5 h-5 text-gray-400 transition-transform duration-300 accordion-chevron" />
+                        </div>
+                    </button>
+                    <div class="accordion-content hidden transition-all duration-300 ease-in-out">
                     <div class="p-6 space-y-6">
                         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                             <div class="space-y-2 group lg:col-span-1">
@@ -571,23 +595,39 @@ const SUPPLY_ICONS: Record<string, string> = {
                         </div>
                     </div>
                 </div>
+            </div>
 
-                <!-- 2b. Production Time Rules -->
-                <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-                    <div class="p-6 border-b border-gray-50 flex items-center justify-between">
-                        <h2 class="text-lg font-bold text-gray-900 flex items-center gap-2.5">
-                            <span class="w-2 h-6 bg-amber-500 rounded-full"></span>
-                            Tiempos de Producción por Cantidad
-                        </h2>
-                        <button 
-                            type="button" 
-                            id="add-time-rule-btn"
-                            class="inline-flex items-center px-3 py-1.5 bg-amber-50 text-amber-600 text-xs font-bold rounded-lg hover:bg-amber-100 transition-colors border border-amber-100"
-                        >
-                            <Plus className="w-3.5 h-3.5 mr-1" />
-                            Agregar Rango
-                        </button>
-                    </div>
+                <!-- 4. Production & Times -->
+                <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden accordion-section" data-section="production">
+                    <button type="button" class="w-full p-6 flex items-center justify-between hover:bg-gray-50/50 transition-colors accordion-toggle">
+                        <div class="flex items-center gap-4">
+                            <div class="w-10 h-10 rounded-xl bg-orange-50 flex items-center justify-center text-orange-600">
+                                <span class="w-2.5 h-6 bg-orange-500 rounded-full"></span>
+                            </div>
+                            <div class="text-left">
+                                <h2 class="text-lg font-bold text-gray-900">Producción y Tiempos</h2>
+                                <p class="text-xs text-gray-400 font-medium italic">Tiempos de entrega según cantidad pedida</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <span class="px-2 py-0.5 rounded-full bg-orange-100 text-orange-600 text-[10px] font-black uppercase">
+                                {timeRules.length} rangos
+                            </span>
+                            <Plus className="w-5 h-5 text-gray-400 transition-transform duration-300 accordion-chevron" />
+                        </div>
+                    </button>
+                    <div class="accordion-content hidden transition-all duration-300 ease-in-out">
+                        <div class="p-6 border-t border-gray-50">
+                            <div class="flex items-center justify-between mb-8">
+                                <div>
+                                    <h3 class="text-base font-bold text-gray-900">Reglas de Producción</h3>
+                                    <p class="text-xs text-gray-400 italic">Define cuántos días tardas según el volumen del pedido</p>
+                                </div>
+                                <button type="button" id="add-time-rule-btn" class="inline-flex items-center gap-2 px-4 py-2 bg-orange-50 text-orange-600 font-bold rounded-xl hover:bg-orange-100 transition-all active:scale-95 text-sm">
+                                    <Plus className="w-4 h-4" />
+                                    Añadir Rango
+                                </button>
+                            </div>
 
                     <div class="p-6">
                         <p class="text-xs text-gray-500 mb-6 bg-gray-50 p-3 rounded-xl border border-gray-100 italic">
@@ -625,82 +665,93 @@ const SUPPLY_ICONS: Record<string, string> = {
                         </div>
                     </div>
                 </div>
+            </div>
+                </div>
 
                 <!-- 3. Product Variants -->
-                <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-                    <div class="p-6 border-b border-gray-50 flex items-center justify-between">
-                        <h2 class="text-lg font-bold text-gray-900 flex items-center gap-2.5">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-indigo-500" viewBox="0 0 20 20" fill="currentColor">
-                                <path fill-rule="evenodd" d="M5 3a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2V5a2 2 0 00-2-2H5zm9 4a1 1 0 10-2 0v2H8V7a1 1 0 00-2 0v2H4.5a.5.5 0 000 1H6v2H4.5a.5.5 0 000 1H6v2a1 1 0 102 0v-2h4v2a1 1 0 102 0v-2h1.5a.5.5 0 000-1H14v-2h1.5a.5.5 0 000-1H14V7z" clip-rule="evenodd" />
-                            </svg>
-                            Variantes de Producto
-                        </h2>
-                        <button 
-                            type="button" 
-                            id="add-variant-btn"
-                            class="inline-flex items-center px-3 py-1.5 bg-indigo-50 text-indigo-600 text-xs font-bold rounded-lg hover:bg-indigo-100 transition-colors border border-indigo-100"
-                        >
-                            <Plus className="w-3.5 h-3.5 mr-1" />
-                            Añadir Variante
-                        </button>
-                    </div>
-
-                    <div class="p-6">
-                        <p class="text-xs text-gray-500 mb-6 bg-gray-50 p-3 rounded-xl border border-gray-100 italic">
-                            Usa las variantes para productos con diferentes tallas, colores o materiales. Cada variante puede tener su propio SKU y stock.
-                        </p>
-
-                        <div id="variants-container" class="space-y-4">
-                            {variants.length === 0 ? (
-                                <div id="no-variants-msg" class="text-center py-8 border-2 border-dashed border-gray-100 rounded-2xl">
-                                    <p class="text-sm text-gray-400">No hay variantes definidas. El producto se tratará como unidad única.</p>
+                <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden accordion-section" data-section="variants">
+                    <button type="button" class="w-full p-6 flex items-center justify-between hover:bg-gray-50/50 transition-colors accordion-toggle">
+                        <div class="flex items-center gap-4">
+                            <div class="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600">
+                                <span class="w-2.5 h-6 bg-brand-black rounded-full"></span>
+                            </div>
+                            <div class="text-left">
+                                <h2 class="text-lg font-bold text-gray-900">Variantes de Producto</h2>
+                                <p class="text-xs text-gray-400 font-medium italic">Tallas, colores, materiales y fotos por variante</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <span id="variant-count-badge" class="px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-600 text-[10px] font-black uppercase">
+                                {variants.length} variantes
+                            </span>
+                            <Plus className="w-5 h-5 text-gray-400 transition-transform duration-300 accordion-chevron" />
+                        </div>
+                    </button>
+                    <div class="accordion-content hidden transition-all duration-300 ease-in-out">
+                        <div class="p-6 border-t border-gray-50">
+                            <div class="flex items-center justify-between mb-8">
+                                <div>
+                                    <h3 class="text-base font-bold text-gray-900">Listado de Variantes</h3>
+                                    <p class="text-xs text-gray-400 italic">Cada variante puede tener su propio SKU, precio y fotos</p>
                                 </div>
-                            ) : (
-                                variants.map((v, idx) => (
-                                    <div class="variant-item grid grid-cols-1 md:grid-cols-12 gap-4 p-4 bg-gray-50/50 rounded-2xl border border-gray-100 relative group animate-in fade-in slide-in-from-top-2">
-                                        <input type="hidden" name={`variant_id_${idx}`} value={v.id} />
-                                        <input type="hidden" name={`variant_existing_images_${idx}`} value={JSON.stringify(v.images || [])} />
-                                        <div class="md:col-span-3">
-                                            <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Nombre / Atributos</label>
-                                            <input type="text" name={`variant_name_${idx}`} value={v.name} placeholder="Ej: Rojo / XL" class="w-full rounded-lg border-gray-200 text-sm h-10 border px-3 focus:ring-indigo-500" required />
-                                        </div>
-                                        <div class="md:col-span-2">
-                                            <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">SKU</label>
-                                            <input type="text" name={`variant_sku_${idx}`} value={v.sku} placeholder="SKU Único" class="w-full rounded-lg border-gray-200 text-sm h-10 border px-3 focus:ring-indigo-500" />
-                                        </div>
-                                        <div class="md:col-span-2">
-                                            <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Precio Opc.</label>
-                                            <input type="number" step="0.01" name={`variant_price_${idx}`} value={v.price} placeholder="Base" class="w-full rounded-lg border-gray-200 text-sm h-10 border px-3 focus:ring-indigo-500" />
-                                        </div>
-                                        <div class="md:col-span-1">
-                                            <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Stock</label>
-                                            <input type="number" name={`variant_stock_${idx}`} value={v.stock} class="w-full rounded-lg border-gray-200 text-sm h-10 border px-3 focus:ring-indigo-500" required />
-                                        </div>
-                                        <div class="md:col-span-3">
-                                            <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Imágenes Varias</label>
-                                            <div class="flex flex-wrap gap-2 mb-2 variant-images-preview" data-idx={idx}>
-                                                {(v.images || []).map((img, imgIdx) => (
-                                                    <div class="relative group/img w-10 h-10">
-                                                        <img src={img} class="w-10 h-10 object-cover rounded-lg border border-gray-200" alt={v.name} />
-                                                        <button type="button" class="remove-variant-existing-img absolute -top-1 -right-1 bg-rose-500 text-white rounded-full p-0.5 opacity-0 group-hover/img:opacity-100 transition-opacity z-10" data-idx={idx} data-img-idx={imgIdx}>
-                                                            <Plus className="w-2.5 h-2.5 rotate-45" />
-                                                        </button>
-                                                    </div>
-                                                ))}
-                                                <label class="w-10 h-10 rounded-lg border-2 border-dashed border-gray-200 flex items-center justify-center cursor-pointer hover:border-indigo-400 hover:bg-indigo-50 transition-all">
-                                                    <Plus className="w-4 h-4 text-gray-300" />
-                                                    <input type="file" accept="image/*" name={`variant_images_${idx}`} multiple class="hidden variant-image-input" data-idx={idx} />
-                                                </label>
+                                <button type="button" id="add-variant-btn" class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-600 font-bold rounded-xl hover:bg-indigo-100 transition-all active:scale-95 text-sm">
+                                    <Plus className="w-4 h-4" />
+                                    Añadir Variante
+                                </button>
+                            </div>
+
+                            <div id="variants-container" class="space-y-4">
+                                {variants.length === 0 ? (
+                                    <div id="no-variants-msg" class="text-center py-8 border-2 border-dashed border-gray-100 rounded-2xl">
+                                        <p class="text-sm text-gray-400">No hay variantes definidas. El producto se tratará como unidad única.</p>
+                                    </div>
+                                ) : (
+                                    variants.map((v, idx) => (
+                                        <div class="variant-item grid grid-cols-1 md:grid-cols-12 gap-4 p-4 bg-gray-50/50 rounded-2xl border border-gray-100 relative group animate-in fade-in slide-in-from-top-2">
+                                            <input type="hidden" name={`variant_id_${idx}`} value={v.id} />
+                                            <input type="hidden" name={`variant_existing_images_${idx}`} value={JSON.stringify(v.images || [])} />
+                                            <div class="md:col-span-3">
+                                                <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Nombre / Atributos</label>
+                                                <input type="text" name={`variant_name_${idx}`} value={v.name} placeholder="Ej: Rojo / XL" class="w-full rounded-lg border-gray-200 text-sm h-10 border px-3 focus:ring-indigo-500" required />
+                                            </div>
+                                            <div class="md:col-span-2">
+                                                <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">SKU</label>
+                                                <input type="text" name={`variant_sku_${idx}`} value={v.sku} placeholder="SKU Único" class="w-full rounded-lg border-gray-200 text-sm h-10 border px-3 focus:ring-indigo-500" />
+                                            </div>
+                                            <div class="md:col-span-2">
+                                                <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Precio Opc.</label>
+                                                <input type="number" step="0.01" name={`variant_price_${idx}`} value={v.price} placeholder="Base" class="w-full rounded-lg border-gray-200 text-sm h-10 border px-3 focus:ring-indigo-500" />
+                                            </div>
+                                            <div class="md:col-span-1">
+                                                <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Stock</label>
+                                                <input type="number" name={`variant_stock_${idx}`} value={v.stock} class="w-full rounded-lg border-gray-200 text-sm h-10 border px-3 focus:ring-indigo-500" required />
+                                            </div>
+                                            <div class="md:col-span-3">
+                                                <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Imágenes Varias</label>
+                                                <div class="flex flex-wrap gap-2 mb-2 variant-images-preview" data-idx={idx}>
+                                                    {(v.images || []).map((img, imgIdx) => (
+                                                        <div class="relative group/img w-10 h-10">
+                                                            <img src={img} class="w-10 h-10 object-cover rounded-lg border border-gray-200" alt={v.name} />
+                                                            <button type="button" class="remove-variant-existing-img absolute -top-1 -right-1 bg-rose-500 text-white rounded-full p-0.5 opacity-0 group-hover/img:opacity-100 transition-opacity z-10" data-idx={idx} data-img-idx={imgIdx}>
+                                                                <Plus className="w-2.5 h-2.5 rotate-45" />
+                                                            </button>
+                                                        </div>
+                                                    ))}
+                                                    <label class="w-10 h-10 rounded-lg border-2 border-dashed border-gray-200 flex items-center justify-center cursor-pointer hover:border-indigo-400 hover:bg-indigo-50 transition-all">
+                                                        <Plus className="w-4 h-4 text-gray-300" />
+                                                        <input type="file" accept="image/*" name={`variant_images_${idx}`} multiple class="hidden variant-image-input" data-idx={idx} />
+                                                    </label>
+                                                </div>
+                                            </div>
+                                            <div class="md:col-span-1 flex items-end justify-center pb-1">
+                                                <button type="button" class="remove-variant-btn p-2 text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors">
+                                                    <Trash2 className="w-4 h-4" />
+                                                </button>
                                             </div>
                                         </div>
-                                        <div class="md:col-span-1 flex items-end justify-center pb-1">
-                                            <button type="button" class="remove-variant-btn p-2 text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors">
-                                                <Trash2 className="w-4 h-4" />
-                                            </button>
-                                        </div>
-                                    </div>
-                                ))
-                            )}
+                                    ))
+                                )}
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -847,6 +898,26 @@ const SUPPLY_ICONS: Record<string, string> = {
             </div>
         </div>
     </form>
+
+    {/* Barra Flotante Inferior */}
+    <div id="sticky-save-bar" class="fixed bottom-8 right-8 z-50 translate-y-32 transition-all duration-500">
+        <div class="bg-white/80 backdrop-blur-xl border border-gray-200/50 p-2 rounded-3xl shadow-2xl flex items-center gap-4 px-6 min-w-[300px]">
+            <div class="flex flex-col">
+                <span class="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Edición Rápida</span>
+                <span class="text-sm font-bold text-brand-black truncate max-w-[150px]">{product?.name || 'Nuevo Producto'}</span>
+            </div>
+            <div class="h-8 w-px bg-gray-100 mx-2"></div>
+            <button 
+                type="submit" 
+                form="product-form"
+                class="save-btn h-11 px-8 flex items-center gap-2 bg-brand-black text-white font-bold rounded-2xl shadow-lg shadow-brand-black/20 hover:scale-[1.05] active:scale-95 transition-all disabled:opacity-50 disabled:pointer-events-none"
+            >
+                <div class="save-spinner hidden animate-spin w-4 h-4 border-2 border-white/30 border-t-white rounded-full"></div>
+                <Save className="w-5 h-5 save-icon" />
+                <span class="save-text">Guardar</span>
+            </button>
+        </div>
+    </div>
 </AdminLayout>
 
 <script is:inline define:vars={{ isNew, id: product?.id, allCosts }}>
@@ -1094,6 +1165,61 @@ const SUPPLY_ICONS: Record<string, string> = {
             const newVariantRemoveBtn = e.target.closest('.remove-variant-new-img');
             if (newVariantRemoveBtn) {
                 newVariantRemoveBtn.closest('.relative').remove();
+            }
+        });
+
+        // --- ACCORDION LOGIC ---
+        document.querySelectorAll('.accordion-toggle').forEach(toggle => {
+            toggle.addEventListener('click', () => {
+                const section = toggle.closest('.accordion-section');
+                const content = section.querySelector('.accordion-content');
+                const chevron = toggle.querySelector('.accordion-chevron');
+                
+                // Toggle state
+                const isOpen = !content.classList.contains('hidden');
+                
+                if (isOpen) {
+                    content.classList.add('hidden');
+                    chevron.classList.remove('rotate-45');
+                    section.classList.remove('active');
+                } else {
+                    content.classList.remove('hidden');
+                    chevron.classList.add('rotate-45');
+                    section.classList.add('active');
+                    
+                    // Smooth scroll to section header
+                    section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            });
+        });
+
+        // Update pricing summary badge initially
+        const updatePricingBadge = () => {
+            const bp = document.getElementById('basePrice')?.value;
+            const net = document.getElementById('netPrice')?.value;
+            const badge = document.getElementById('pricing-summary-badge');
+            if (badge && bp && net) {
+                badge.innerHTML = `
+                    <span class="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-600 text-[10px] font-black uppercase">PVP: $${bp}</span>
+                    <span class="px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-600 text-[10px] font-black uppercase">Neto: $${net}</span>
+                `;
+            }
+        };
+        setTimeout(updatePricingBadge, 500);
+
+        // Sticky Save Bar Logic
+        const stickyBar = document.getElementById('sticky-save-bar');
+        const mainSaveBtn = document.querySelector('.save-btn');
+        
+        window.addEventListener('scroll', () => {
+            if (!mainSaveBtn || !stickyBar) return;
+            const rect = mainSaveBtn.getBoundingClientRect();
+            if (rect.bottom < 0) {
+                stickyBar.classList.remove('translate-y-32', 'translate-y-24');
+                stickyBar.classList.add('translate-y-0');
+            } else {
+                stickyBar.classList.add('translate-y-32');
+                stickyBar.classList.remove('translate-y-0');
             }
         });
 
@@ -1391,9 +1517,21 @@ const SUPPLY_ICONS: Record<string, string> = {
         const method = isNew ? 'POST' : 'PUT';
         const url = isNew ? '/api/products' : `/api/products/${id}`;
 
+        const saveBtns = document.querySelectorAll('.save-btn');
+        const saveSpinners = document.querySelectorAll('.save-spinner');
+        const saveIcons = document.querySelectorAll('.save-icon');
+        const saveTexts = document.querySelectorAll('.save-text');
+
+        // Loading state
+        saveBtns.forEach(btn => btn.disabled = true);
+        saveSpinners.forEach(s => s.classList.remove('hidden'));
+        saveIcons.forEach(i => i.classList.add('hidden'));
+        saveTexts.forEach(t => t.textContent = 'Guardando...');
+
         try {
             const response = await fetch(url, { method: method, body: formData });
             if (response.ok) {
+                // ... rest of the code
                 const data = await response.json();
                 const productId = isNew ? data.id : id;
 
@@ -1462,6 +1600,8 @@ const SUPPLY_ICONS: Record<string, string> = {
                     else alert('Producto guardado correctamente');
                 }
 
+                // Success state
+                saveTexts.forEach(t => t.textContent = '¡Guardado!');
                 setTimeout(() => {
                     if (isNew && data.id) window.location.href = `/admin/products/${data.id}`;
                     else window.location.reload();
@@ -1469,9 +1609,20 @@ const SUPPLY_ICONS: Record<string, string> = {
             } else {
                 const text = await response.text();
                 alert('Error al guardar: ' + text);
+                // Reset loading state
+                saveBtns.forEach(btn => btn.disabled = false);
+                saveSpinners.forEach(s => s.classList.add('hidden'));
+                saveIcons.forEach(i => i.classList.remove('hidden'));
+                saveTexts.forEach((t, i) => t.textContent = i === 0 ? 'Guardar Cambios' : 'Guardar');
             }
         } catch (error) {
+            console.error(error);
             alert('Error de red al guardar el producto');
+            // Reset loading state
+            saveBtns.forEach(btn => btn.disabled = false);
+            saveSpinners.forEach(s => s.classList.add('hidden'));
+            saveIcons.forEach(i => i.classList.remove('hidden'));
+            saveTexts.forEach((t, i) => t.textContent = i === 0 ? 'Guardar Cambios' : 'Guardar');
         }
     }
 

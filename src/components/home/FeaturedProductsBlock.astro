@@ -1,0 +1,43 @@
+---
+import ProductGrid from '../product/ProductGrid.astro';
+import { getFeaturedProducts } from '@/lib/services/ProductService';
+
+interface Props {
+  title?: string;
+  subtitle?: string;
+  limit?: number;
+  viewAllText?: string;
+  viewAllLink?: string;
+}
+
+const {
+  title = "Los más elegidos",
+  subtitle = "Descubrí nuestros productos más populares",
+  limit = 8,
+  viewAllText = "Ver todos los productos",
+  viewAllLink = "/productos"
+} = Astro.props;
+
+const featuredProducts = await getFeaturedProducts(limit);
+---
+
+<section class="section">
+  <div class="container">
+    <div class="text-center mb-12">
+      <h2 class="section-title">{title}</h2>
+      <div class="gold-line mt-4 mb-4"></div>
+      <p class="section-subtitle">{subtitle}</p>
+    </div>
+
+    <ProductGrid products={featuredProducts} />
+
+    <div class="text-center mt-10">
+      <a href={viewAllLink} class="btn btn-outline">
+        {viewAllText}
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3" />
+        </svg>
+      </a>
+    </div>
+  </div>
+</section>

@@ -1,0 +1,87 @@
+---
+interface Props {
+  title?: string;
+  subtitle?: string;
+  badge?: string;
+  primaryCtaText?: string;
+  primaryCtaLink?: string;
+  secondaryCtaText?: string;
+  secondaryCtaLink?: string;
+}
+
+const {
+  title = "Momentos que <span class=\"text-gradient-gold\">merecen</span> ser recordados",
+  subtitle = "Creamos souvenirs y regalos únicos, hechos con el cuidado que cada recuerdo merece. Personalizá cada detalle para ese momento especial.",
+  badge = "✨ Souvenirs & Regalos Personalizados",
+  primaryCtaText = "Ver productos",
+  primaryCtaLink = "/productos",
+  secondaryCtaText = "Contactanos",
+  secondaryCtaLink = "/contacto"
+} = Astro.props;
+---
+
+<section class="relative min-h-[70vh] md:min-h-[80vh] flex items-center gradient-hero overflow-hidden">
+  <!-- Elementos decorativos -->
+  <div class="absolute inset-0 overflow-hidden pointer-events-none">
+    <div class="absolute -top-20 -right-20 w-96 h-96 bg-primary/20 rounded-full blur-3xl animate-float"></div>
+    <div class="absolute -bottom-20 -left-20 w-80 h-80 bg-accent/10 rounded-full blur-3xl animate-float" style="animation-delay: 1.5s"></div>
+    <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-rose-gold/5 rounded-full blur-3xl"></div>
+  </div>
+
+  <div class="container relative z-10">
+    <div class="max-w-2xl mx-auto text-center md:text-left md:mx-0">
+      <div class="inline-block mb-4 animate-fade-in">
+        <span class="px-4 py-1.5 bg-white/80 rounded-full text-xs font-heading font-semibold text-secondary tracking-wider uppercase shadow-sm">
+          {badge}
+        </span>
+      </div>
+
+      <h1 class="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-heading font-bold text-brand-black leading-tight mb-6 animate-slide-up" set:html={title}>
+      </h1>
+
+      <p class="text-lg md:text-xl text-dark-gray/80 leading-relaxed mb-8 animate-slide-up" style="animation-delay: 0.1s">
+        {subtitle}
+      </p>
+
+      <div class="flex flex-col sm:flex-row items-center gap-4 animate-slide-up" style="animation-delay: 0.2s">
+        <a href={primaryCtaLink} class="btn btn-primary btn-lg w-full sm:w-auto">
+          {primaryCtaText}
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3" />
+          </svg>
+        </a>
+        <a href={secondaryCtaLink} class="btn btn-outline btn-lg w-full sm:w-auto">
+          {secondaryCtaText}
+        </a>
+      </div>
+
+      <!-- Indicadores de confianza -->
+      <div class="flex flex-wrap items-center justify-center md:justify-start gap-6 mt-10 pt-8 border-t border-primary/20 animate-fade-in" style="animation-delay: 0.4s">
+        <div class="flex items-center gap-2">
+          <div class="w-8 h-8 rounded-full bg-success/10 flex items-center justify-center">
+            <svg class="w-4 h-4 text-success" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+            </svg>
+          </div>
+          <span class="text-sm text-dark-gray/70">Envíos a todo el país</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <div class="w-8 h-8 rounded-full bg-gold/10 flex items-center justify-center">
+            <svg class="w-4 h-4 text-accent" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+            </svg>
+          </div>
+          <span class="text-sm text-dark-gray/70">4.9 ★ en Google</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <div class="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
+            <svg class="w-4 h-4 text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <span class="text-sm text-dark-gray/70">Producción artesanal</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>

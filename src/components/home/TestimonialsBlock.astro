@@ -1,0 +1,96 @@
+---
+interface Testimonial {
+  name: string;
+  initials: string;
+  comment: string;
+  rating: number;
+  verified: boolean;
+}
+
+interface Props {
+  title?: string;
+  subtitle?: string;
+  testimonials?: Testimonial[];
+  overallRating?: number;
+  totalReviews?: number;
+}
+
+const {
+  title = "Nuestros clientes",
+  subtitle = "Mirá lo que dicen de nosotros",
+  testimonials = [
+    {
+      name: "Cristina Salas",
+      initials: "CS",
+      comment: "\"Super delicado todo. Nos encantó. Todo llegó en perfectas condiciones. Muchísimas gracias a todo el equipo. Super recomendables.\"",
+      rating: 5,
+      verified: true
+    },
+    {
+      name: "Claudia Valeria González",
+      initials: "CG",
+      comment: "\"Excelente atención. Cumplieron con los tiempos de entrega, respondieron rápido las consultas y el resultado fue excelente. Muy recomendable.\"",
+      rating: 5,
+      verified: true
+    },
+    {
+      name: "Sara Binder",
+      initials: "SB",
+      comment: "\"Excelente atención!! Los chocolates de calidad y la presentación, hermosa!! A partir de una idea, fueron consultándome sobre el diseño hasta que lo consideré adecuado.\"",
+      rating: 5,
+      verified: true
+    }
+  ],
+  overallRating = 4.9,
+  totalReviews = 44
+} = Astro.props;
+---
+
+<section class="section bg-white">
+  <div class="container">
+    <div class="text-center mb-12">
+      <h2 class="section-title">{title}</h2>
+      <div class="gold-line mt-4 mb-4"></div>
+      <p class="section-subtitle">{subtitle}</p>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      {testimonials.map((t) => (
+        <div class="card p-6 hover:shadow-lg transition-shadow">
+          <div class="flex items-center gap-1 mb-3">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <svg class={`w-4 h-4 ${i < t.rating ? 'text-gold' : 'text-gray-200'}`} fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+              </svg>
+            ))}
+          </div>
+          <p class="text-sm text-dark-gray leading-relaxed mb-4 italic">
+            {t.comment}
+          </p>
+          <div class="flex items-center gap-3 pt-3 border-t border-gray-100">
+            <div class="w-8 h-8 rounded-full bg-primary/30 flex items-center justify-center">
+              <span class="text-xs font-bold text-secondary">{t.initials}</span>
+            </div>
+            <div>
+              <p class="text-sm font-heading font-semibold text-brand-black">{t.name}</p>
+              {t.verified && <p class="text-xs text-gray-400">Cliente verificada</p>}
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+
+    <!-- Puntuación general -->
+    <div class="text-center mt-10 p-6 bg-off-white rounded-2xl max-w-md mx-auto">
+      <div class="flex items-center justify-center gap-1 mb-2">
+        {Array.from({ length: 5 }).map(() => (
+          <svg class="w-6 h-6 text-gold" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+          </svg>
+        ))}
+      </div>
+      <p class="font-heading font-bold text-2xl text-brand-black">{overallRating} de 5</p>
+      <p class="text-sm text-gray-400">Basado en {totalReviews} reseñas en Google</p>
+    </div>
+  </div>
+</section>

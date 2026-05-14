@@ -1,0 +1,361 @@
+---
+import AdminLayout from '@/layouts/AdminLayout.astro';
+import { getAllHomeBlocks } from '@/lib/services/HomeService';
+
+const blocks = await getAllHomeBlocks();
+---
+
+<AdminLayout title="Constructor de Inicio">
+    <div class="mb-8 flex justify-between items-end">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900">Constructor de Inicio</h1>
+            <p class="text-gray-500 mt-1">Personalizá el orden y el contenido de tu página principal.</p>
+        </div>
+        <button id="add-block-btn" class="btn btn-primary">
+            + Añadir Sección
+        </button>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div class="lg:col-span-2">
+            <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                <div class="p-6 border-b border-gray-100">
+                    <h2 class="text-lg font-semibold text-gray-800">Estructura de la Home</h2>
+                    <p class="text-xs text-gray-500 mt-1">Arrastrá para reordenar las secciones.</p>
+                </div>
+
+                <div id="blocks-list" class="p-4 space-y-3 min-h-[200px]">
+                    {blocks.map((block) => (
+                        <div 
+                            class="block-item flex items-center gap-4 p-4 bg-gray-50 rounded-lg border border-gray-200 group cursor-default" 
+                            data-id={block.id}
+                            data-type={block.type}
+                            data-settings={JSON.stringify(block.settings)}
+                        >
+                            <div class="flex-shrink-0 flex items-center cursor-move text-gray-400 hover:text-primary transition-colors">
+                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8h16M4 16h16" />
+                                </svg>
+                            </div>
+                            
+                            <div class="flex-1">
+                                <div class="flex items-center gap-2">
+                                    <span class="px-2 py-0.5 bg-secondary/10 text-secondary text-[10px] font-bold uppercase rounded tracking-wider">
+                                        {block.type}
+                                    </span>
+                                    <h3 class="font-semibold text-gray-800 capitalize">
+                                        {block.settings.title || block.type.replace('_', ' ')}
+                                    </h3>
+                                </div>
+                            </div>
+
+                            <div class="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button class="edit-block-btn p-2 text-gray-500 hover:text-primary hover:bg-white rounded-lg transition-all" title="Editar ajustes">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                    </svg>
+                                </button>
+                                <button class="delete-block-btn p-2 text-gray-500 hover:text-error hover:bg-white rounded-lg transition-all" title="Eliminar bloque">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+                
+                <div class="p-6 bg-gray-50 border-t border-gray-100 flex justify-between items-center">
+                    <p class="text-xs text-gray-400 italic">Los cambios en el orden se guardan automáticamente.</p>
+                    <a href="/" target="_blank" class="text-sm font-medium text-primary hover:underline flex items-center gap-1">
+                        Ver sitio
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                        </svg>
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <div class="lg:col-span-1">
+            <div id="edit-panel" class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 sticky top-24 hidden">
+                <h2 class="text-lg font-semibold text-gray-800 mb-4">Editar Bloque</h2>
+                <form id="edit-block-form" class="space-y-4">
+                    <input type="hidden" id="edit-id" />
+                    <div id="settings-fields" class="space-y-4">
+                        <!-- Campos dinámicos según el tipo de bloque -->
+                    </div>
+                    <div class="flex gap-2 pt-4">
+                        <button type="submit" class="btn btn-primary flex-1">Guardar Cambios</button>
+                        <button type="button" id="cancel-edit" class="btn btn-outline">Cancelar</button>
+                    </div>
+                </form>
+            </div>
+
+            <div id="no-edit-selected" class="bg-gray-50 rounded-xl border-2 border-dashed border-gray-200 p-8 text-center sticky top-24">
+                <div class="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <svg class="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                    </svg>
+                </div>
+                <p class="text-sm text-gray-500">Seleccioná una sección para editar su contenido y ajustes.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para Añadir Bloque -->
+    <div id="add-block-modal" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center hidden">
+        <div class="bg-white rounded-2xl p-8 max-w-md w-full mx-4 shadow-2xl">
+            <h2 class="text-xl font-bold text-gray-900 mb-6">Añadir Nueva Sección</h2>
+            <div class="grid grid-cols-1 gap-3">
+                <button class="add-type-btn btn btn-outline justify-start gap-3 h-auto py-3 px-4" data-type="hero">
+                    <div class="w-8 h-8 bg-blue-50 rounded flex items-center justify-center text-blue-500 font-bold">H</div>
+                    <div class="text-left">
+                        <p class="font-semibold text-sm">Hero Principal</p>
+                        <p class="text-xs text-gray-400">Banner principal con título y botones.</p>
+                    </div>
+                </button>
+                <button class="add-type-btn btn btn-outline justify-start gap-3 h-auto py-3 px-4" data-type="categories">
+                    <div class="w-8 h-8 bg-green-50 rounded flex items-center justify-center text-green-500 font-bold">C</div>
+                    <div class="text-left">
+                        <p class="font-semibold text-sm">Cuadrícula de Categorías</p>
+                        <p class="text-xs text-gray-400">Accesos directos a tus categorías.</p>
+                    </div>
+                </button>
+                <button class="add-type-btn btn btn-outline justify-start gap-3 h-auto py-3 px-4" data-type="featured_products">
+                    <div class="w-8 h-8 bg-purple-50 rounded flex items-center justify-center text-purple-500 font-bold">P</div>
+                    <div class="text-left">
+                        <p class="font-semibold text-sm">Productos Destacados</p>
+                        <p class="text-xs text-gray-400">Muestra tus productos más vendidos.</p>
+                    </div>
+                </button>
+                <button class="add-type-btn btn btn-outline justify-start gap-3 h-auto py-3 px-4" data-type="testimonials">
+                    <div class="w-8 h-8 bg-yellow-50 rounded flex items-center justify-center text-yellow-500 font-bold">T</div>
+                    <div class="text-left">
+                        <p class="font-semibold text-sm">Testimonios</p>
+                        <p class="text-xs text-gray-400">Reseñas de tus clientes.</p>
+                    </div>
+                </button>
+                <button class="add-type-btn btn btn-outline justify-start gap-3 h-auto py-3 px-4" data-type="cta">
+                    <div class="w-8 h-8 bg-pink-50 rounded flex items-center justify-center text-pink-500 font-bold">W</div>
+                    <div class="text-left">
+                        <p class="font-semibold text-sm">Banner WhatsApp / CTA</p>
+                        <p class="text-xs text-gray-400">Llamado a la acción con contacto.</p>
+                    </div>
+                </button>
+            </div>
+            <button id="close-modal" class="btn btn-ghost w-full mt-6">Cerrar</button>
+        </div>
+    </div>
+</AdminLayout>
+
+<script>
+    import Sortable from 'sortablejs';
+
+    function initHomeBuilder() {
+        const blocksList = document.getElementById('blocks-list');
+        const addBlockBtn = document.getElementById('add-block-btn');
+        const addBlockModal = document.getElementById('add-block-modal');
+        const closeModalBtn = document.getElementById('close-modal');
+        const editPanel = document.getElementById('edit-panel');
+        const noEditSelected = document.getElementById('no-edit-selected');
+        const editForm = document.getElementById('edit-block-form');
+        const settingsFields = document.getElementById('settings-fields');
+        const cancelEditBtn = document.getElementById('cancel-edit');
+
+        // Inicializar Sortable
+        if (blocksList) {
+            new Sortable(blocksList, {
+                animation: 150,
+                handle: '.cursor-move',
+                ghostClass: 'bg-primary/5',
+                onEnd: async () => {
+                    const blockIds = Array.from(document.querySelectorAll('.block-item'))
+                        .map(el => parseInt((el as HTMLElement).dataset.id || '0'));
+                    
+                    try {
+                        await fetch('/api/admin/home/blocks', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ action: 'reorder', blockIds })
+                        });
+                        if (window.showToast) window.showToast('Orden actualizado');
+                    } catch (err) {
+                        console.error('Error al reordenar:', err);
+                    }
+                }
+            });
+        }
+
+        // Abrir/Cerrar Modal
+        addBlockBtn?.addEventListener('click', () => addBlockModal?.classList.remove('hidden'));
+        closeModalBtn?.addEventListener('click', () => addBlockModal?.classList.add('hidden'));
+
+        // Añadir Bloque
+        document.querySelectorAll('.add-type-btn').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const type = (btn as HTMLElement).dataset.type;
+                try {
+                    const response = await fetch('/api/admin/home/blocks', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ 
+                            action: 'create', 
+                            type, 
+                            order: document.querySelectorAll('.block-item').length,
+                            settings: {} 
+                        })
+                    });
+                    if (response.ok) {
+                        window.location.reload();
+                    }
+                } catch (err) {
+                    console.error('Error al crear bloque:', err);
+                }
+            });
+        });
+
+        // Eliminar Bloque
+        blocksList?.addEventListener('click', async (e) => {
+            const target = e.target as HTMLElement;
+            const deleteBtn = target.closest('.delete-block-btn');
+            if (deleteBtn) {
+                const item = deleteBtn.closest('.block-item') as HTMLElement;
+                const id = parseInt(item.dataset.id || '0');
+                if (confirm('¿Estás seguro de eliminar esta sección de la home?')) {
+                    try {
+                        const response = await fetch('/api/admin/home/blocks', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ action: 'delete', id })
+                        });
+                        if (response.ok) {
+                            item.remove();
+                            if (window.showToast) window.showToast('Bloque eliminado');
+                        }
+                    } catch (err) {
+                        console.error('Error al eliminar:', err);
+                    }
+                }
+            }
+
+            // Seleccionar para Editar
+            const editBtn = target.closest('.edit-block-btn');
+            if (editBtn) {
+                const item = editBtn.closest('.block-item') as HTMLElement;
+                showEditPanel(item);
+            }
+        });
+
+        function showEditPanel(item: HTMLElement) {
+            const id = item.dataset.id;
+            const type = item.dataset.type;
+            const settings = JSON.parse(item.dataset.settings || '{}');
+
+            (document.getElementById('edit-id') as HTMLInputElement).value = id || '';
+            
+            // Generar campos según el tipo
+            settingsFields!.innerHTML = generateSettingsFields(type || '', settings);
+            
+            editPanel?.classList.remove('hidden');
+            noEditSelected?.classList.add('hidden');
+            
+            // Hacer scroll suave al panel en móviles
+            if (window.innerWidth < 1024) {
+                editPanel?.scrollIntoView({ behavior: 'smooth' });
+            }
+        }
+
+        function generateSettingsFields(type: string, settings: any) {
+            let html = '';
+            
+            // Campos comunes
+            html += `
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">Título de la Sección</label>
+                    <input type="text" name="title" value="${settings.title || ''}" class="input w-full" placeholder="Ej: Nuestros Productos" />
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">Subtítulo</label>
+                    <textarea name="subtitle" class="input w-full" rows="2">${settings.subtitle || ''}</textarea>
+                </div>
+            `;
+
+            // Campos específicos
+            if (type === 'hero') {
+                html += `
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1">Badge (Texto pequeño arriba)</label>
+                        <input type="text" name="badge" value="${settings.badge || ''}" class="input w-full" />
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-1">Texto Botón 1</label>
+                            <input type="text" name="primaryCtaText" value="${settings.primaryCtaText || ''}" class="input w-full" />
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-1">Link Botón 1</label>
+                            <input type="text" name="primaryCtaLink" value="${settings.primaryCtaLink || ''}" class="input w-full" />
+                        </div>
+                    </div>
+                `;
+            } else if (type === 'featured_products') {
+                html += `
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1">Límite de productos</label>
+                        <input type="number" name="limit" value="${settings.limit || 8}" class="input w-full" />
+                    </div>
+                `;
+            } else if (type === 'cta') {
+                html += `
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1">Texto del Botón</label>
+                        <input type="text" name="buttonText" value="${settings.buttonText || ''}" class="input w-full" />
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1">Mensaje de WhatsApp</label>
+                        <input type="text" name="whatsappMessage" value="${settings.whatsappMessage || ''}" class="input w-full" />
+                    </div>
+                `;
+            }
+
+            return html;
+        }
+
+        editForm?.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const id = parseInt((document.getElementById('edit-id') as HTMLInputElement).value);
+            const formData = new FormData(editForm as HTMLFormElement);
+            const settings: any = {};
+            
+            formData.forEach((value, key) => {
+                settings[key] = value;
+            });
+
+            try {
+                const response = await fetch('/api/admin/home/blocks', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'update', id, data: { settings } })
+                });
+
+                if (response.ok) {
+                    if (window.showToast) window.showToast('Configuración guardated');
+                    window.location.reload(); // Recargamos para actualizar la vista previa visual
+                }
+            } catch (err) {
+                console.error('Error al actualizar:', err);
+            }
+        });
+
+        cancelEditBtn?.addEventListener('click', () => {
+            editPanel?.classList.add('hidden');
+            noEditSelected?.classList.remove('hidden');
+        });
+    }
+
+    // Inicializar
+    initHomeBuilder();
+    document.addEventListener('astro:page-load', initHomeBuilder);
+</script>

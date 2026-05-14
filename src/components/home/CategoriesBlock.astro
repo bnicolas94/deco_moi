@@ -1,0 +1,53 @@
+---
+interface Props {
+  title?: string;
+  subtitle?: string;
+  categories?: Array<{
+    name: string;
+    slug: string;
+    description: string;
+    colorClass: string;
+    icon: string;
+  }>;
+}
+
+const {
+  title = "Nuestros souvenirs",
+  subtitle = "Hechos con el cuidado que cada recuerdo merece",
+  categories = [
+    { name: "Chocolates", slug: "chocolates", description: "Personalizados", colorClass: "bg-primary/30", icon: "M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z" },
+    { name: "Presentes", slug: "presentes", description: "Regalos especiales", colorClass: "bg-rose-gold/30", icon: "M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" },
+    { name: "Tejidos", slug: "tejidos", description: "Artesanales", colorClass: "bg-accent/20", icon: "M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" },
+    { name: "Velas", slug: "velas", description: "Aromáticas", colorClass: "bg-gold/10", icon: "M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z M9.879 16.121A3 3 0 1012.015 11L11 14H9c0 .768.293 1.536.879 2.121z" }
+  ]
+} = Astro.props;
+---
+
+<section class="section bg-white">
+  <div class="container">
+    <div class="text-center mb-12">
+      <h2 class="section-title">{title}</h2>
+      <div class="gold-line mt-4 mb-4"></div>
+      <p class="section-subtitle">{subtitle}</p>
+    </div>
+
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
+      {categories.map((cat) => (
+        <a href={`/productos/${cat.slug}`} class="group">
+          <div class="card card-hover relative aspect-category overflow-hidden">
+            <div class="absolute inset-0 bg-gradient-to-t from-brand-black/70 via-brand-black/20 to-transparent z-10"></div>
+            <div class={`absolute inset-0 ${cat.colorClass} flex items-center justify-center`}>
+              <svg class="w-16 h-16 text-secondary/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d={cat.icon} />
+              </svg>
+            </div>
+            <div class="absolute bottom-0 left-0 right-0 p-4 z-20">
+              <h3 class="font-heading font-bold text-white text-lg group-hover:text-primary transition-colors">{cat.name}</h3>
+              <p class="text-white/70 text-sm">{cat.description}</p>
+            </div>
+          </div>
+        </a>
+      ))}
+    </div>
+  </div>
+</section>
