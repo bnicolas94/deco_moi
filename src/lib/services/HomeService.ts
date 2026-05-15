@@ -69,7 +69,7 @@ export async function seedInitialBlocks() {
     const existing = await db.select().from(homeBlocks).limit(1);
     if (existing.length > 0) return;
 
-    const initialBlocks = [
+    const initialBlocks: Omit<HomeBlock, 'id' | 'isActive'>[] = [
         { type: 'hero', order: 0, settings: {} },
         { type: 'categories', order: 1, settings: {} },
         { type: 'featured_products', order: 2, settings: { limit: 8 } },

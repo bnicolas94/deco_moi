@@ -180,7 +180,7 @@ const blocks = await getAllHomeBlocks();
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ action: 'reorder', blockIds })
                         });
-                        if (window.showToast) window.showToast('Orden actualizado');
+                        if ((window as any).showToast) (window as any).showToast('Orden actualizado');
                     } catch (err) {
                         console.error('Error al reordenar:', err);
                     }
@@ -232,7 +232,7 @@ const blocks = await getAllHomeBlocks();
                         });
                         if (response.ok) {
                             item.remove();
-                            if (window.showToast) window.showToast('Bloque eliminado');
+                            if ((window as any).showToast) (window as any).showToast('Bloque eliminado');
                         }
                     } catch (err) {
                         console.error('Error al eliminar:', err);
@@ -341,7 +341,7 @@ const blocks = await getAllHomeBlocks();
                 });
 
                 if (response.ok) {
-                    if (window.showToast) window.showToast('Configuración guardated');
+                    if ((window as any).showToast) (window as any).showToast('Configuración guardada');
                     window.location.reload(); // Recargamos para actualizar la vista previa visual
                 }
             } catch (err) {

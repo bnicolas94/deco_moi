@@ -10,9 +10,9 @@ const { id } = Astro.params;
 const isNew = id === 'new';
 
 // Fetch initial data
-let product = null;
-let variants = [];
-let timeRules = [];
+let product: any = null;
+let variants: any[] = [];
+let timeRules: any[] = [];
 let meliLinkId = '';
 let productCosts: any[] = [];
 if (!isNew && id) {
@@ -129,7 +129,7 @@ const SUPPLY_ICONS: Record<string, string> = {
 // --- FIN COSTOS E INSUMOS ---
 ---
 
-<AdminLayout title={isNew ? "Nuevo Producto" : `Editar: ${product.name}`}>
+<AdminLayout title={isNew ? "Nuevo Producto" : `Editar: ${product?.name}`}>
     <form id="product-form" class="max-w-7xl mx-auto pb-20">
         <!-- Header -->
         <div class="mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -145,7 +145,7 @@ const SUPPLY_ICONS: Record<string, string> = {
                         {isNew ? "Nuevo Producto" : "Editar Producto"}
                     </h1>
                     <p class="text-gray-500 mt-1 font-medium italic">
-                        {isNew ? "Añade un nuevo ítem a tu catálogo." : `Gestionando "${product.name}"`}
+                        {isNew ? "Añade un nuevo ítem a tu catálogo." : `Gestionando "${product?.name}"`}
                     </p>
                 </div>
             </div>
@@ -506,7 +506,7 @@ const SUPPLY_ICONS: Record<string, string> = {
 
                                                             {hasChildren && (
                                                                 <div class="children-list hidden border-t border-gray-50 bg-gray-50/30" data-parent-of-list={s.id}>
-                                                                    {children.map(child => {
+                                                                    {children.map((child: any) => {
                                                                         const linkedChild = linkedSuppliesData.find(ls => ls.supplyId === child.id);
                                                                         const isChildChecked = !!linkedChild;
                                                                         const hasChildYield = linkedChild && linkedChild.partsUsed && linkedChild.partsTotal;
@@ -640,7 +640,7 @@ const SUPPLY_ICONS: Record<string, string> = {
                                     <p class="text-sm text-gray-400">No hay rangos definidos. Se usará el tiempo de producción de fallback.</p>
                                 </div>
                             ) : (
-                                timeRules.map((rule, idx) => (
+                                timeRules.map((rule: any, idx: number) => (
                                     <div class="time-rule-item grid grid-cols-1 md:grid-cols-12 gap-4 p-4 bg-amber-50/30 rounded-2xl border border-amber-100/50 relative group animate-in fade-in slide-in-from-top-2">
                                         <div class="md:col-span-3">
                                             <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Cantidad Mínima</label>
@@ -706,7 +706,7 @@ const SUPPLY_ICONS: Record<string, string> = {
                                         <p class="text-sm text-gray-400">No hay variantes definidas. El producto se tratará como unidad única.</p>
                                     </div>
                                 ) : (
-                                    variants.map((v, idx) => (
+                                    variants.map((v: any, idx: number) => (
                                         <div class="variant-item grid grid-cols-1 md:grid-cols-12 gap-4 p-4 bg-gray-50/50 rounded-2xl border border-gray-100 relative group animate-in fade-in slide-in-from-top-2">
                                             <input type="hidden" name={`variant_id_${idx}`} value={v.id} />
                                             <input type="hidden" name={`variant_existing_images_${idx}`} value={JSON.stringify(v.images || [])} />
@@ -729,7 +729,7 @@ const SUPPLY_ICONS: Record<string, string> = {
                                             <div class="md:col-span-3">
                                                 <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Imágenes Varias</label>
                                                 <div class="flex flex-wrap gap-2 mb-2 variant-images-preview" data-idx={idx}>
-                                                    {(v.images || []).map((img, imgIdx) => (
+                                                    {(v.images || []).map((img: any, imgIdx: number) => (
                                                         <div class="relative group/img w-10 h-10">
                                                             <img src={img} class="w-10 h-10 object-cover rounded-lg border border-gray-200" alt={v.name} />
                                                             <button type="button" class="remove-variant-existing-img absolute -top-1 -right-1 bg-rose-500 text-white rounded-full p-0.5 opacity-0 group-hover/img:opacity-100 transition-opacity z-10" data-idx={idx} data-img-idx={imgIdx}>
@@ -767,7 +767,7 @@ const SUPPLY_ICONS: Record<string, string> = {
                                     type="checkbox" 
                                     id="isActive"
                                     name="isActive" 
-                                    checked={isNew ? true : product.isActive} 
+                                    checked={isNew ? true : product?.isActive} 
                                     value="true"
                                     class="sr-only peer"
                                 />
@@ -840,7 +840,7 @@ const SUPPLY_ICONS: Record<string, string> = {
                     </p>
 
                     <div id="existing-images" class="grid grid-cols-2 gap-3 min-h-[100px]">
-                        {currentImages.map((img, idx) => (
+                        {currentImages.map((img: any, idx: number) => (
                             <div 
                                 id={`img-${idx}`}
                                 class="existing-image-item relative group rounded-xl overflow-hidden border border-gray-100 shadow-sm cursor-move transition-all active:scale-95 active:rotate-2 hover:shadow-md h-24"
