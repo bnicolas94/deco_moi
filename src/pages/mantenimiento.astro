@@ -4,13 +4,15 @@ import { siteConfig } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 
 const wpConfig = await db.select().from(siteConfig).where(eq(siteConfig.key, 'contact_whatsapp')).limit(1);
+const wpMsgConfig = await db.select().from(siteConfig).where(eq(siteConfig.key, 'contact_whatsapp_message')).limit(1);
 const instagramConfig = await db.select().from(siteConfig).where(eq(siteConfig.key, 'social_instagram')).limit(1);
 
 const wpNumberRaw = wpConfig.length > 0 && wpConfig[0].value ? String(wpConfig[0].value) : '';
 const wpNumber = wpNumberRaw.replace(/\D/g, '');
+const wpMessageRaw = wpMsgConfig.length > 0 && wpMsgConfig[0].value ? String(wpMsgConfig[0].value) : 'Hola, me gustaría hacer una consulta';
 let wpLink = '#';
 if (wpNumber) {
-    wpLink = `https://wa.me/${wpNumber}?text=Hola,%20me%20gustar%C3%ADa%20hacer%20una%20consulta`;
+    wpLink = `https://wa.me/${wpNumber}?text=${encodeURIComponent(wpMessageRaw)}`;
 }
 
 const instagramLink = instagramConfig.length > 0 && instagramConfig[0].value ? String(instagramConfig[0].value) : 'https://instagram.com';

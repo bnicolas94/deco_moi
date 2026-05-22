@@ -28,6 +28,11 @@ const config = await getGeneralConfig();
                         <p class="text-xs text-gray-400 mt-1">Incluye el código de país sin el '+' (ej. 549 para Argentina).</p>
                     </div>
                     <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1">Mensaje Predeterminado de WhatsApp</label>
+                        <input type="text" id="contact-whatsapp-message" value={config.whatsappMessage} placeholder="Hola, me gustaría hacer una consulta" class="input w-full" />
+                        <p class="text-xs text-gray-400 mt-1">Texto que aparecerá por defecto cuando el cliente abra WhatsApp.</p>
+                    </div>
+                    <div class="md:col-span-2">
                         <label class="block text-sm font-semibold text-gray-700 mb-1">Link de Instagram</label>
                         <input type="url" id="social-instagram" value={config.instagram} placeholder="https://instagram.com/decomoi" class="input w-full" />
                         <p class="text-xs text-gray-400 mt-1">El enlace completo a tu perfil de Instagram.</p>
@@ -55,13 +60,14 @@ const config = await getGeneralConfig();
             btn.disabled = true;
 
             const whatsapp = (document.getElementById('contact-whatsapp') as HTMLInputElement).value;
+            const whatsappMessage = (document.getElementById('contact-whatsapp-message') as HTMLInputElement).value;
             const instagram = (document.getElementById('social-instagram') as HTMLInputElement).value;
 
             try {
                 const response = await fetch('/api/admin/config/general', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ whatsapp, instagram })
+                    body: JSON.stringify({ whatsapp, whatsappMessage, instagram })
                 });
 
                 if (response.ok) {

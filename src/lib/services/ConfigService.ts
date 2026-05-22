@@ -77,17 +77,20 @@ export async function getBankTransferConfig(): Promise<BankTransferConfig> {
 
 export interface GeneralConfig {
     whatsapp: string;
+    whatsappMessage: string;
     instagram: string;
 }
 
 export async function getGeneralConfig(): Promise<GeneralConfig> {
-    const defaultData = { whatsapp: '', instagram: '' };
+    const defaultData = { whatsapp: '', whatsappMessage: 'Hola, me gustaría hacer una consulta', instagram: '' };
     try {
         const wpRow = await db.select().from(siteConfig).where(eq(siteConfig.key, 'contact_whatsapp')).limit(1);
+        const wpMsgRow = await db.select().from(siteConfig).where(eq(siteConfig.key, 'contact_whatsapp_message')).limit(1);
         const igRow = await db.select().from(siteConfig).where(eq(siteConfig.key, 'social_instagram')).limit(1);
 
         return {
             whatsapp: wpRow.length > 0 && wpRow[0].value ? String(wpRow[0].value) : defaultData.whatsapp,
+            whatsappMessage: wpMsgRow.length > 0 && wpMsgRow[0].value ? String(wpMsgRow[0].value) : defaultData.whatsappMessage,
             instagram: igRow.length > 0 && igRow[0].value ? String(igRow[0].value) : defaultData.instagram,
         };
     } catch (e) {

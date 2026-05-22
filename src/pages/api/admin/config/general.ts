@@ -6,7 +6,7 @@ import { eq } from 'drizzle-orm';
 export const POST: APIRoute = async ({ request }) => {
     try {
         const body = await request.json();
-        const { whatsapp, instagram } = body;
+        const { whatsapp, whatsappMessage, instagram } = body;
 
         const setConfigField = async (key: string, value: any, description: string) => {
             const existing = await db.select().from(siteConfig).where(eq(siteConfig.key, key)).limit(1);
@@ -25,6 +25,7 @@ export const POST: APIRoute = async ({ request }) => {
         };
 
         if (whatsapp !== undefined) await setConfigField('contact_whatsapp', whatsapp, 'Número de WhatsApp de contacto (solo números)');
+        if (whatsappMessage !== undefined) await setConfigField('contact_whatsapp_message', whatsappMessage, 'Mensaje predeterminado de WhatsApp');
         if (instagram !== undefined) await setConfigField('social_instagram', instagram, 'Link al perfil de Instagram');
 
         return new Response(JSON.stringify({ success: true }), { status: 200 });
