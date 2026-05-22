@@ -1,0 +1,88 @@
+---
+import AdminLayout from '@/layouts/AdminLayout.astro';
+import { getGeneralConfig } from '@/lib/services/ConfigService';
+
+const config = await getGeneralConfig();
+---
+
+<AdminLayout title="Configuración General">
+    <div class="mb-8 flex justify-between items-end">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900">Configuración General</h1>
+            <p class="text-gray-500 mt-1">Gestiona la información de contacto y redes sociales de tu tienda.</p>
+        </div>
+    </div>
+
+    {/* Configuración de Contacto */}
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden mb-8">
+        <div class="p-6 border-b border-gray-100">
+            <h2 class="text-lg font-semibold text-gray-800">Información de Contacto</h2>
+            <p class="text-xs text-gray-500 mt-1">Estos datos se muestran en el modo mantenimiento y otras partes de la tienda.</p>
+        </div>
+        <div class="p-6">
+            <form id="general-config-form" class="space-y-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1">Número de WhatsApp</label>
+                        <input type="text" id="contact-whatsapp" value={config.whatsapp} placeholder="Ej: 5491112345678" class="input w-full" />
+                        <p class="text-xs text-gray-400 mt-1">Incluye el código de país sin el '+' (ej. 549 para Argentina).</p>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1">Link de Instagram</label>
+                        <input type="url" id="social-instagram" value={config.instagram} placeholder="https://instagram.com/decomoi" class="input w-full" />
+                        <p class="text-xs text-gray-400 mt-1">El enlace completo a tu perfil de Instagram.</p>
+                    </div>
+                </div>
+                <div class="flex justify-end pt-4 border-t border-gray-100 mt-6">
+                    <button type="submit" class="btn btn-primary px-8">Guardar Configuración</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</AdminLayout>
+
+<script>
+    function initGeneralConfig() {
+        const form = document.getElementById('general-config-form');
+        
+        form?.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const btn = form.querySelector('button[type="submit"]') as HTMLButtonElement;
+            if (!btn) return;
+            
+            const originalText = btn.textContent;
+            btn.textContent = 'Guardando...';
+            btn.disabled = true;
+
+            const whatsapp = (document.getElementById('contact-whatsapp') as HTMLInputElement).value;
+            const instagram = (document.getElementById('social-instagram') as HTMLInputElement).value;
+
+            try {
+                const response = await fetch('/api/admin/config/general', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ whatsapp, instagram })
+                });
+
+                if (response.ok) {
+                    if (window.showToast) window.showToast('Configuración guardada correctamente');
+                    else alert('Configuración guardada correctamente');
+                } else {
+                    if (window.showToast) window.showToast('Error al guardar la configuración', 'error');
+                    else alert('Error al guardar configuración');
+                }
+            } catch (err) {
+                console.error(err);
+                if (window.showToast) window.showToast('Error de red al intentar guardar', 'error');
+                else alert('Error de red al guardar');
+            } finally {
+                btn.textContent = originalText;
+                btn.disabled = false;
+            }
+        });
+    }
+
+    // Inicializar
+    initGeneralConfig();
+    document.addEventListener('astro:page-load', initGeneralConfig);
+</script>
