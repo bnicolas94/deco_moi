@@ -1,0 +1,82 @@
+---
+import { db } from '@/lib/db/connection';
+import { products, categories } from '@/lib/db/schema';
+import { eq, desc, inArray } from 'drizzle-orm';
+import ProductCard from '../product/ProductCard.astro';
+
+export interface Props {
+    title?: string;
+    subtitle?: string;
+    categoryIds?: number[];
+    limit?: number;
+    showCta?: boolean;
+    ctaText?: string;
+    ctaLink?: string;
+}
+
+const {
+    title = 'Nuestros Productos',
+    subtitle,
+    categoryIds = [],
+    limit = 4,
+    showCta = false,
+    ctaText = 'Ver todos',
+    ctaLink = '/productos'
+} = Astro.props;
+
+// Fetch products based on criteria
+let query = db.select({
+    id: products.id,
+    name: products.name,
+    slug: products.slug,
+    description: products.description,
+    price: products.price,
+    salePrice: products.salePrice,
+    stock: products.stock,
+    sku: products.sku,
+    images: products.images,
+    isActive: products.isActive,
+    categoryId: products.categoryId,
+    createdAt: products.createdAt,
+    categoryName: categories.name,
+    categorySlug: categories.slug
+})
+.from(products)
+.leftJoin(categories, eq(products.categoryId, categories.id))
+.where(eq(products.isActive, true));
+
+// Si el usuario del builder seleccionó categorías específicas
+if (categoryIds.length > 0) {
+    query = query.where(inArray(products.categoryId, categoryIds)) as any;
+}
+
+const fetchedProducts = await query.orderBy(desc(products.createdAt)).limit(limit);
+---
+
+<section class="py-16 md:py-24 bg-white">
+    <div class="container mx-auto px-4">
+        <div class="flex flex-col md:flex-row justify-between items-end mb-12 gap-4">
+            <div class="max-w-2xl">
+                <h2 class="text-3xl md:text-4xl font-bold text-gray-900 mb-4 font-montserrat">{title}</h2>
+                {subtitle && <p class="text-lg text-gray-600">{subtitle}</p>}
+            </div>
+            {showCta && ctaLink && (
+                <a href={ctaLink} class="text-brand-primary font-medium hover:underline flex items-center gap-1">
+                    {ctaText} <span aria-hidden="true">&rarr;</span>
+                </a>
+            )}
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {fetchedProducts.map((product) => (
+                <ProductCard product={product as any} />
+            ))}
+        </div>
+
+        {fetchedProducts.length === 0 && (
+            <div class="text-center text-gray-400 py-20 border-2 border-dashed border-gray-200 rounded-xl">
+                No hay productos disponibles para mostrar con los filtros actuales.
+            </div>
+        )}
+    </div>
+</section>

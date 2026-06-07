@@ -1,0 +1,59 @@
+---
+export interface Props {
+    title?: string;
+    content: string;
+    image: string;
+    imagePosition?: 'left' | 'right';
+    ctaText?: string;
+    ctaLink?: string;
+    backgroundColor?: string;
+}
+
+const {
+    title,
+    content,
+    image,
+    imagePosition = 'left',
+    ctaText,
+    ctaLink,
+    backgroundColor = '#ffffff'
+} = Astro.props;
+---
+
+<section class="py-16 md:py-24" style={`background-color: ${backgroundColor};`}>
+    <div class="container mx-auto px-4">
+        <div class={`flex flex-col ${imagePosition === 'right' ? 'md:flex-row-reverse' : 'md:flex-row'} items-center gap-12 md:gap-20`}>
+            {/* Image */}
+            <div class="w-full md:w-1/2">
+                <div class="relative rounded-2xl overflow-hidden shadow-xl aspect-[4/3] group">
+                    <img 
+                        src={image || 'https://images.unsplash.com/photo-1513519245088-0e12902e5a38?q=80&w=800'} 
+                        alt={title || 'Deco Moi'} 
+                        class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+                        loading="lazy"
+                    />
+                </div>
+            </div>
+
+            {/* Content */}
+            <div class="w-full md:w-1/2 flex flex-col justify-center">
+                {title && (
+                    <h2 class="text-3xl md:text-4xl font-bold text-gray-900 mb-6 font-montserrat">{title}</h2>
+                )}
+                
+                <div class="prose prose-lg text-gray-600 mb-8 max-w-none" set:html={content} />
+
+                {ctaText && ctaLink && (
+                    <div>
+                        <a 
+                            href={ctaLink}
+                            class="inline-block bg-brand-primary hover:bg-brand-secondary text-white font-medium px-8 py-3 rounded-full transition-colors duration-300"
+                        >
+                            {ctaText}
+                        </a>
+                    </div>
+                )}
+            </div>
+        </div>
+    </div>
+</section>

@@ -1,0 +1,181 @@
+---
+import AdminLayout from '@/layouts/AdminLayout.astro';
+import { ArrowLeft, Save, LayoutTemplate } from 'lucide-react';
+import { db } from '@/lib/db/connection';
+import { pageTemplates } from '@/lib/db/schema';
+
+if (!Astro.locals.user || Astro.locals.user.role !== 'admin') {
+    return Astro.redirect('/login');
+}
+
+const templates = await db.select({
+    id: pageTemplates.id,
+    name: pageTemplates.name,
+    blocks: pageTemplates.blocks
+}).from(pageTemplates);
+---
+
+<AdminLayout title="Nueva Página">
+    <div class="max-w-2xl mx-auto">
+        <div class="mb-6 flex items-center gap-4">
+            <a href="/admin/paginas" class="text-gray-400 hover:text-gray-600 transition-colors">
+                <ArrowLeft class="w-5 h-5" />
+            </a>
+            <h1 class="text-2xl font-bold text-gray-900">Crear Nueva Página</h1>
+        </div>
+
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 md:p-8">
+            <form id="newPageForm" class="space-y-6">
+                <div>
+                    <label for="title" class="block text-sm font-medium text-gray-700 mb-1">Título de la Página</label>
+                    <input 
+                        type="text" 
+                        id="title" 
+                        name="title" 
+                        required 
+                        placeholder="Ej: Sobre Nosotros, FAQ, Bodas 2026..."
+                        class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-transparent outline-none transition-all"
+                    />
+                </div>
+
+                <div>
+                    <label for="slug" class="block text-sm font-medium text-gray-700 mb-1">URL (Slug)</label>
+                    <div class="flex items-center">
+                        <span class="text-gray-400 bg-gray-50 border border-r-0 border-gray-200 rounded-l-lg px-4 py-2 h-full">
+                            decomoi.com.ar/
+                        </span>
+                        <input 
+                            type="text" 
+                            id="slug" 
+                            name="slug" 
+                            required 
+                            placeholder="sobre-nosotros"
+                            class="w-full px-4 py-2 border border-gray-200 rounded-r-lg focus:ring-2 focus:ring-brand-primary focus:border-transparent outline-none transition-all"
+                        />
+                    </div>
+                    <p class="text-xs text-gray-500 mt-2">Solo minúsculas y guiones. No uses espacios ni caracteres especiales.</p>
+                </div>
+
+                {templates.length > 0 && (
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-3">Plantilla Inicial (Opcional)</label>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <label class="relative flex cursor-pointer rounded-lg border bg-white p-4 shadow-sm focus:outline-none hover:border-brand-primary border-brand-primary ring-1 ring-brand-primary transition-all group">
+                                <input type="radio" name="templateId" value="" class="sr-only" checked>
+                                <span class="flex flex-1">
+                                    <span class="flex flex-col">
+                                        <span class="block text-sm font-medium text-gray-900 mb-1">Página en Blanco</span>
+                                        <span class="block text-xs text-gray-500">Comienza desde cero con un lienzo vacío.</span>
+                                    </span>
+                                </span>
+                                <LayoutTemplate class="h-5 w-5 text-brand-primary" aria-hidden="true" />
+                            </label>
+
+                            {templates.map(tmpl => (
+                                <label class="relative flex cursor-pointer rounded-lg border border-gray-200 bg-white p-4 shadow-sm focus:outline-none hover:border-gray-300 transition-all group">
+                                    <input type="radio" name="templateId" value={tmpl.id} class="sr-only">
+                                    <span class="flex flex-1">
+                                        <span class="flex flex-col">
+                                            <span class="block text-sm font-medium text-gray-900 mb-1">{tmpl.name}</span>
+                                            <span class="block text-xs text-gray-500">{(tmpl.blocks as any[]).length} bloques preconfigurados.</span>
+                                        </span>
+                                    </span>
+                                </label>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                <div class="pt-4 border-t border-gray-100 flex justify-end">
+                    <button 
+                        type="submit" 
+                        id="submitBtn"
+                        class="bg-brand-primary hover:bg-brand-secondary text-white px-6 py-2 rounded-lg flex items-center gap-2 transition-colors shadow-sm font-medium"
+                    >
+                        <Save class="w-4 h-4" />
+                        Crear y Empezar a Diseñar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</AdminLayout>
+
+<script>
+    const form = document.getElementById('newPageForm') as HTMLFormElement;
+    const titleInput = document.getElementById('title') as HTMLInputElement;
+    const slugInput = document.getElementById('slug') as HTMLInputElement;
+    const submitBtn = document.getElementById('submitBtn') as HTMLButtonElement;
+
+    // Lógica para que los radio buttons seleccionados se estilicen
+    const radios = document.querySelectorAll('input[name="templateId"]');
+    radios.forEach(radio => {
+        radio.addEventListener('change', (e) => {
+            radios.forEach(r => {
+                const parent = (r as HTMLInputElement).parentElement;
+                if (parent) {
+                    if ((r as HTMLInputElement).checked) {
+                        parent.classList.add('border-brand-primary', 'ring-1', 'ring-brand-primary');
+                        parent.classList.remove('border-gray-200');
+                        const icon = parent.querySelector('svg');
+                        if (icon) icon.classList.replace('text-gray-400', 'text-brand-primary');
+                    } else {
+                        parent.classList.remove('border-brand-primary', 'ring-1', 'ring-brand-primary');
+                        parent.classList.add('border-gray-200');
+                        const icon = parent.querySelector('svg');
+                        if (icon) icon.classList.replace('text-brand-primary', 'text-gray-400');
+                    }
+                }
+            });
+        });
+    });
+
+    // Auto-generar slug a partir del título
+    titleInput.addEventListener('input', () => {
+        if (document.activeElement !== slugInput) {
+            slugInput.value = titleInput.value
+                .toLowerCase()
+                .normalize("NFD").replace(/[\u0300-\u036f]/g, "") 
+                .replace(/[^a-z0-9\s-]/g, '') 
+                .replace(/\s+/g, '-') 
+                .replace(/-+/g, '-') 
+                .replace(/^-|-$/g, ''); 
+        }
+    });
+
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = 'Creando...';
+
+        const formData = new FormData(form);
+        const templateId = formData.get('templateId');
+
+        try {
+            const res = await fetch('/api/pages', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    title: titleInput.value,
+                    slug: slugInput.value,
+                    templateId: templateId ? templateId.toString() : undefined
+                })
+            });
+
+            const data = await res.json();
+
+            if (res.ok && data.page) {
+                window.location.href = `/admin/paginas/${data.page.id}/editar`;
+            } else {
+                alert(data.error || 'Error al crear la página');
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = 'Crear y Empezar a Diseñar';
+            }
+        } catch (e) {
+            console.error(e);
+            alert('Error de conexión');
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = 'Crear y Empezar a Diseñar';
+        }
+    });
+</script>

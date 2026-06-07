@@ -1,0 +1,64 @@
+---
+export interface Feature {
+    title: string;
+    description: string;
+    icon?: string;
+    image?: string;
+}
+
+export interface Props {
+    title?: string;
+    subtitle?: string;
+    features: Feature[];
+    columns?: 2 | 3 | 4;
+    backgroundColor?: string;
+}
+
+const {
+    title,
+    subtitle,
+    features = [],
+    columns = 3,
+    backgroundColor = '#f9fafb'
+} = Astro.props;
+
+const gridCols = {
+    2: 'md:grid-cols-2',
+    3: 'md:grid-cols-3',
+    4: 'md:grid-cols-2 lg:grid-cols-4'
+};
+---
+
+<section class="py-16 md:py-24" style={`background-color: ${backgroundColor};`}>
+    <div class="container mx-auto px-4">
+        {title && (
+            <div class="text-center max-w-3xl mx-auto mb-16">
+                <h2 class="text-3xl md:text-4xl font-bold text-gray-900 mb-4 font-montserrat">{title}</h2>
+                {subtitle && <p class="text-lg text-gray-600">{subtitle}</p>}
+            </div>
+        )}
+
+        <div class={`grid grid-cols-1 ${gridCols[columns]} gap-8`}>
+            {features.map((feature) => (
+                <div class="bg-white p-8 rounded-2xl shadow-sm hover:shadow-md transition-shadow border border-gray-100 flex flex-col items-center text-center group">
+                    {feature.icon && (
+                        <div class="w-16 h-16 bg-brand-primary/10 text-brand-primary rounded-full flex items-center justify-center mb-6 group-hover:bg-brand-primary group-hover:text-white transition-colors duration-300" set:html={feature.icon} />
+                    )}
+                    {feature.image && !feature.icon && (
+                        <div class="w-20 h-20 mb-6 rounded-full overflow-hidden">
+                            <img src={feature.image} alt={feature.title} class="w-full h-full object-cover" loading="lazy" />
+                        </div>
+                    )}
+                    <h3 class="text-xl font-bold text-gray-900 mb-3">{feature.title}</h3>
+                    <p class="text-gray-600 leading-relaxed">{feature.description}</p>
+                </div>
+            ))}
+            
+            {features.length === 0 && (
+                <div class="col-span-full text-center text-gray-400 py-10 border-2 border-dashed border-gray-200 rounded-xl">
+                    Agrega tarjetas desde las propiedades del bloque.
+                </div>
+            )}
+        </div>
+    </div>
+</section>

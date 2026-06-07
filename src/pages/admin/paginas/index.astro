@@ -1,0 +1,113 @@
+---
+import AdminLayout from '@/layouts/AdminLayout.astro';
+import { db } from '@/lib/db/connection';
+import { pages } from '@/lib/db/schema';
+import { desc } from 'drizzle-orm';
+import { FileText, Plus, Eye, Edit, Trash2 } from 'lucide-react';
+
+// Require admin
+if (!Astro.locals.user || Astro.locals.user.role !== 'admin') {
+    return Astro.redirect('/login');
+}
+
+const allPages = await db.select({
+    id: pages.id,
+    title: pages.title,
+    slug: pages.slug,
+    status: pages.status,
+    updatedAt: pages.updatedAt
+}).from(pages).orderBy(desc(pages.createdAt));
+---
+
+<AdminLayout title="Gestión de Páginas">
+    <div class="flex justify-between items-center mb-8">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900 flex items-center gap-2">
+                <FileText class="w-6 h-6 text-brand-primary" />
+                Páginas
+            </h1>
+            <p class="text-sm text-gray-500 mt-1">Gestiona las páginas estáticas del sitio (landings, legales, faq)</p>
+        </div>
+        <a 
+            href="/admin/paginas/nueva" 
+            class="bg-brand-primary hover:bg-brand-secondary text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors shadow-sm text-sm font-medium"
+        >
+            <Plus class="w-4 h-4" />
+            Nueva Página
+        </a>
+    </div>
+
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        {allPages.length === 0 ? (
+            <div class="p-12 text-center flex flex-col items-center">
+                <FileText class="w-12 h-12 text-gray-300 mb-4" />
+                <h3 class="text-lg font-medium text-gray-900 mb-1">Aún no hay páginas</h3>
+                <p class="text-gray-500 mb-6">Crea tu primera landing page o página informativa</p>
+                <a href="/admin/paginas/nueva" class="text-brand-primary font-medium hover:underline">Crear nueva página</a>
+            </div>
+        ) : (
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-sm text-gray-600">
+                    <thead class="bg-gray-50/80 text-gray-500 border-b border-gray-100 font-medium">
+                        <tr>
+                            <th class="px-6 py-4">Título</th>
+                            <th class="px-6 py-4">URL (Slug)</th>
+                            <th class="px-6 py-4">Estado</th>
+                            <th class="px-6 py-4">Última Modificación</th>
+                            <th class="px-6 py-4 text-right">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100">
+                        {allPages.map(page => (
+                            <tr class="hover:bg-gray-50/50 transition-colors">
+                                <td class="px-6 py-4 font-medium text-gray-900">{page.title}</td>
+                                <td class="px-6 py-4">
+                                    <span class="bg-gray-100 text-gray-600 px-2 py-1 rounded text-xs font-mono">/{page.slug}</span>
+                                </td>
+                                <td class="px-6 py-4">
+                                    <span class={`px-2.5 py-1 rounded-full text-xs font-medium border ${
+                                        page.status === 'published' ? 'bg-green-50 text-green-700 border-green-200' : 
+                                        page.status === 'archived' ? 'bg-red-50 text-red-700 border-red-200' :
+                                        'bg-amber-50 text-amber-700 border-amber-200'
+                                    }`}>
+                                        {page.status === 'published' ? 'Publicado' : page.status === 'archived' ? 'Archivado' : 'Borrador'}
+                                    </span>
+                                </td>
+                                <td class="px-6 py-4">
+                                    {page.updatedAt?.toLocaleDateString('es-AR', { day: '2-digit', month: 'short', year: 'numeric' })}
+                                </td>
+                                <td class="px-6 py-4 text-right">
+                                    <div class="flex justify-end gap-3">
+                                        <a href={`/${page.slug}?preview=true`} target="_blank" title="Ver" class="text-gray-400 hover:text-gray-600 transition-colors">
+                                            <Eye class="w-4 h-4" />
+                                        </a>
+                                        <a href={`/admin/paginas/${page.id}/editar`} title="Editar" class="text-gray-400 hover:text-brand-primary transition-colors">
+                                            <Edit class="w-4 h-4" />
+                                        </a>
+                                        <button onclick={`deletePage('${page.id}')`} title="Eliminar" class="text-gray-400 hover:text-red-500 transition-colors">
+                                            <Trash2 class="w-4 h-4" />
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+        )}
+    </div>
+</AdminLayout>
+
+<script>
+    window.deletePage = async (id: string) => {
+        if (!confirm('¿Seguro que deseas archivar esta página?')) return;
+        try {
+            const res = await fetch(`/api/pages/${id}`, { method: 'DELETE' });
+            if (res.ok) window.location.reload();
+            else alert('Error al archivar la página');
+        } catch (e) {
+            console.error(e);
+            alert('Error de red');
+        }
+    }
+</script>

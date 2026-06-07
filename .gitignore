@@ -41,3 +41,8 @@ tmp/
 drizzle/
 
 /scratch
+.pgsql/
+pgsql/
+pgsql.zip
+pgsql17.zip
+decomoi_backup.sql

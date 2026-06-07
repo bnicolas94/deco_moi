@@ -84,6 +84,7 @@ export const POST: APIRoute = async (context) => {
                 sku,
                 isActive,
                 isFeatured,
+                showDiscountRanges: formData.get('showDiscountRanges') === 'true',
                 images: imageUrls,
             }).returning({ id: products.id });
 

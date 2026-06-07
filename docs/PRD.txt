@@ -1,0 +1,318 @@
+DECO MOI
+Product Requirements Document
+Page Builder — Módulo de creación visual de páginas
+ 
+Para: Equipo Antigravity   |   Versión 1.0   |   2026
+1. Resumen ejecutivo
+Este documento especifica los requerimientos para desarrollar un módulo de Page Builder integrado al panel de administración de Deco Moi. El objetivo es permitir que el equipo cree y edite páginas estáticas (landings, informativas, FAQs, etc.) sin intervención del equipo de desarrollo.
+Proyecto
+Deco Moi E-commerce — Módulo Page Builder
+Stack existente
+Astro + TypeScript + PostgreSQL + Drizzle ORM
+Hosting
+Railway
+Prioridad
+Alta — bloquea autonomía del cliente en contenido
+Estimación
+3–4 semanas según alcance del MVP
+Responsable
+Equipo Antigravity
+2. Problema y objetivo
+2.1 Problema actual
+Actualmente cualquier nueva página del sitio (Sobre nosotros, Cómo funciona, FAQ, landings de eventos corporativos o bodas) requiere que un desarrollador escriba código Astro, haga commit y redeploy. Esto genera dependencia técnica para tareas de contenido y ralentiza la operación del negocio.
+2.2 Objetivo
+Implementar un constructor visual de páginas dentro del panel admin existente, de modo que el equipo de Deco Moi pueda:
+Crear páginas nuevas con URL personalizada (slug)
+Componer el contenido mediante bloques prediseñados arrastrando y soltando
+Editar texto, imágenes y propiedades de cada bloque sin código
+Publicar, despublicar y archivar páginas
+Previsualizar el resultado en mobile y desktop antes de publicar
+2.3 Lo que NO incluye este PRD
+Editor de plantillas de email
+Modificación del checkout, carrito o flujos de compra
+CMS de blog con categorías y etiquetas (fuera de alcance v1)
+Historial de versiones / undo-redo (backlog futuro)
+3. Usuarios del sistema
+Admin de Deco Moi
+Usuario principal. Crea y edita páginas desde el panel. No tiene conocimientos técnicos.
+Visitante del sitio
+Usuario final que consume las páginas publicadas. No interactúa con el builder.
+Desarrollador Antigravity
+Crea y mantiene los bloques disponibles. Agrega nuevos bloques cuando el negocio los requiere.
+4. Casos de uso principales
+4.1 Páginas previstas
+El sistema debe soportar al menos los siguientes tipos de páginas desde el lanzamiento:
+Sobre nosotros / Historia de Deco Moi
+Cómo funciona el proceso de personalización
+Preguntas frecuentes (FAQ con acordeón)
+Landings de eventos: bodas, quinceaños, cumpleaños, bautismos
+Landing corporativa / regalos empresariales
+Página de contacto con formulario
+Política de privacidad y Términos y condiciones
+4.2 Flujo de creación de una página
+El admin navega a /admin/paginas y hace clic en "Nueva página"
+Elige empezar desde cero o desde un template predefinido
+Define título, slug y metadatos SEO
+En el editor agrega bloques desde la biblioteca lateral
+Configura las propiedades de cada bloque (texto, imágenes, links, colores)
+Previsualiza en desktop y mobile
+Guarda como borrador o publica directamente
+La página queda disponible en decomoi.com.ar/{slug}
+5. Arquitectura técnica
+5.1 Principio de diseño
+El editor visual es un React island (client:only) dentro de Astro. El render público de las páginas es Astro SSR puro, sin JavaScript adicional para el visitante final. Esta separación garantiza performance óptima en el frontend y experiencia de edición fluida en el admin.
+5.2 Modelo de datos — tabla pages
+Agregar la siguiente tabla al schema Drizzle existente (src/lib/db/schema.ts):
+export const pages = pgTable('pages', {
+  id:              uuid('id').primaryKey().defaultRandom(),
+  title:           varchar('title', { length: 200 }).notNull(),
+  slug:            varchar('slug', { length: 200 }).notNull().unique(),
+  status:          varchar('status', { length: 20 }).default('draft'),
+  blocks:          json('blocks').$type<PageBlock[]>().default([]),
+  seoTitle:        varchar('seo_title', { length: 60 }),
+  seoDescription:  varchar('seo_description', { length: 160 }),
+  ogImage:         varchar('og_image', { length: 255 }),
+  publishedAt:     timestamp('published_at'),
+  createdAt:       timestamp('created_at').defaultNow(),
+  updatedAt:       timestamp('updated_at').defaultNow(),
+});
+Status válidos: draft | published | archived
+5.3 Estructura del bloque (JSON)
+Cada página almacena un array de bloques en el campo blocks (JSONB). Cada bloque respeta la siguiente interfaz:
+interface PageBlock {
+  id:        string;            // uuid generado al crear el bloque
+  type:      BlockType;         // 'hero' | 'richtext' | 'image_text' | ...
+  order:     number;            // posición en la página (0, 1, 2, ...)
+  isVisible: boolean;           // toggle sin borrar el bloque
+  props:     Record<string, any>; // propiedades específicas del tipo
+}
+5.4 Tabla page_templates (opcional v1, recomendada)
+id
+serial PK
+name
+varchar(100) — ej: 'Landing de bodas'
+thumbnail
+varchar(255) — imagen de preview
+blocks
+jsonb — bloques pre-configurados
+category
+varchar(50) — landing | informativa | legal
+5.5 Rutas y archivos nuevos
+/admin/paginas
+Listado de páginas con estado, acciones y buscador
+/admin/paginas/nueva
+Selección de template o inicio en blanco + metadatos
+/admin/paginas/[id]/editar
+Editor visual con 3 paneles (React island)
+/[slug].astro
+Render público SSR de la página — ruta catch-all nueva
+POST /api/pages
+Crear página
+GET /api/pages/:id
+Obtener página con bloques
+PUT /api/pages/:id
+Actualizar bloques (autosave cada 30s)
+PUT /api/pages/:id/publish
+Publicar o despublicar
+src/lib/blocks/
+Un archivo .ts por tipo de bloque con schema Zod
+src/components/blocks/
+Un .astro por tipo de bloque (render público)
+src/components/admin/builder/
+Componentes del editor visual React
+6. Bloques requeridos
+6.1 Bloques genéricos (MVP)
+Bloque
+Categoría
+Propiedades clave
+Hero / Banner
+Contenido
+Título, subtítulo, imagen de fondo, opacidad overlay, botón CTA (texto + link), alineación, altura mínima
+Texto enriquecido
+Contenido
+Editor rich text (Tiptap), ancho máximo (narrow/normal/wide), alineación de texto
+Imagen + Texto
+Contenido
+Imagen (con alt), contenido rich text, posición imagen (izq/der), ratio de imagen
+Tarjetas / Features
+Contenido
+Título sección, lista dinámica de cards (ícono + título + descripción), columnas (2/3/4), estilo visual
+FAQ / Acordeón
+Contenido
+Título sección, lista dinámica de preguntas y respuestas, primer ítem abierto por defecto
+Galería / Slider
+Media
+Lista de imágenes con alt, modo (slider/grid/masonry), columnas, lightbox on/off
+Video embed
+Media
+Fuente (YouTube/Vimeo/propio), URL, autoplay (silenciado), ratio de aspecto
+Pasos / Proceso
+Contenido
+Título sección, lista dinámica de pasos (número + título + descripción), layout (horizontal/vertical/alternado)
+Banner de texto
+Decorativo
+Texto, color de fondo (paleta Deco Moi), color de texto, link opcional (banner clickeable)
+Separador / Espaciado
+Layout
+Altura en px (20-200), línea horizontal on/off, color de línea
+Formulario de contacto
+Interacción
+Título, email destinatario (default: config tienda), mensaje de éxito, campos visibles
+Mapa / Ubicación
+Integración
+Dirección completa, nivel de zoom, altura del mapa en px
+6.2 Bloques especiales de e-commerce
+Estos bloques se conectan a la base de datos existente de Deco Moi y son exclusivos del proyecto:
+Bloque
+Categoría
+Propiedades clave
+Grilla de productos
+E-commerce
+Categoría o tag a mostrar, cantidad de productos (4/8/12), mostrar precio on/off, solo destacados on/off
+Testimonios dinámicos
+E-commerce
+Cantidad a mostrar, rating mínimo (1-5), diseño (slider/grilla)
+CTA con WhatsApp
+E-commerce
+Título, subtítulo, texto del botón, mensaje pre-cargado configurable, fondo (color sólido o imagen)
+7. Editor visual — especificaciones de UI
+7.1 Layout del editor
+El editor se divide en tres zonas fijas:
+Panel izquierdo (~280px)
+Biblioteca de bloques agrupados por categoría. Búsqueda. Drag desde aquí al canvas.
+Centro (flexible)
+Canvas con preview de la página. Muestra los bloques en el orden correcto. Toggle mobile/desktop.
+Panel derecho (~280px)
+Propiedades del bloque seleccionado. Formulario dinámico según tipo de bloque.
+7.2 Interacciones requeridas
+Agregar bloque: clic en + entre bloques → abre biblioteca → click o drag al canvas
+Reordenar: handle de drag (⠿) en borde izquierdo de cada bloque
+Editar: clic en bloque → propiedades aparecen en panel derecho
+Ocultar/mostrar: toggle ojo en cada bloque (no borra el bloque)
+Duplicar: botón copiar → copia inmediatamente debajo con mismo contenido
+Eliminar: botón trash con confirmación modal
+Preview responsive: toggle mobile (375px) / desktop (1200px)
+Autosave: cada 30 segundos con indicador de estado (Guardado / Guardando... / Error)
+Publicar: botón primario en barra superior → draft pasa a published
+Vista previa externa: link que abre /[slug]?preview=true en nueva pestaña
+7.3 Tipos de campo en panel de propiedades
+Texto corto
+Input text con contador de caracteres si hay límite máximo
+Texto largo / Rich text
+Tiptap editor (negritas, listas, links, títulos)
+Imagen
+Uploader con drag & drop + campo URL manual + campo alt text obligatorio
+Enlace
+Campo URL + texto visible + selector de target (_self/_blank)
+Color
+Color picker con paleta de Deco Moi pre-cargada + opción hex libre
+Select
+Dropdown con opciones fijas (alineación, columnas, modo, etc.)
+Toggle
+Checkbox estilizado (mostrar/ocultar elementos del bloque)
+Número / Slider
+Input numérico con rango mínimo y máximo (opacidad, px, columnas)
+Lista dinámica
+Agregar/eliminar/reordenar items (para FAQ, features, pasos, imágenes)
+Relación a DB
+Select que trae categorías o tags desde la API existente
+8. Render público de páginas
+8.1 Ruta catch-all
+Crear src/pages/[slug].astro. Esta ruta:
+Recibe el slug desde la URL
+Consulta la tabla pages donde slug = params.slug AND status = 'published'
+Si no existe → 404
+Si existe → renderiza los bloques en orden usando el componente Astro correspondiente a cada type
+Aplica meta tags SEO desde los campos seo_title, seo_description, og_image
+8.2 Componente de renderizado de bloque
+Crear src/components/blocks/BlockRenderer.astro que recibe un array de PageBlock y delega a cada componente según block.type. Ejemplo:
+{ block.type === 'hero' && <HeroBlock {...block.props} /> }
+{ block.type === 'richtext' && <RichTextBlock {...block.props} /> }
+{ block.type === 'faq' && <FaqBlock {...block.props} /> }
+Cada componente de bloque en src/components/blocks/*.astro recibe únicamente las props que necesita. Sin lógica de negocio, solo presentación.
+8.3 SEO
+Meta title: usa seo_title si está definido, sino title de la página
+Meta description: campo seo_description
+og:image: campo og_image (si no hay, usar imagen por defecto de la tienda)
+Canonical: URL absoluta de la página
+No indexar páginas con status != 'published' (X-Robots-Tag: noindex)
+9. Especificación de la API
+GET /api/pages
+Lista todas las páginas (solo admin). Filtros: status, search.
+POST /api/pages
+Crea página nueva. Body: { title, slug, status, blocks, seoTitle, seoDescription, ogImage }
+GET /api/pages/:id
+Devuelve página completa con todos sus bloques.
+PUT /api/pages/:id
+Actualiza página. Acepta actualizaciones parciales (solo bloques, o solo metadatos).
+PUT /api/pages/:id/publish
+Cambia status a published y setea publishedAt = now(). Si ya está publicada, pasa a draft.
+DELETE /api/pages/:id
+Soft delete: cambia status a archived. No borra de la DB.
+GET /api/pages/slug/:slug
+Busca página por slug. Usado por el render público SSR.
+GET /api/block-types
+Devuelve lista de tipos de bloque disponibles con metadata (nombre, ícono, props schema).
+Todas las rutas de escritura requieren autenticación JWT admin existente. La ruta GET /api/pages/slug/:slug es pública (usada por SSR).
+10. Validaciones y reglas de negocio
+El slug debe ser único, solo minúsculas, sin espacios (reemplazar por -), sin caracteres especiales
+El slug se genera automáticamente del título pero es editable. Advertir si ya existe.
+No se puede publicar sin al menos un bloque visible
+El campo alt text de imágenes es obligatorio para accesibilidad
+Los slugs reservados no pueden usarse: productos, producto, carrito, checkout, confirmacion, admin, api
+Bloques con isVisible: false no se renderizan en el sitio público
+El autosave no cambia el status de la página (draft sigue siendo draft)
+Eliminar una página publicada la archiva (status: archived), no la borra físicamente
+Las props de cada bloque se validan con Zod en el backend antes de guardar
+11. Criterios de aceptación
+11.1 Funcionalidad core
+El admin puede crear una página nueva desde cero en menos de 5 minutos
+El admin puede agregar, reordenar y editar los 12 bloques genéricos del MVP
+El admin puede agregar los 3 bloques especiales de e-commerce
+Las páginas publicadas son accesibles en /slug sin redeploy
+El autosave funciona correctamente y no pierde datos
+El preview mobile/desktop refleja el resultado real
+Las páginas renderizadas tienen los meta tags SEO correctos
+Las rutas protegidas del admin requieren autenticación
+11.2 Performance
+Las páginas públicas tienen Lighthouse score > 85 (sin JS adicional por el builder)
+El editor visual carga en menos de 3 segundos
+El autosave no bloquea la UI (operación en background)
+11.3 Calidad
+Los bloques respetan la identidad visual de Deco Moi (paleta, tipografía, espaciado)
+El editor funciona en Chrome, Firefox y Safari en desktop
+El contenido de las páginas es completamente responsive
+Los campos de imagen incluyen alt text y se valida su presencia
+12. Plan de implementación sugerido
+Semana 1 — Fundación
+Tabla pages en Drizzle + migraciones. API REST CRUD básico. Ruta pública /[slug].astro con render SSR. Componentes Astro de los 4 bloques más simples (Hero, RichText, Imagen+Texto, Separador).
+Semana 2 — Bloques restantes
+Implementar los 8 bloques genéricos restantes. Implementar los 3 bloques de e-commerce. Validación Zod en backend para props de cada bloque.
+Semana 3 — Editor visual
+Listado de páginas en admin con filtros y estados. React island del editor con los 3 paneles. Drag & drop con @dnd-kit/sortable. Panel de propiedades dinámico por tipo de bloque.
+Semana 4 — Pulido y cierre
+Autosave + indicador de estado. Preview iframe con toggle mobile/desktop. SEO y meta tags. Templates pre-armados (bodas, FAQ, nosotros). Testing y ajustes.
+Dependencias y librerías nuevas
+@dnd-kit/core + @dnd-kit/sortable — drag and drop en el editor
+@tiptap/react + extensiones — rich text editor en propiedades
+zod — validación de props de bloques en backend (probablemente ya instalado)
+React — ya soportado como island en Astro, no es dependencia nueva
+13. Decisiones pendientes
+Storage de imágenes
+¿Las imágenes subidas en el builder van a Cloudinary, S3 o al filesystem de Railway? Definir antes de implementar el campo imagen.
+Preview en iframe
+El preview puede ser un iframe de /[slug]?preview=true o un render en el canvas. El iframe es más fiel pero requiere autenticación especial para el draft.
+Templates incluidos en MVP
+¿Se incluyen templates pre-armados desde el inicio o se entrega solo la funcionalidad base y se agregan después?
+Cache invalidation
+Si se usa ISR o cache de Astro, definir cómo se invalida al publicar una página desde el admin.
+14. Fuera de alcance — v1
+Historial de versiones y undo/redo (backlog v2)
+Colaboración en tiempo real (backlog v2)
+Editor de templates por parte del admin (Antigravity define los templates)
+Blog con categorías, tags y paginación
+Páginas de producto generadas por el builder (el catálogo tiene su propio sistema)
+Soporte multidioma
+A/B testing de páginas
+ 
+Deco Moi × Antigravity — PRD Page Builder v1.0 — 2026

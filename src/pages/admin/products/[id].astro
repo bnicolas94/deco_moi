@@ -1,7 +1,7 @@
 ---
 import AdminLayout from '@/layouts/AdminLayout.astro';
 import { db } from '@/lib/db/connection';
-import { products, categories, mockupTemplates, productionTimeRules, meliItemLinks, costItems, productCostItems, productSupplies, supplies } from '@/lib/db/schema';
+import { products, categories, mockupTemplates, productionTimeRules, priceRules, meliItemLinks, costItems, productCostItems, productSupplies, supplies } from '@/lib/db/schema';
 import { eq, asc, and } from 'drizzle-orm';
 import { Save, ArrowLeft, Image as ImageIcon, Trash2, Star, Plus, Clock, ExternalLink } from 'lucide-react';
 import RichTextEditor from '@/components/admin/RichTextEditor';
@@ -13,6 +13,7 @@ const isNew = id === 'new';
 let product: any = null;
 let variants: any[] = [];
 let timeRules: any[] = [];
+let priceRulesList: any[] = [];
 let meliLinkId = '';
 let productCosts: any[] = [];
 if (!isNew && id) {
@@ -33,6 +34,11 @@ if (!isNew && id) {
     timeRules = await db.select().from(productionTimeRules)
         .where(eq(productionTimeRules.productId, parseInt(id)))
         .orderBy(asc(productionTimeRules.minQuantity));
+
+    // Load price rules
+    priceRulesList = await db.select().from(priceRules)
+        .where(eq(priceRules.productId, parseInt(id)))
+        .orderBy(asc(priceRules.minQuantity));
         
     // Cargar link de MercadoLibre
     const mlLink = await db.select().from(meliItemLinks).where(eq(meliItemLinks.productId, parseInt(id))).limit(1);
@@ -678,6 +684,77 @@ const SUPPLY_ICONS: Record<string, string> = {
             </div>
                 </div>
 
+                <!-- 5. Price Rules (Descuentos) -->
+                <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden accordion-section" data-section="pricerules">
+                    <button type="button" class="w-full p-6 flex items-center justify-between hover:bg-gray-50/50 transition-colors accordion-toggle">
+                        <div class="flex items-center gap-4">
+                            <div class="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600">
+                                <span class="w-2.5 h-6 bg-emerald-500 rounded-full"></span>
+                            </div>
+                            <div class="text-left">
+                                <h2 class="text-lg font-bold text-gray-900">Descuentos por Cantidad</h2>
+                                <p class="text-xs text-gray-400 font-medium italic">Define descuentos según volumen</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <span class="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-600 text-[10px] font-black uppercase">
+                                {priceRulesList.length} reglas
+                            </span>
+                            <Plus className="w-5 h-5 text-gray-400 transition-transform duration-300 accordion-chevron" />
+                        </div>
+                    </button>
+                    <div class="accordion-content hidden transition-all duration-300 ease-in-out">
+                        <div class="p-6 border-t border-gray-50">
+                            <div class="flex items-center justify-between mb-8">
+                                <div>
+                                    <h3 class="text-base font-bold text-gray-900">Reglas de Descuento</h3>
+                                    <p class="text-xs text-gray-400 italic">Define porcentajes de descuento por comprar por mayor</p>
+                                </div>
+                                <button type="button" id="add-price-rule-btn" class="inline-flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-600 font-bold rounded-xl hover:bg-emerald-100 transition-all active:scale-95 text-sm">
+                                    <Plus className="w-4 h-4" />
+                                    Añadir Regla
+                                </button>
+                            </div>
+
+                            <div class="p-6">
+                                <p class="text-xs text-gray-500 mb-6 bg-gray-50 p-3 rounded-xl border border-gray-100 italic">
+                                    Define porcentajes de descuento que se aplicarán sobre el precio base cuando el cliente alcance ciertas cantidades en el carrito.
+                                </p>
+
+                                <div id="price-rules-container" class="space-y-4">
+                                    {priceRulesList.length === 0 ? (
+                                        <div id="no-price-rules-msg" class="text-center py-8 border-2 border-dashed border-gray-100 rounded-2xl">
+                                            <p class="text-sm text-gray-400">No hay descuentos por cantidad definidos.</p>
+                                        </div>
+                                    ) : (
+                                        priceRulesList.map((rule: any, idx: number) => (
+                                            <div class="price-rule-item grid grid-cols-1 md:grid-cols-12 gap-4 p-4 bg-emerald-50/30 rounded-2xl border border-emerald-100/50 relative group animate-in fade-in slide-in-from-top-2">
+                                                <div class="md:col-span-3">
+                                                    <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Cantidad Mínima</label>
+                                                    <input type="number" name={`price_rule_min_${idx}`} value={rule.minQuantity} min="1" placeholder="1" class="w-full rounded-lg border-gray-200 text-sm h-10 border px-3 focus:ring-emerald-500" required />
+                                                </div>
+                                                <div class="md:col-span-3">
+                                                    <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Cantidad Máxima</label>
+                                                    <input type="number" name={`price_rule_max_${idx}`} value={rule.maxQuantity} placeholder="Sin límite" class="w-full rounded-lg border-gray-200 text-sm h-10 border px-3 focus:ring-emerald-500" />
+                                                </div>
+                                                <div class="md:col-span-5">
+                                                    <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Descuento (%)</label>
+                                                    <input type="number" step="0.01" name={`price_rule_pct_${idx}`} value={rule.discountPercentage} placeholder="Ej: 10" class="w-full rounded-lg border-gray-200 text-sm h-10 border px-3 focus:ring-emerald-500" required />
+                                                </div>
+                                                <div class="md:col-span-1 flex items-end justify-center pb-1">
+                                                    <button type="button" class="remove-price-rule-btn p-2 text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors">
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- 3. Product Variants -->
                 <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden accordion-section" data-section="variants">
                     <button type="button" class="w-full p-6 flex items-center justify-between hover:bg-gray-50/50 transition-colors accordion-toggle">
@@ -800,6 +877,23 @@ const SUPPLY_ICONS: Record<string, string> = {
                                 <span class="ml-3 text-sm font-bold text-gray-700 group-hover:text-gray-900 transition-colors flex items-center gap-1.5 focus:ring-amber-500">
                                     <Star className={`w-4 h-4 ${product?.isFeatured ? 'fill-amber-400 text-amber-400' : 'text-gray-400'}`} />
                                     Destacado
+                                </span>
+                            </div>
+                        </label>
+                        
+                        <label class="flex items-center group cursor-pointer">
+                            <div class="relative flex items-center">
+                                <input 
+                                    type="checkbox" 
+                                    id="showDiscountRanges"
+                                    name="showDiscountRanges" 
+                                    checked={isNew ? true : product?.showDiscountRanges} 
+                                    value="true"
+                                    class="sr-only peer"
+                                />
+                                <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-emerald-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:width-5 after:transition-all peer-checked:bg-emerald-500"></div>
+                                <span class="ml-3 text-sm font-bold text-gray-700 group-hover:text-gray-900 transition-colors flex items-center gap-1.5 focus:ring-emerald-500">
+                                    Mostrar tabla de descuentos
                                 </span>
                             </div>
                         </label>
@@ -1408,6 +1502,50 @@ const SUPPLY_ICONS: Record<string, string> = {
                 }
             }
         });
+
+        // ========================================
+        // Price Rules Logic
+        // ========================================
+        const addPriceRuleBtn = document.getElementById('add-price-rule-btn');
+        const priceRulesContainer = document.getElementById('price-rules-container');
+        const noPriceRulesMsg = document.getElementById('no-price-rules-msg');
+        let priceRuleCount = document.querySelectorAll('.price-rule-item').length;
+
+        addPriceRuleBtn?.addEventListener('click', () => {
+            if (noPriceRulesMsg) noPriceRulesMsg.remove();
+            const ruleIdx = priceRuleCount++;
+            const div = document.createElement('div');
+            div.className = 'price-rule-item grid grid-cols-1 md:grid-cols-12 gap-4 p-4 bg-emerald-50/30 rounded-2xl border border-emerald-100/50 relative group animate-in fade-in slide-in-from-top-2';
+            div.innerHTML = `
+                <div class="md:col-span-3">
+                    <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Cantidad Mínima</label>
+                    <input type="number" name="price_rule_min_${ruleIdx}" min="1" placeholder="1" class="w-full rounded-lg border-gray-200 text-sm h-10 border px-3 focus:ring-emerald-500" required />
+                </div>
+                <div class="md:col-span-3">
+                    <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Cantidad Máxima</label>
+                    <input type="number" name="price_rule_max_${ruleIdx}" placeholder="Sin límite" class="w-full rounded-lg border-gray-200 text-sm h-10 border px-3 focus:ring-emerald-500" />
+                </div>
+                <div class="md:col-span-5">
+                    <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Descuento (%)</label>
+                    <input type="number" step="0.01" name="price_rule_pct_${ruleIdx}" placeholder="Ej: 10" class="w-full rounded-lg border-gray-200 text-sm h-10 border px-3 focus:ring-emerald-500" required />
+                </div>
+                <div class="md:col-span-1 flex items-end justify-center pb-1">
+                    <button type="button" class="remove-price-rule-btn p-2 text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-trash-2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>
+                    </button>
+                </div>`;
+            priceRulesContainer.appendChild(div);
+        });
+
+        priceRulesContainer?.addEventListener('click', (e) => {
+            const btn = e.target.closest('.remove-price-rule-btn');
+            if (btn) {
+                btn.closest('.price-rule-item').remove();
+                if (document.querySelectorAll('.price-rule-item').length === 0) {
+                    priceRulesContainer.innerHTML = `<div id="no-price-rules-msg" class="text-center py-8 border-2 border-dashed border-gray-100 rounded-2xl"><p class="text-sm text-gray-400">No hay descuentos por cantidad definidos.</p></div>`;
+                }
+            }
+        });
     });
 
     function attachVariantImagePreview(input) {
@@ -1564,6 +1702,27 @@ const SUPPLY_ICONS: Record<string, string> = {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ rules: timeRules }),
+                });
+
+                // Save price rules as a separate call
+                const priceRulesData = [];
+                document.querySelectorAll('.price-rule-item').forEach((item) => {
+                    const minQ = item.querySelector(`input[name^="price_rule_min_"]`)?.value;
+                    const maxQ = item.querySelector(`input[name^="price_rule_max_"]`)?.value;
+                    const pct = item.querySelector(`input[name^="price_rule_pct_"]`)?.value;
+                    if (minQ && pct) {
+                        priceRulesData.push({
+                            minQuantity: parseInt(minQ),
+                            maxQuantity: maxQ ? parseInt(maxQ) : null,
+                            discountPercentage: pct,
+                        });
+                    }
+                });
+
+                const priceResp = await fetch(`/api/products/${productId}/price-rules`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ rules: priceRulesData }),
                 });
 
                 // --- SAVE COSTOS E INSUMOS ---

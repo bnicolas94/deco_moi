@@ -1,6 +1,7 @@
 import { pgTable, serial, text, integer, decimal, timestamp, boolean, json, uuid, varchar, uniqueIndex } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
 import type { PerspectiveConfig, SurfaceConfig, CameraConfig, DesignPresets } from '@/types/mockup';
+import type { PageBlock } from '../blocks/index';
 
 // ============================================
 // CATEGORÍAS
@@ -50,6 +51,7 @@ export const products = pgTable('products', {
     updatedAt: timestamp('updated_at').defaultNow(),
     mockupTemplateId: integer('mockup_template_id'),
     allowsMockup: boolean('allows_mockup').default(false),
+    showDiscountRanges: boolean('show_discount_ranges').default(true),
 });
 
 // ============================================
@@ -653,6 +655,33 @@ export const homeBlocks = pgTable('home_blocks', {
     settings: json('settings').$type<any>().default({}),
     order: integer('order').default(0),
     isActive: boolean('is_active').default(true),
+    createdAt: timestamp('created_at').defaultNow(),
+    updatedAt: timestamp('updated_at').defaultNow(),
+});
+
+// ============================================
+// PAGE BUILDER
+// ============================================
+export const pages = pgTable('pages', {
+    id: uuid('id').primaryKey().defaultRandom(),
+    title: varchar('title', { length: 200 }).notNull(),
+    slug: varchar('slug', { length: 200 }).notNull().unique(),
+    status: varchar('status', { length: 20 }).default('draft'),
+    blocks: json('blocks').$type<PageBlock[]>().default([]),
+    seoTitle: varchar('seo_title', { length: 60 }),
+    seoDescription: varchar('seo_description', { length: 160 }),
+    ogImage: varchar('og_image', { length: 255 }),
+    publishedAt: timestamp('published_at'),
+    createdAt: timestamp('created_at').defaultNow(),
+    updatedAt: timestamp('updated_at').defaultNow(),
+});
+
+export const pageTemplates = pgTable('page_templates', {
+    id: serial('id').primaryKey(),
+    name: varchar('name', { length: 100 }).notNull(),
+    thumbnail: varchar('thumbnail', { length: 255 }),
+    blocks: json('blocks').$type<PageBlock[]>().default([]),
+    category: varchar('category', { length: 50 }),
     createdAt: timestamp('created_at').defaultNow(),
     updatedAt: timestamp('updated_at').defaultNow(),
 });

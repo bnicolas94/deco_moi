@@ -1,0 +1,42 @@
+---
+export interface Props {
+    content: string;
+    maxWidth?: 'narrow' | 'normal' | 'wide';
+    align?: 'left' | 'center' | 'right' | 'justify';
+}
+
+const {
+    content,
+    maxWidth = 'normal',
+    align = 'left'
+} = Astro.props;
+
+const maxWidthClasses = {
+    narrow: 'max-w-3xl',
+    normal: 'max-w-4xl',
+    wide: 'max-w-6xl'
+};
+
+const alignClasses = {
+    left: 'text-left',
+    center: 'text-center mx-auto',
+    right: 'text-right',
+    justify: 'text-justify'
+};
+---
+
+<section class="py-12 md:py-16 px-4 bg-white">
+    <div class={`mx-auto ${maxWidthClasses[maxWidth]} ${alignClasses[align]}`}>
+        <div class="prose prose-lg md:prose-xl prose-stone max-w-none break-words" set:html={content} />
+    </div>
+</section>
+
+<style is:global>
+    /* Estilos base para el contenido del RichText (Tiptap genera HTML puro) */
+    .prose p { margin-bottom: 1em; }
+    .prose h1, .prose h2, .prose h3 { font-family: 'Montserrat', sans-serif; font-weight: 700; margin-top: 1.5em; margin-bottom: 0.5em; }
+    .prose a { color: #8C7C61; text-decoration: underline; } /* brand-primary */
+    .prose ul { list-style-type: disc; padding-left: 1.5em; margin-bottom: 1em; }
+    .prose ol { list-style-type: decimal; padding-left: 1.5em; margin-bottom: 1em; }
+    .prose blockquote { border-left: 4px solid #EBE5DB; padding-left: 1em; font-style: italic; color: #555; }
+</style>

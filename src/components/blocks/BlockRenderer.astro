@@ -1,0 +1,53 @@
+---
+import type { PageBlock } from '@/lib/blocks';
+import HeroBlock from './HeroBlock.astro';
+import RichTextBlock from './RichTextBlock.astro';
+import SpacerBlock from './SpacerBlock.astro';
+import ImageTextBlock from './ImageTextBlock.astro';
+import FeaturesBlock from './FeaturesBlock.astro';
+import FaqBlock from './FaqBlock.astro';
+import ProductGridBlock from './ProductGridBlock.astro';
+import TestimonialsBlock from './TestimonialsBlock.astro';
+import WhatsappCtaBlock from './WhatsappCtaBlock.astro';
+import ContactFormBlock from './ContactFormBlock.astro';
+
+export interface Props {
+    blocks: PageBlock[];
+}
+
+const { blocks } = Astro.props;
+
+// Filtramos los bloques visibles (o si no se define isVisible, lo asumimos true)
+const visibleBlocks = blocks.filter(b => b.isVisible !== false).sort((a, b) => a.order - b.order);
+---
+
+{visibleBlocks.map(block => {
+    switch(block.type) {
+        case 'hero':
+            return <HeroBlock {...block.props} />;
+        case 'richtext':
+            return <RichTextBlock {...block.props} />;
+        case 'spacer':
+            return <SpacerBlock {...block.props} />;
+        case 'image_text':
+            return <ImageTextBlock {...block.props} />;
+        case 'features':
+            return <FeaturesBlock {...block.props} />;
+        case 'faq':
+            return <FaqBlock {...block.props} />;
+        case 'product_grid':
+            return <ProductGridBlock {...block.props} />;
+        case 'testimonials':
+            return <TestimonialsBlock {...block.props} />;
+        case 'whatsapp_cta':
+            return <WhatsappCtaBlock {...block.props} />;
+        case 'contact_form':
+            return <ContactFormBlock {...block.props} />;
+        default:
+            // Bloque no soportado o en desarrollo
+            if (import.meta.env.DEV) {
+                return <div class="p-4 border border-dashed border-red-500 text-red-500 my-4 text-center">Bloque desconocido: {block.type}</div>;
+            }
+            return null;
+    }
+})}

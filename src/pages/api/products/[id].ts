@@ -107,6 +107,7 @@ export const PUT: APIRoute = async (context) => {
                     sku,
                     isActive,
                     isFeatured,
+                    showDiscountRanges: formData.get('showDiscountRanges') === 'true',
                     images: updatedImages,
                     updatedAt: new Date(),
                 })

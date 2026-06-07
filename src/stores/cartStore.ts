@@ -5,17 +5,34 @@ export interface CartItem {
     name: string;
     slug: string;
     sku: string;
+    basePrice: number;
     price: number;
     image: string;
     quantity: number;
     customization?: string;
     variantId?: number;
     variantName?: string;
+    priceRules?: any[];
 }
 
 // Estado del carrito
 export const $cartItems = atom<CartItem[]>([]);
 export const $isCartOpen = atom(false);
+
+// Helper para calcular precio con descuento
+export function calculateDiscountedPrice(basePrice: number, quantity: number, rules?: any[]): number {
+    if (!rules || rules.length === 0) return basePrice;
+    
+    const applicableRule = rules
+        .filter((r) => quantity >= r.minQuantity && (r.maxQuantity === null || quantity <= r.maxQuantity))
+        .sort((a, b) => b.minQuantity - a.minQuantity)[0];
+        
+    if (applicableRule) {
+        const discount = parseFloat(applicableRule.discountPercentage) || 0;
+        return basePrice * (1 - discount / 100);
+    }
+    return basePrice;
+}
 
 // Computados
 export const $cartCount = computed($cartItems, (items) =>
@@ -31,7 +48,7 @@ export const $cartTransferTotal = computed($cartTotal, (total) =>
 );
 
 // Acciones
-export function addToCart(item: Omit<CartItem, 'quantity'>, quantity = 1, openCart = true) {
+export function addToCart(item: Omit<CartItem, 'quantity' | 'price'> & { price?: number }, quantity = 1, openCart = true) {
     const current = $cartItems.get();
     const existingIndex = current.findIndex((i) =>
         i.id === item.id &&
@@ -41,13 +58,17 @@ export function addToCart(item: Omit<CartItem, 'quantity'>, quantity = 1, openCa
 
     if (existingIndex >= 0) {
         const updated = [...current];
+        const newQuantity = updated[existingIndex].quantity + quantity;
         updated[existingIndex] = {
             ...updated[existingIndex],
-            quantity: updated[existingIndex].quantity + quantity,
+            quantity: newQuantity,
+            price: calculateDiscountedPrice(updated[existingIndex].basePrice, newQuantity, updated[existingIndex].priceRules)
         };
         $cartItems.set(updated);
     } else {
-        $cartItems.set([...current, { ...item, quantity }]);
+        const basePrice = item.basePrice || item.price || 0;
+        const initialPrice = calculateDiscountedPrice(basePrice, quantity, item.priceRules);
+        $cartItems.set([...current, { ...item, basePrice, price: initialPrice, quantity } as CartItem]);
     }
 
     saveToLocalStorage();
@@ -78,7 +99,14 @@ export function updateQuantity(id: number | string, quantity: number) {
     const current = $cartItems.get();
     const updated = current.map((item) => {
         const key = `${item.id}-${item.variantId || 'base'}-${item.customization || 'none'}`;
-        return (item.id === id || key === id) ? { ...item, quantity } : item;
+        if (item.id === id || key === id) {
+            return {
+                ...item,
+                quantity,
+                price: calculateDiscountedPrice(item.basePrice, quantity, item.priceRules)
+            };
+        }
+        return item;
     });
     $cartItems.set(updated);
     saveToLocalStorage();

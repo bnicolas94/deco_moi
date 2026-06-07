@@ -143,6 +143,8 @@ const canonicalURL = new URL(Astro.url.pathname, Astro.site || 'https://decomoi.
             slug: el.dataset.productSlug || '',
             sku: el.dataset.productSku || '',
             price: parseFloat(el.dataset.productPrice || '0'),
+            basePrice: el.dataset.productBaseprice ? parseFloat(el.dataset.productBaseprice) : undefined,
+            priceRules: el.dataset.productPricerules ? JSON.parse(el.dataset.productPricerules) : undefined,
             image: el.dataset.productImage || '',
             variantId: el.dataset.variantId ? parseInt(el.dataset.variantId) : undefined,
             variantName: el.dataset.variantName || undefined,
@@ -168,6 +170,7 @@ const canonicalURL = new URL(Astro.url.pathname, Astro.site || 'https://decomoi.
           let variantName: string | undefined;
           let variantSku = el.dataset.productSku || '';
           let variantPrice = parseFloat(el.dataset.productPrice || '0');
+          let basePrice = el.dataset.productBaseprice ? parseFloat(el.dataset.productBaseprice) : undefined;
 
           if (variantSelector) {
             const activeVariant = variantSelector.querySelector('.variant-btn.border-brand-black') as HTMLElement;
@@ -175,7 +178,8 @@ const canonicalURL = new URL(Astro.url.pathname, Astro.site || 'https://decomoi.
               variantId = activeVariant.dataset.variantId ? parseInt(activeVariant.dataset.variantId) : undefined;
               variantName = activeVariant.dataset.variantName || undefined;
               variantSku = activeVariant.dataset.variantSku || variantSku;
-              variantPrice = activeVariant.dataset.variantPrice ? parseFloat(activeVariant.dataset.variantPrice) : variantPrice;
+              // El precio base viene del DOM actualizado
+              basePrice = el.dataset.productBaseprice ? parseFloat(el.dataset.productBaseprice) : undefined;
             }
           }
 
@@ -185,6 +189,8 @@ const canonicalURL = new URL(Astro.url.pathname, Astro.site || 'https://decomoi.
             slug: el.dataset.productSlug || '',
             sku: variantSku,
             price: variantPrice,
+            basePrice: basePrice,
+            priceRules: el.dataset.productPricerules ? JSON.parse(el.dataset.productPricerules) : undefined,
             image: el.dataset.productImage || '',
             variantId,
             variantName,

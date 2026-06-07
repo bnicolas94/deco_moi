@@ -1,0 +1,19 @@
+---
+export interface Props {
+    height?: number;
+    showLine?: boolean;
+    lineColor?: string;
+}
+
+const {
+    height = 50,
+    showLine = false,
+    lineColor = '#EBE5DB'
+} = Astro.props;
+---
+
+<div style={`height: ${height}px;`} class="w-full flex items-center justify-center bg-white" aria-hidden="true">
+    {showLine && (
+        <div class="w-3/4 max-w-6xl mx-auto border-t" style={`border-color: ${lineColor};`}></div>
+    )}
+</div>

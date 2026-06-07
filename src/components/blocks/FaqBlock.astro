@@ -1,0 +1,69 @@
+---
+export interface FaqItem {
+    question: string;
+    answer: string;
+}
+
+export interface Props {
+    title?: string;
+    subtitle?: string;
+    items: FaqItem[];
+}
+
+const {
+    title = 'Preguntas Frecuentes',
+    subtitle,
+    items = []
+} = Astro.props;
+---
+
+<section class="py-16 md:py-24 bg-white">
+    <div class="container mx-auto px-4 max-w-4xl">
+        <div class="text-center mb-12">
+            <h2 class="text-3xl md:text-4xl font-bold text-gray-900 mb-4 font-montserrat">{title}</h2>
+            {subtitle && <p class="text-lg text-gray-600">{subtitle}</p>}
+        </div>
+
+        <div class="space-y-4" itemscope itemtype="https://schema.org/FAQPage">
+            {items.map((item, index) => (
+                <details class="group bg-gray-50 rounded-xl border border-gray-100 [&_summary::-webkit-details-marker]:hidden" itemscope itemprop="mainEntity" itemtype="https://schema.org/Question">
+                    <summary class="flex cursor-pointer items-center justify-between gap-1.5 p-6 font-medium text-gray-900">
+                        <h3 class="text-lg" itemprop="name">{item.question}</h3>
+                        <span class="relative size-5 shrink-0">
+                            <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                class="absolute inset-0 size-5 opacity-100 group-open:opacity-0 transition-opacity"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                                stroke-width="2"
+                            >
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+                            </svg>
+                            <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                class="absolute inset-0 size-5 opacity-0 group-open:opacity-100 transition-opacity"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                                stroke-width="2"
+                            >
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M20 12H4" />
+                            </svg>
+                        </span>
+                    </summary>
+                    
+                    <div class="px-6 pb-6 text-gray-600 prose max-w-none" itemscope itemprop="acceptedAnswer" itemtype="https://schema.org/Answer">
+                        <div itemprop="text" set:html={item.answer} />
+                    </div>
+                </details>
+            ))}
+
+            {items.length === 0 && (
+                <div class="text-center text-gray-400 py-10 border-2 border-dashed border-gray-200 rounded-xl">
+                    Agrega preguntas frecuentes desde las propiedades del bloque.
+                </div>
+            )}
+        </div>
+    </div>
+</section>

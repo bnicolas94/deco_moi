@@ -266,6 +266,8 @@ const initialProductionTime = productionTimeRules.length > 0
             data-product-slug={product.slug}
             data-product-sku={product.sku}
             data-product-price={finalPrice}
+            data-product-baseprice={finalPrice}
+            data-product-pricerules={JSON.stringify(priceRules)}
             data-product-image={images[0] || ''}
             disabled={product.variants && product.variants.length > 0}
           >
@@ -291,6 +293,8 @@ const initialProductionTime = productionTimeRules.length > 0
           data-product-slug={product.slug}
           data-product-sku={product.sku}
           data-product-price={finalPrice}
+          data-product-baseprice={finalPrice}
+          data-product-pricerules={JSON.stringify(priceRules)}
           data-product-image={images[0] || ''}
           disabled={product.variants && product.variants.length > 0}
         >
@@ -358,7 +362,7 @@ const initialProductionTime = productionTimeRules.length > 0
         <button class="tab-btn active px-5 py-3 text-sm font-heading font-medium text-brand-black border-b-2 border-primary whitespace-nowrap transition-colors" data-tab="descripcion">
           Descripción
         </button>
-        {priceRules.length > 0 && (
+        {product.showDiscountRanges && priceRules.length > 0 && (
           <button class="tab-btn px-5 py-3 text-sm font-heading font-medium text-gray-400 border-b-2 border-transparent hover:text-brand-black whitespace-nowrap transition-colors" data-tab="precios">
             Precios por cantidad
           </button>
@@ -381,7 +385,7 @@ const initialProductionTime = productionTimeRules.length > 0
       </div>
 
       <!-- Tab: Precios -->
-      {priceRules.length > 0 && (
+      {product.showDiscountRanges && priceRules.length > 0 && (
         <div class="tab-content hidden" data-tab-content="precios">
           <div class="max-w-2xl">
             <h3 class="font-heading font-semibold text-lg text-brand-black mb-4">Precios por cantidad</h3>
@@ -513,6 +517,53 @@ const initialProductionTime = productionTimeRules.length > 0
   const priceDisplay = document.querySelector('.text-3xl.font-heading.bold') || document.querySelector('.text-3xl.font-heading.font-bold');
   const skuDisplay = document.querySelector('.text-xs.text-gray-400:last-of-type');
   const transferPriceDisplay = document.querySelector('.text-sm.text-success.font-medium');
+  const qtyInput = document.getElementById('qty-input') as HTMLInputElement;
+
+  let currentBasePrice = parseFloat(mainAddToCartBtn?.getAttribute('data-product-price') || '0');
+
+  function updatePricingDisplays(baseP) {
+    const qty = parseInt(qtyInput?.value || '1');
+    const rules = (window as any).__priceRules || [];
+    
+    let appliedDiscountPct = 0;
+    if (rules.length > 0) {
+      const applicableRule = rules
+        .filter((r: any) => qty >= r.minQuantity && (r.maxQuantity === null || qty <= r.maxQuantity))
+        .sort((a: any, b: any) => b.minQuantity - a.minQuantity)[0];
+      if (applicableRule) {
+        appliedDiscountPct = parseFloat(applicableRule.discountPercentage);
+      }
+    }
+
+    const unitPrice = baseP * (1 - appliedDiscountPct / 100);
+
+    if (mainAddToCartBtn) {
+      mainAddToCartBtn.setAttribute('data-product-price', unitPrice.toString());
+      mainAddToCartBtn.setAttribute('data-product-baseprice', baseP.toString());
+    }
+    if (buyNowBtn) {
+      buyNowBtn.setAttribute('data-product-price', unitPrice.toString());
+      buyNowBtn.setAttribute('data-product-baseprice', baseP.toString());
+    }
+
+    if (priceDisplay) {
+      if (appliedDiscountPct > 0) {
+        priceDisplay.innerHTML = `<span class="line-through text-gray-400 text-xl mr-2">${formatPrice(baseP)}</span>${formatPrice(unitPrice)}`;
+      } else {
+        priceDisplay.textContent = formatPrice(baseP);
+      }
+    }
+
+    if (transferPriceDisplay) {
+      const transferPrice = unitPrice * 0.9;
+      transferPriceDisplay.innerHTML = `
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        ${formatPrice(transferPrice)} con transferencia bancaria (10% off)
+      `;
+    }
+  }
 
   variantSelector?.addEventListener('click', (e) => {
     const btn = e.target.closest('button');
@@ -552,6 +603,8 @@ const initialProductionTime = productionTimeRules.length > 0
     const variantImagesStr = btn.getAttribute('data-variant-images');
     const variantImages = variantImagesStr ? JSON.parse(variantImagesStr) : [];
     
+    currentBasePrice = variantPrice;
+
     // Gallery elements
     const mainImage = document.getElementById('main-image');
     const placeholder = document.getElementById('main-image-placeholder');
@@ -594,7 +647,6 @@ const initialProductionTime = productionTimeRules.length > 0
     if (mainAddToCartBtn) {
       mainAddToCartBtn.setAttribute('data-variant-id', variantId || '');
       mainAddToCartBtn.setAttribute('data-variant-name', variantName || '');
-      mainAddToCartBtn.setAttribute('data-product-price', variantPrice.toString());
       mainAddToCartBtn.setAttribute('data-product-sku', variantSku || '');
       
       // Stock check
@@ -614,7 +666,6 @@ const initialProductionTime = productionTimeRules.length > 0
 
     // Sincronizar botón Comprar con la variante activa
     if (buyNowBtn) {
-      buyNowBtn.setAttribute('data-product-price', variantPrice.toString());
       buyNowBtn.setAttribute('data-product-sku', variantSku || '');
       if (variantStock <= 0) {
         buyNowBtn.setAttribute('disabled', 'true');
@@ -625,18 +676,9 @@ const initialProductionTime = productionTimeRules.length > 0
       }
     }
 
-    // Actualizar displays de precio y SKU
-    if (priceDisplay) priceDisplay.textContent = formatPrice(variantPrice);
     if (skuDisplay && variantSku) skuDisplay.textContent = `SKU: ${variantSku}`;
-    if (transferPriceDisplay) {
-      const transferPrice = variantPrice * 0.9;
-      transferPriceDisplay.innerHTML = `
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-        ${formatPrice(transferPrice)} con transferencia bancaria (10% off)
-      `;
-    }
+
+    updatePricingDisplays(currentBasePrice);
   });
 
   // Galería de thumbnails
@@ -664,32 +706,29 @@ const initialProductionTime = productionTimeRules.length > 0
   attachThumbnailListeners();
 
   // Cantidad
-  const qtyInput = document.getElementById('qty-input') as HTMLInputElement;
   const qtyMinus = document.getElementById('qty-minus');
   const qtyPlus = document.getElementById('qty-plus');
   const minOrder = parseInt(qtyInput?.min || '1');
 
   qtyMinus?.addEventListener('click', () => {
     const current = parseInt(qtyInput.value);
-    if (current > minOrder) qtyInput.value = String(current - 1);
+    if (current > minOrder) {
+      qtyInput.value = String(current - 1);
+      updateProductionTime();
+      updatePricingDisplays(currentBasePrice);
+    }
   });
 
   qtyPlus?.addEventListener('click', () => {
     const current = parseInt(qtyInput.value);
     qtyInput.value = String(current + 1);
     updateProductionTime();
-  });
-
-  qtyMinus?.addEventListener('click', () => {
-    const current = parseInt(qtyInput.value);
-    if (current > minOrder) {
-      qtyInput.value = String(current - 1);
-      updateProductionTime();
-    }
+    updatePricingDisplays(currentBasePrice);
   });
 
   qtyInput?.addEventListener('change', () => {
     updateProductionTime();
+    updatePricingDisplays(currentBasePrice);
   });
 
   // Production time dynamic update
@@ -714,8 +753,9 @@ const initialProductionTime = productionTimeRules.length > 0
   }
 </script>
 
-<script is:inline define:vars={{ productionTimeRules: JSON.stringify(productionTimeRules), productionTimeFallback: product.productionTime || '' }}>
-  // Make production time data available to the main script
+<script is:inline define:vars={{ productionTimeRules: JSON.stringify(productionTimeRules), productionTimeFallback: product.productionTime || '', priceRules: JSON.stringify(priceRules) }}>
+  // Make production time and price rules data available to the main script
   window.__productionTimeRules = JSON.parse(productionTimeRules);
   window.__productionTimeFallback = productionTimeFallback || null;
+  window.__priceRules = JSON.parse(priceRules);
 </script>

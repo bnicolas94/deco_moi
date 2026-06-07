@@ -22,6 +22,10 @@ export default {
                 error: '#F44336',
                 warning: '#FF9800',
                 info: '#2196F3',
+                brand: {
+                    primary: '#4F46E5',
+                    secondary: '#4338CA'
+                }
             },
             fontFamily: {
                 heading: ['Montserrat', 'sans-serif'],

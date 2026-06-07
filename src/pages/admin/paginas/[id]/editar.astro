@@ -1,0 +1,46 @@
+---
+import '@/styles/global.css';
+import { db } from '@/lib/db/connection';
+import { pages } from '@/lib/db/schema';
+import { eq } from 'drizzle-orm';
+import PageEditor from '@/components/admin/builder/PageEditor';
+
+if (!Astro.locals.user || Astro.locals.user.role !== 'admin') {
+    return Astro.redirect('/login');
+}
+
+const { id } = Astro.params;
+if (!id) return Astro.redirect('/admin/paginas');
+
+const result = await db.select({
+    id: pages.id,
+    title: pages.title,
+    slug: pages.slug,
+    status: pages.status,
+    blocks: pages.blocks,
+    seoTitle: pages.seoTitle,
+    seoDescription: pages.seoDescription,
+    ogImage: pages.ogImage,
+    publishedAt: pages.publishedAt,
+    createdAt: pages.createdAt,
+    updatedAt: pages.updatedAt
+}).from(pages).where(eq(pages.id, id));
+if (!result.length) {
+    return Astro.redirect('/admin/paginas');
+}
+
+const pageData = result[0];
+---
+
+<!DOCTYPE html>
+<html lang="es" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Editando: {pageData.title} - Page Builder</title>
+</head>
+<body class="h-full m-0 p-0 overflow-hidden bg-gray-50">
+    <!-- El editor es una SPA dentro de esta vista aislada del layout tradicional de admin -->
+    <PageEditor client:only="react" initialData={pageData} />
+</body>
+</html>
