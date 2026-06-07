@@ -3,7 +3,7 @@ import AdminLayout from '@/layouts/AdminLayout.astro';
 import { db } from '@/lib/db/connection';
 import { products, categories, mockupTemplates, productionTimeRules, meliItemLinks, costItems, productCostItems, productSupplies, supplies } from '@/lib/db/schema';
 import { eq, asc, and } from 'drizzle-orm';
-import { Save, ArrowLeft, Image as ImageIcon, Trash2, Star, Plus, Clock } from 'lucide-react';
+import { Save, ArrowLeft, Image as ImageIcon, Trash2, Star, Plus, Clock, ExternalLink } from 'lucide-react';
 import RichTextEditor from '@/components/admin/RichTextEditor';
 
 const { id } = Astro.params;
@@ -147,6 +147,16 @@ const SUPPLY_ICONS: Record<string, string> = {
                     <p class="text-gray-500 mt-1 font-medium italic">
                         {isNew ? "Añade un nuevo ítem a tu catálogo." : `Gestionando "${product?.name}"`}
                     </p>
+                    {!isNew && product?.slug && (
+                        <a 
+                            href={`/producto/${product.slug}`} 
+                            target="_blank"
+                            class="inline-flex items-center gap-1.5 mt-2 px-3 py-1 text-xs font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 border border-indigo-100 rounded-full transition-all"
+                        >
+                            <ExternalLink className="w-3.5 h-3.5" />
+                            Ver en tienda
+                        </a>
+                    )}
                 </div>
             </div>
             

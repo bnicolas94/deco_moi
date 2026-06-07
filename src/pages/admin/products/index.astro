@@ -227,7 +227,7 @@ const allCategories = await db.select().from(categories).orderBy(categories.name
                                             </div>
                                         </div>
                                         <div class="ml-4">
-                                            <div class="text-sm font-bold text-gray-900 line-clamp-1">{product.name}</div>
+                                            <a href={`/admin/products/${product.id}`} class="text-sm font-bold text-gray-900 line-clamp-1 hover:text-indigo-600 hover:underline transition-colors cursor-pointer">{product.name}</a>
                                             <div class="text-[10px] font-mono text-gray-400 tracking-tighter uppercase mt-0.5">{product.sku || 'Sin SKU'}</div>
                                         </div>
                                     </div>
