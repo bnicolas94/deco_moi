@@ -105,7 +105,7 @@ export const POST: APIRoute = async (context) => {
                         await tx.insert(productVariants).values({
                             productId: newProduct.id,
                             name: v.name,
-                            sku: v.sku,
+                            sku: v.sku || null,
                             price: v.price ? v.price.toString() : null,
                             stock: v.stock,
                             images: variantImages,

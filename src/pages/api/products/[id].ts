@@ -34,7 +34,7 @@ export const PUT: APIRoute = async (context) => {
     const categoryIdStr = formData.get('categoryId')?.toString() || '0';
     const categoryId = parseInt(categoryIdStr);
     const description = formData.get('description')?.toString();
-    const sku = formData.get('sku')?.toString();
+    const sku = formData.get('sku')?.toString() || null;
     const isActive = formData.get('isActive') === 'true';
     const isFeatured = formData.get('isFeatured') === 'true';
 
@@ -142,7 +142,7 @@ export const PUT: APIRoute = async (context) => {
                         await tx.update(productVariants)
                             .set({
                                 name: v.name,
-                                sku: v.sku,
+                                sku: v.sku || null,
                                 price: v.price ? v.price.toString() : null,
                                 stock: v.stock,
                                 images: variantImages,
@@ -156,7 +156,7 @@ export const PUT: APIRoute = async (context) => {
                             .values({
                                 productId: id,
                                 name: v.name,
-                                sku: v.sku,
+                                sku: v.sku || null,
                                 price: v.price ? v.price.toString() : null,
                                 stock: v.stock,
                                 images: variantImages,
