@@ -63,9 +63,7 @@ const mainImage = product.images?.[0] || null;
       </a>
     </h3>
 
-    {product.shortDescription && (
-      <p class="text-2xs text-gray-400 mb-2 line-clamp-1">{stripHtml(product.shortDescription)}</p>
-    )}
+
 
     <div class="mb-1">
       {product.isOnSale && product.salePrice ? (

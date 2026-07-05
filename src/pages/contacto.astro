@@ -1,6 +1,13 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
 import { SOCIAL_LINKS } from '@/lib/utils/constants';
+import { getGeneralConfig } from '@/lib/services/ConfigService';
+
+const generalConfig = await getGeneralConfig();
+const whatsappNumber = generalConfig.whatsapp || import.meta.env.PUBLIC_WHATSAPP_NUMBER || '5491112345678';
+const whatsappMessage = generalConfig.whatsappMessage || 'Hola! Tengo una consulta.';
+const cleanWhatsapp = whatsappNumber.replace(/\D/g, '');
+const whatsappUrl = `https://wa.me/${cleanWhatsapp}?text=${encodeURIComponent(whatsappMessage)}`;
 ---
 
 <BaseLayout
@@ -33,7 +40,7 @@ import { SOCIAL_LINKS } from '@/lib/utils/constants';
       <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
         <!-- WhatsApp -->
         <a
-          href={SOCIAL_LINKS.whatsapp}
+          href={whatsappUrl}
           target="_blank"
           rel="noopener noreferrer"
           class="card p-6 text-center hover:shadow-lg transition-shadow group"

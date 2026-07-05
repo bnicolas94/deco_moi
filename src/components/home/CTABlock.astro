@@ -1,4 +1,7 @@
 ---
+import { getGeneralConfig } from '@/lib/services/ConfigService';
+const generalConfig = await getGeneralConfig();
+
 interface Props {
   title?: string;
   subtitle?: string;
@@ -11,9 +14,11 @@ const {
   title = "¿Tenés un evento especial?",
   subtitle = "Contactanos por WhatsApp y te ayudamos a crear el souvenir perfecto para tu ocasión. Pedidos urgentes y personalización total.",
   buttonText = "Escribinos por WhatsApp",
-  whatsappNumber = import.meta.env.PUBLIC_WHATSAPP_NUMBER || '5491112345678',
-  whatsappMessage = "Hola! Quiero consultar sobre souvenirs personalizados"
+  whatsappNumber = generalConfig.whatsapp || import.meta.env.PUBLIC_WHATSAPP_NUMBER || '5491112345678',
+  whatsappMessage = generalConfig.whatsappMessage || "Hola! Quiero consultar sobre souvenirs personalizados"
 } = Astro.props;
+
+const cleanWhatsapp = whatsappNumber.replace(/\D/g, '');
 ---
 
 <section class="py-16 gradient-primary">
@@ -25,7 +30,7 @@ const {
       {subtitle}
     </p>
     <a
-      href={`https://wa.me/${whatsappNumber}?text=${encodeURIComponent(whatsappMessage)}`}
+      href={`https://wa.me/${cleanWhatsapp}?text=${encodeURIComponent(whatsappMessage)}`}
       target="_blank"
       rel="noopener noreferrer"
       class="btn btn-whatsapp btn-lg"

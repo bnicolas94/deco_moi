@@ -1,4 +1,7 @@
 ---
+import { getGeneralConfig } from '@/lib/services/ConfigService';
+const generalConfig = await getGeneralConfig();
+
 export interface Props {
     title?: string;
     phoneNumber?: string;
@@ -9,13 +12,14 @@ export interface Props {
 
 const {
     title = '¿Necesitas ayuda o un pedido personalizado?',
-    phoneNumber = import.meta.env.PUBLIC_WHATSAPP_NUMBER || '5491112345678',
-    message = 'Hola! Quiero realizar una consulta.',
+    phoneNumber = generalConfig.whatsapp || import.meta.env.PUBLIC_WHATSAPP_NUMBER || '5491112345678',
+    message = generalConfig.whatsappMessage || 'Hola! Quiero realizar una consulta.',
     buttonText = 'Chatear por WhatsApp',
     backgroundColor = '#f9fafb'
 } = Astro.props;
 
-const whatsappUrl = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(message)}`;
+const cleanWhatsapp = phoneNumber.replace(/\D/g, '');
+const whatsappUrl = `https://wa.me/${cleanWhatsapp}?text=${encodeURIComponent(message)}`;
 ---
 
 <section class="py-12 md:py-16" style={`background-color: ${backgroundColor};`}>
