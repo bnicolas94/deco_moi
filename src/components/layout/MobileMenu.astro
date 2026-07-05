@@ -1,5 +1,12 @@
 ---
 import { NAV_LINKS, MAIN_CATEGORIES, SOCIAL_LINKS } from '@/lib/utils/constants';
+import { getGeneralConfig } from '@/lib/services/ConfigService';
+
+const generalConfig = await getGeneralConfig();
+const whatsappNumber = generalConfig.whatsapp || import.meta.env.PUBLIC_WHATSAPP_NUMBER || '5491112345678';
+const whatsappMessage = generalConfig.whatsappMessage || 'Hola! Tengo una consulta.';
+const cleanWhatsapp = whatsappNumber.replace(/\D/g, '');
+const whatsappUrl = `https://wa.me/${cleanWhatsapp}?text=${encodeURIComponent(whatsappMessage)}`;
 ---
 
 <!-- Overlay -->
@@ -116,7 +123,7 @@ import { NAV_LINKS, MAIN_CATEGORIES, SOCIAL_LINKS } from '@/lib/utils/constants'
         </svg>
       </a>
       <a
-        href={SOCIAL_LINKS.whatsapp}
+        href={whatsappUrl}
         target="_blank"
         rel="noopener noreferrer"
         class="w-10 h-10 rounded-full bg-light-gray flex items-center justify-center hover:bg-[#25D366]/20 transition-colors"

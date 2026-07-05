@@ -2,6 +2,13 @@
 import Navigation from './Navigation.astro';
 import MobileMenu from './MobileMenu.astro';
 import { SOCIAL_LINKS } from '@/lib/utils/constants';
+import { getGeneralConfig } from '@/lib/services/ConfigService';
+
+const generalConfig = await getGeneralConfig();
+const whatsappNumber = generalConfig.whatsapp || import.meta.env.PUBLIC_WHATSAPP_NUMBER || '5491112345678';
+const whatsappMessage = generalConfig.whatsappMessage || 'Hola! Tengo una consulta.';
+const cleanWhatsapp = whatsappNumber.replace(/\D/g, '');
+const whatsappUrl = `https://wa.me/${cleanWhatsapp}?text=${encodeURIComponent(whatsappMessage)}`;
 ---
 
 <header class="sticky top-0 z-50 w-full">
@@ -9,7 +16,7 @@ import { SOCIAL_LINKS } from '@/lib/utils/constants';
   <div class="bg-secondary text-white text-center py-2 px-4">
     <p class="text-xs sm:text-sm font-medium tracking-wide">
       ✨ <strong>10% de descuento</strong> pagando con transferencia bancaria |
-      <a href={SOCIAL_LINKS.whatsapp} target="_blank" rel="noopener" class="underline hover:text-primary transition-colors">
+      <a href={whatsappUrl} target="_blank" rel="noopener" class="underline hover:text-primary transition-colors">
         Pedidos urgentes por WhatsApp
       </a>
     </p>
