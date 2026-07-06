@@ -1,0 +1,514 @@
+<!doctype html>
+<html lang="es" class="h-full">
+ <head><script>window["__codeletBootstrap__"]=JSON.parse('{"A":"A","B":"20260703-05-6766c4c"}');</script><script src="/_sdk/f432b76fb310b513.telemetry_sdk.js" integrity="sha512-9FJQ55EKmmqhyyik8BhrMVfm0+iYYfb8uOlRsjtkxJMEI97qOVEI4PnHohDjQAtvAep0IOEpdQ64eki0sz62ug=="></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Souvenirs</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script src="https://cdn.jsdelivr.net/npm/lucide@0.263.0/dist/umd/lucide.min.js"></script>
+  <script src="/_sdk/8650958800d6c92a.element_sdk.js" integrity="sha512-zFMhEG5W24TdVhhc4yw+K4kKrl6mClLz7Nz7OlZcKY64bZTx26LpVI6mwMCarQMzfrHe8i4fBMu4fxoFej2m9g=="></script>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600;700&amp;family=Montserrat:wght@300;400;500;600&amp;display=swap" rel="stylesheet">
+  <style>
+    html, body { height: 100%; margin: 0; }
+    body { font-family: 'Montserrat', sans-serif; }
+    h1, h2, h3 { font-family: 'Cormorant Garamond', serif; }
+    .hero-strip { width: calc(100% / 12); height: 100%; object-fit: cover; }
+    .event-btn { position: relative; overflow: hidden; border-radius: 0; width: 100%; height: 100%; cursor: pointer; transition: all 0.5s ease; display: block; }
+    .events-grid:has(.event-btn:hover) .event-btn:not(:hover) { opacity: 0.4; }
+    .event-btn:hover { opacity: 1; }
+    .event-btn .overlay { position: absolute; inset: 0; background: linear-gradient(to top, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.1) 100%); display: flex; align-items: flex-end; justify-content: center; padding: 1.2rem; }
+    .event-btn .overlay span { color: #fff; font-family: 'Cormorant Garamond', serif; font-size: 1.3rem; font-weight: 600; text-align: center; }
+    
+    .style-btn { position: relative; overflow: hidden; border-radius: 12px; width: 100%; height: 140px; cursor: pointer; transition: all 0.8s cubic-bezier(0.34, 1.56, 0.64, 1); display: block; }
+    .styles-grid:has(.style-btn:hover) .style-btn:not(:hover) { opacity: 0.35; transform: scale(0.95); }
+    .style-btn:hover { transform: scale(1.15); opacity: 1 !important; }
+    .style-btn .overlay { position: absolute; inset: 0; background: linear-gradient(to top, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.1) 100%); display: flex; align-items: flex-end; justify-content: center; padding: 1.2rem; }
+    .style-btn .overlay span { color: #fff; font-family: 'Cormorant Garamond', serif; font-size: 1.3rem; font-weight: 600; text-align: center; }
+    .product-card { position: relative; overflow: hidden; border-radius: 12px; cursor: pointer; }
+    .product-card .img-hover { position: absolute; inset: 0; opacity: 0; transition: opacity 0.4s; }
+    .product-card:hover .img-hover { opacity: 1; }
+    .product-card:hover .img-main { opacity: 0; }
+    .fade-in { animation: fadeIn 0.4s ease; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    .qty-input::-webkit-inner-spin-button { -webkit-appearance: none; }
+    .qty-input { -moz-appearance: textfield; }
+  </style>
+  <style>body { box-sizing: border-box; }</style>
+  <script src="/_sdk/0179d719c431a79e.data_sdk.js" type="text/javascript" integrity="sha512-OsRvJkI5GkC3MJQcgotQYotpzrMSX415GiKKgvYdxQEEkzD/fdchShO2FMSy0PJr/tiINMXOk5Vl2zAgg6bUiA=="></script>
+ </head>
+ <body class="h-full bg-[#faf8f5] text-[#2c2c2c] overflow-auto">
+  <div id="app" class="w-full h-full">
+   <!-- HERO SECTION -->
+   <section id="hero-section" class="w-full h-full relative flex flex-col">
+    <!-- Menu horizontal al tope -->
+    <div class="w-full border-b border-[#e5e0d5] py-4">
+     <div class="flex items-center justify-center gap-8 px-4">
+      <button class="flex items-center gap-2 text-sm text-[#8b7355] hover:text-[#2c2c2c] transition">¿Quiénes somos?</button> <button class="flex items-center gap-2 text-sm text-[#8b7355] hover:text-[#2c2c2c] transition">Preguntas Frecuentes</button> <button class="flex items-center gap-2 text-sm text-[#8b7355] hover:text-[#2c2c2c] transition">Crea Tu Diseño</button> <button class="flex items-center gap-2 text-sm text-[#8b7355] hover:text-[#2c2c2c] transition">Experiencias</button> <button class="flex items-center gap-2 text-sm text-[#8b7355] hover:text-[#2c2c2c] transition">Calificaciones</button>
+     </div>
+    </div>
+    <div class="flex-1 flex flex-col">
+     <!-- Header con titulo -->
+     <div class="flex items-center justify-center pt-8 pb-4">
+      <h1 id="main-title" class="text-6xl md:text-7xl text-[#2c2c2c] font-light tracking-wide">Souvenirs</h1>
+     </div><!-- Dos bloques divididos -->
+     <div class="flex-1 flex gap-0">
+      <!-- SOCIALES -->
+      <div class="flex-1 flex flex-col relative overflow-hidden group/sociales cursor-pointer" onclick="scrollToCategory('sociales')">
+       <div id="sociales-strips" class="flex-1 flex w-full h-full"></div>
+       <div class="absolute inset-0 bg-black/30 group-hover/sociales:bg-black/20 transition-all flex items-center justify-center flex-col gap-3">
+        <h2 class="text-4xl md:text-5xl text-white font-light">Sociales</h2>
+       </div>
+      </div><!-- COMERCIALES -->
+      <div class="flex-1 flex flex-col relative overflow-hidden group/comerciales cursor-pointer" onclick="scrollToCategory('comerciales')">
+       <div id="comerciales-strips" class="flex-1 flex w-full h-full"></div>
+       <div class="absolute inset-0 bg-black/30 group-hover/comerciales:bg-black/20 transition-all flex items-center justify-center flex-col gap-3">
+        <h2 class="text-4xl md:text-5xl text-white font-light">Comerciales</h2>
+       </div>
+      </div>
+     </div>
+    </div>
+   </section><!-- EVENTS SECTION -->
+   <section id="events-section" class="w-full px-0 py-0 hidden h-full flex flex-col">
+    <button onclick="goHome()" class="flex items-center gap-2 text-sm text-[#8b7355] mb-6 hover:underline px-4 pt-4"><i data-lucide="arrow-left" class="w-4 h-4"></i> Inicio</button>
+    <h2 class="text-4xl text-center mb-10 font-light text-[#3a3a3a] px-4">Elegí tu evento</h2>
+    <div id="events-grid" class="events-grid grid grid-cols-2 gap-0 w-full flex-1"></div>
+   </section><!-- STYLES SECTION -->
+   <section id="styles-section" class="w-full px-4 py-16 max-w-5xl mx-auto hidden">
+    <button onclick="goToEvents()" class="flex items-center gap-2 text-sm text-[#8b7355] mb-6 hover:underline"><i data-lucide="arrow-left" class="w-4 h-4"></i> Volver a eventos</button>
+    <h2 id="styles-title" class="text-4xl text-center mb-10 font-light text-[#3a3a3a]"></h2>
+    <div id="styles-grid" class="styles-grid grid grid-cols-2 gap-4 md:gap-6"></div>
+   </section><!-- PRODUCTS SECTION -->
+   <section id="products-section" class="w-full px-4 py-16 max-w-5xl mx-auto hidden">
+    <button id="back-to-styles" class="flex items-center gap-2 text-sm text-[#8b7355] mb-6 hover:underline"><i data-lucide="arrow-left" class="w-4 h-4"></i> Volver a estilos</button>
+    <h2 id="products-title" class="text-4xl text-center mb-10 font-light text-[#3a3a3a]"></h2>
+    <div id="products-grid" class="grid grid-cols-2 md:grid-cols-3 gap-5"></div>
+   </section><!-- PRODUCT DETAIL SECTION -->
+   <section id="detail-section" class="w-full px-4 py-16 max-w-5xl mx-auto hidden">
+    <button id="back-to-products" class="flex items-center gap-2 text-sm text-[#8b7355] mb-6 hover:underline"><i data-lucide="arrow-left" class="w-4 h-4"></i> Volver a productos</button>
+    <div id="detail-content" class="fade-in"></div>
+   </section>
+  </div>
+  <script>
+// DATA
+const events = {
+  sociales: [
+    { id: 'babyshower', name: 'Baby Shower', color: '#f4c2c2', gradient: 'linear-gradient(135deg,#f9e4e4,#f4c2c2)' },
+    { id: 'nacimiento', name: 'Nacimiento', color: '#c2e0f4', gradient: 'linear-gradient(135deg,#e4f2f9,#c2e0f4)' },
+    { id: 'bautismo', name: 'Bautismo', color: '#e8dff5', gradient: 'linear-gradient(135deg,#f5f0ff,#e8dff5)' },
+    { id: 'barmitzva', name: 'Bar Mitzvá', color: '#d4e6c3', gradient: 'linear-gradient(135deg,#edf5e4,#d4e6c3)' },
+    { id: 'comunion', name: 'Comunión', color: '#fff3cd', gradient: 'linear-gradient(135deg,#fffde4,#fff3cd)' },
+    { id: 'xv', name: 'XV Años', color: '#f5c6d0', gradient: 'linear-gradient(135deg,#fde4ea,#f5c6d0)' },
+    { id: 'boda', name: 'Boda', color: '#fde8d0', gradient: 'linear-gradient(135deg,#fff5ea,#fde8d0)' },
+    { id: 'cumpleinfantil', name: 'Cumpleaños Infantiles', color: '#ff9fb2', gradient: 'linear-gradient(135deg,#ffb3d9,#ff9fb2)' },
+    { id: 'cumpleadultos', name: 'Cumpleaños Adultos', color: '#b4a7d6', gradient: 'linear-gradient(135deg,#d4c5e2,#b4a7d6)' }
+  ],
+  comerciales: [
+    { id: 'personalizado', name: 'Personalizados con Logo', color: '#e6b3ff', gradient: 'linear-gradient(135deg,#f0d9ff,#e6b3ff)' },
+    { id: 'pascua', name: 'Pascua', color: '#ffc966', gradient: 'linear-gradient(135deg,#ffe680,#ffc966)' },
+    { id: 'navidad', name: 'Navidad', color: '#c41e3a', gradient: 'linear-gradient(135deg,#e83a4a,#c41e3a)' },
+    { id: 'mundial', name: 'Mundial', color: '#4a90e2', gradient: 'linear-gradient(135deg,#6ba3ff,#4a90e2)' },
+    { id: 'año_nuevo', name: 'Año Nuevo', color: '#c0d9ff', gradient: 'linear-gradient(135deg,#e0ebff,#c0d9ff)' }
+  ]
+};
+
+const stylesData = {
+  default: [
+    { id: 'velas', name: 'Velas', color: '#ffeaa7' },
+    { id: 'chocolates', name: 'Chocolates', color: '#dfe6e9' },
+    { id: 'tejidos', name: 'Tejidos', color: '#fab1a0' },
+    { id: 'kits', name: 'Kits de Emergencia', color: '#a29bfe' },
+    { id: 'bolsitas', name: 'Bolsitas', color: '#81ecec' },
+    { id: 'jabones', name: 'Jabones Artesanales', color: '#ffeaa7' }
+  ],
+  xv: [
+    { id: 'velas', name: 'Velas', color: '#ffeaa7' },
+    { id: 'chocolates', name: 'Chocolates', color: '#dfe6e9' },
+    { id: 'tejidos', name: 'Tejidos', color: '#fab1a0' },
+    { id: 'cintas', name: 'Cintas de XV', color: '#f5c6d0' },
+    { id: 'kits', name: 'Kits de Emergencia', color: '#a29bfe' },
+    { id: 'bolsitas', name: 'Bolsitas', color: '#81ecec' }
+  ]
+};
+
+const productImages = {
+  chocolates: 'https://images.unsplash.com/photo-1599599810694-b5ac4dd87952?w=400&h=400&fit=crop',
+  velas: 'https://images.unsplash.com/photo-1602099113235-7c828341ca5d?w=400&h=400&fit=crop',
+  tejidos: 'https://images.unsplash.com/photo-1575529387538-1f1c0f40d1da?w=400&h=400&fit=crop',
+  kits: 'https://images.unsplash.com/photo-1607623814075-e51df1bdc82f?w=400&h=400&fit=crop',
+  cintas: 'https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?w=400&h=400&fit=crop',
+  bolsitas: 'https://images.unsplash.com/photo-1508718531068-35d02277d59b?w=400&h=400&fit=crop',
+  jabones: 'https://images.unsplash.com/photo-1600857062241-98e5dba7214f?w=400&h=400&fit=crop'
+};
+
+const productsData = {
+  chocolates: [
+    { id: 'choco2', name: 'Cajita de 2 Chocolates', price: 1500, category: 'chocolates' },
+    { id: 'choco6blanco', name: 'Cajita 6 Chocolates Blanca y Dorada', price: 3200, category: 'chocolates' },
+    { id: 'choco6ink', name: 'Cajita 6 Chocolates Diseño Ink', price: 3400, category: 'chocolates' },
+    { id: 'choco6negra', name: 'Cajita 6 Chocolates Negra y Dorada', price: 3500, category: 'chocolates' },
+    { id: 'chocosueltos', name: 'Chocolates Sueltos', price: 800, category: 'chocolates' },
+    { id: 'cintas', name: 'Cintas con Chocolates', price: 1200, category: 'chocolates' }
+  ],
+  velas: [
+    { id: 'vela1', name: 'Vela Aromática Clásica', price: 1800, category: 'velas' },
+    { id: 'vela2', name: 'Vela Personalizada', price: 2200, category: 'velas' },
+    { id: 'vela3', name: 'Set de 3 Mini Velas', price: 2800, category: 'velas' }
+  ],
+  tejidos: [
+    { id: 'tejido1', name: 'Crochet Mini Corazón', price: 1000, category: 'tejidos' },
+    { id: 'tejido2', name: 'Amigurumi Personalizado', price: 2500, category: 'tejidos' }
+  ],
+  kits: [
+    { id: 'kit1', name: 'Kit de Emergencia Básico', price: 2000, category: 'kits' },
+    { id: 'kit2', name: 'Kit de Emergencia Premium', price: 3500, category: 'kits' }
+  ],
+  cintas: [
+    { id: 'cinta1', name: 'Cinta Satinada Personalizada', price: 900, category: 'cintas' },
+    { id: 'cinta2', name: 'Cinta con Dije', price: 1400, category: 'cintas' }
+  ],
+  bolsitas: [
+    { id: 'bolsa1', name: 'Bolsita de Organza', price: 700, category: 'bolsitas' },
+    { id: 'bolsa2', name: 'Bolsita Kraft Personalizada', price: 1100, category: 'bolsitas' }
+  ],
+  jabones: [
+    { id: 'jabon1', name: 'Jabón Artesanal Lavanda', price: 1200, category: 'jabones' },
+    { id: 'jabon2', name: 'Set Jabones x3', price: 2800, category: 'jabones' }
+  ]
+};
+
+let currentEvent = null;
+let currentStyle = null;
+
+// HERO STRIPS
+function buildHero() {
+  const socialesContainer = document.getElementById('sociales-strips');
+  const comercialesContainer = document.getElementById('comerciales-strips');
+  
+  events.sociales.forEach(ev => {
+    const strip = document.createElement('div');
+    strip.className = 'hero-strip';
+    strip.style.background = ev.gradient;
+    strip.style.width = `calc(100% / ${events.sociales.length})`;
+    socialesContainer.appendChild(strip);
+  });
+  
+  events.comerciales.forEach(ev => {
+    const strip = document.createElement('div');
+    strip.className = 'hero-strip';
+    strip.style.background = ev.gradient;
+    strip.style.width = `calc(100% / ${events.comerciales.length})`;
+    comercialesContainer.appendChild(strip);
+  });
+}
+
+// EVENTS GRID
+function buildEvents(category) {
+  const grid = document.getElementById('events-grid');
+  grid.innerHTML = '';
+  const categoryEvents = category === 'sociales' ? events.sociales : events.comerciales;
+  categoryEvents.forEach(ev => {
+    const btn = document.createElement('div');
+    btn.className = 'event-btn';
+    btn.style.background = ev.gradient;
+    btn.innerHTML = `<div class="overlay"><span>${ev.name}</span></div>`;
+    btn.onclick = () => openStyles(ev);
+    grid.appendChild(btn);
+  });
+  window.currentCategory = category;
+}
+
+function openStyles(ev) {
+  currentEvent = ev;
+  hideAll();
+  document.getElementById('styles-section').classList.remove('hidden');
+  document.getElementById('styles-title').textContent = `Estilos para ${ev.name}`;
+  const styles = stylesData[ev.id] || stylesData.default;
+  const grid = document.getElementById('styles-grid');
+  grid.innerHTML = '';
+  styles.forEach(s => {
+    const btn = document.createElement('div');
+    btn.className = 'style-btn';
+    btn.style.background = s.color;
+    btn.innerHTML = `<div class="overlay"><span>${s.name}</span></div>`;
+    btn.onclick = () => openProducts(s);
+    grid.appendChild(btn);
+  });
+  
+  // Agregar botón "Ver Todos" al final
+  const verTodosBtn = document.createElement('button');
+  verTodosBtn.className = 'flex items-center justify-center gap-2 text-sm text-[#8b7355] border border-[#8b7355] px-6 py-3 rounded-lg hover:bg-[#8b7355] hover:text-white transition mt-4 mx-auto';
+  verTodosBtn.innerHTML = `<i data-lucide="grid-3x3" class="w-4 h-4"></i> Ver Todos`;
+  verTodosBtn.onclick = () => openAllProducts();
+  const buttonContainer = document.createElement('div');
+  buttonContainer.className = 'col-span-2 flex justify-center';
+  buttonContainer.appendChild(verTodosBtn);
+  grid.appendChild(buttonContainer);
+  
+  lucide.createIcons();
+  window.scrollTo(0, 0);
+}
+
+function openProducts(style) {
+  currentStyle = style;
+  hideAll();
+  document.getElementById('products-section').classList.remove('hidden');
+  document.getElementById('products-title').textContent = style.name;
+  document.getElementById('back-to-styles').onclick = () => openStyles(currentEvent);
+  const products = productsData[style.id] || [{ id: 'gen1', name: 'Producto 1', price: 1500, img1Color: '#dfe6e9', img2Color: '#b2bec3' }];
+  const grid = document.getElementById('products-grid');
+  grid.innerHTML = '';
+  products.forEach(p => {
+    const card = document.createElement('div');
+    card.className = 'product-card bg-white shadow-md';
+    const imgUrl = productImages[p.category] || productImages.chocolates;
+    card.innerHTML = `
+      <div class="relative aspect-square overflow-hidden">
+        <img src="${imgUrl}" alt="${p.name}" loading="lazy" class="w-full h-full object-cover" onerror="console.error('Image failed to load:', this.src); this.style.background='#e5e7eb'; this.alt='Imagen no disponible';">
+      </div>
+      <div class="p-3">
+        <p class="text-sm font-medium truncate">${p.name}</p>
+        <p class="text-[#8b7355] font-semibold mt-1">$${p.price.toLocaleString()}</p>
+      </div>`;
+    card.onclick = () => openDetail(p);
+    grid.appendChild(card);
+  });
+  lucide.createIcons();
+  window.scrollTo(0, 0);
+}
+
+function openAllProducts() {
+  hideAll();
+  document.getElementById('products-section').classList.remove('hidden');
+  document.getElementById('products-title').textContent = 'Todos los Productos';
+  document.getElementById('back-to-styles').onclick = () => openStyles(currentEvent);
+  
+  // Combinar todos los productos de todas las categorías
+  const allProducts = [];
+  Object.values(productsData).forEach(categoryProducts => {
+    allProducts.push(...categoryProducts);
+  });
+  
+  const grid = document.getElementById('products-grid');
+  grid.innerHTML = '';
+  allProducts.forEach(p => {
+    const card = document.createElement('div');
+    card.className = 'product-card bg-white shadow-md';
+    const imgUrl = productImages[p.category] || productImages.chocolates;
+    card.innerHTML = `
+      <div class="relative aspect-square overflow-hidden">
+        <img src="${imgUrl}" alt="${p.name}" loading="lazy" class="w-full h-full object-cover" onerror="console.error('Image failed to load:', this.src); this.style.background='#e5e7eb'; this.alt='Imagen no disponible';">
+      </div>
+      <div class="p-3">
+        <p class="text-sm font-medium truncate">${p.name}</p>
+        <p class="text-[#8b7355] font-semibold mt-1">$${p.price.toLocaleString()}</p>
+      </div>`;
+    card.onclick = () => openDetail(p);
+    grid.appendChild(card);
+  });
+  lucide.createIcons();
+  window.scrollTo(0, 0);
+}
+
+function openDetail(product) {
+  hideAll();
+  document.getElementById('detail-section').classList.remove('hidden');
+  document.getElementById('back-to-products').onclick = () => openProducts(currentStyle);
+  const transferDiscount = 0.10;
+  const transferPrice = Math.round(product.price * (1 - transferDiscount));
+  const imgUrl = productImages[product.category] || productImages.chocolates;
+
+  document.getElementById('detail-content').innerHTML = `
+    <div class="grid md:grid-cols-2 gap-8 fade-in">
+      <div class="space-y-3">
+        <div class="aspect-square rounded-xl overflow-hidden bg-gray-100">
+          <img src="${imgUrl}" alt="${product.name}" loading="lazy" class="w-full h-full object-cover" onerror="console.error('Image failed to load:', this.src); this.style.background='#e5e7eb'; this.alt='Imagen no disponible';">
+        </div>
+        <div class="grid grid-cols-3 gap-2">
+          <div class="aspect-square rounded-lg overflow-hidden bg-gray-100">
+            <img src="${imgUrl}" alt="Detalle 1" loading="lazy" class="w-full h-full object-cover opacity-70" onerror="this.style.background='#e5e7eb';">
+          </div>
+          <div class="aspect-square rounded-lg overflow-hidden bg-gray-100">
+            <img src="${imgUrl}" alt="Detalle 2" loading="lazy" class="w-full h-full object-cover opacity-70" onerror="this.style.background='#e5e7eb';">
+          </div>
+          <div class="aspect-square rounded-lg overflow-hidden bg-gray-100">
+            <img src="${imgUrl}" alt="Detalle 3" loading="lazy" class="w-full h-full object-cover opacity-70" onerror="this.style.background='#e5e7eb';">
+          </div>
+        </div>
+      </div>
+      <div class="space-y-5">
+        <h2 class="text-3xl font-light">${product.name}</h2>
+        <div id="price-display">
+          <p class="text-2xl font-semibold text-[#3a3a3a]" id="unit-price">$${product.price.toLocaleString()}</p>
+          <p class="text-lg text-[#8b7355]" id="transfer-price">$${transferPrice.toLocaleString()} <span class="text-sm font-light">con transferencia</span></p>
+        </div>
+
+        <div class="border-t pt-4 space-y-3">
+          <label class="text-sm font-medium text-gray-600">Diseño:</label>
+          <div class="flex gap-2 flex-wrap">
+            ${[1,2,3,4,5,6,7].map(n => `
+              <button class="design-btn w-10 h-10 rounded-lg border-2 border-gray-300 text-sm font-semibold text-gray-600 hover:border-[#8b7355] hover:text-[#8b7355] transition" data-design="${n}">${n}</button>
+            `).join('')}
+          </div>
+          <input type="hidden" id="selected-design" value="1">
+        </div>
+
+        <p class="text-sm text-gray-500 leading-relaxed">Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam.</p>
+        
+        <div class="border-t pt-4 space-y-3">
+          <label class="text-sm font-medium text-gray-600">Cantidad:</label>
+          <div class="flex items-center gap-3">
+            <button onclick="changeQty(-1)" class="w-9 h-9 rounded-full border border-gray-300 flex items-center justify-center hover:bg-gray-100 transition">−</button>
+            <input id="qty-input" type="number" min="1" value="1" class="qty-input w-20 text-center border border-gray-300 rounded-lg py-2 text-lg font-medium" oninput="updateTotal()">
+            <button onclick="changeQty(1)" class="w-9 h-9 rounded-full border border-gray-300 flex items-center justify-center hover:bg-gray-100 transition">+</button>
+          </div>
+        </div>
+
+        <div id="total-box" class="bg-[#f9f6f1] rounded-xl p-4 space-y-1">
+          <p class="text-xs text-gray-500 uppercase tracking-wide">Total estimado</p>
+          <p class="text-xl font-semibold" id="total-normal">$${product.price.toLocaleString()}</p>
+          <p class="text-md text-[#8b7355]" id="total-transfer">$${transferPrice.toLocaleString()} <span class="text-xs">con transferencia</span></p>
+          <p id="discount-badge" class="text-xs text-green-700 hidden"></p>
+        </div>
+
+        <div class="flex gap-3 pt-2">
+          <button class="flex-1 bg-[#2c2c2c] text-white py-3 rounded-lg font-medium hover:bg-[#1a1a1a] transition">Comprar ahora</button>
+          <button class="flex-1 border-2 border-[#2c2c2c] text-[#2c2c2c] py-3 rounded-lg font-medium hover:bg-[#2c2c2c] hover:text-white transition">Agregar al carrito</button>
+        </div>
+      </div>
+    </div>`;
+
+  // Design selection functionality
+  document.querySelectorAll('.design-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+      document.querySelectorAll('.design-btn').forEach(b => b.classList.remove('border-[#8b7355]', 'text-[#8b7355]', 'bg-[#f5f0e8]'));
+      this.classList.add('border-[#8b7355]', 'text-[#8b7355]', 'bg-[#f5f0e8]');
+      document.getElementById('selected-design').value = this.dataset.design;
+    });
+  });
+
+  // Set first design as selected
+  document.querySelector('.design-btn[data-design="1"]').classList.add('border-[#8b7355]', 'text-[#8b7355]', 'bg-[#f5f0e8]');
+
+  window._currentProduct = product;
+  window._transferDiscount = transferDiscount;
+  lucide.createIcons();
+  window.scrollTo(0, 0);
+}
+
+function changeQty(delta) {
+  const input = document.getElementById('qty-input');
+  let val = parseInt(input.value) || 1;
+  val = Math.max(1, val + delta);
+  input.value = val;
+  updateTotal();
+}
+
+function updateTotal() {
+  const qty = Math.max(1, parseInt(document.getElementById('qty-input').value) || 1);
+  const product = window._currentProduct;
+  let unitPrice = product.price;
+  let volumeDiscount = 0;
+
+  if (qty >= 50) { volumeDiscount = 0.05; }
+  else if (qty >= 25) { volumeDiscount = 0.02; }
+
+  const discountedUnit = Math.round(unitPrice * (1 - volumeDiscount));
+  const transferUnit = Math.round(discountedUnit * (1 - window._transferDiscount));
+
+  document.getElementById('unit-price').textContent = `$${discountedUnit.toLocaleString()}`;
+  document.getElementById('transfer-price').innerHTML = `$${transferUnit.toLocaleString()} <span class="text-sm font-light">con transferencia</span>`;
+
+  document.getElementById('total-normal').textContent = `$${(discountedUnit * qty).toLocaleString()}`;
+  document.getElementById('total-transfer').innerHTML = `$${(transferUnit * qty).toLocaleString()} <span class="text-xs">con transferencia</span>`;
+
+  const badge = document.getElementById('discount-badge');
+  if (volumeDiscount > 0) {
+    badge.classList.remove('hidden');
+    badge.textContent = `🎉 Descuento por cantidad: ${(volumeDiscount * 100).toFixed(0)}% aplicado (${qty}+ unidades)`;
+  } else {
+    badge.classList.add('hidden');
+  }
+}
+
+// NAVIGATION
+function hideAll() {
+  ['hero-section','events-section','styles-section','products-section','detail-section'].forEach(id => {
+    document.getElementById(id).classList.add('hidden');
+  });
+}
+
+function scrollToCategory(category) {
+  hideAll();
+  document.getElementById('events-section').classList.remove('hidden');
+  buildEvents(category);
+  lucide.createIcons();
+  window.scrollTo(0, 0);
+}
+
+function goHome() {
+  hideAll();
+  document.getElementById('hero-section').classList.remove('hidden');
+  window.scrollTo(0, 0);
+}
+
+function goToEvents() {
+  hideAll();
+  document.getElementById('events-section').classList.remove('hidden');
+  window.scrollTo(0, 0);
+}
+
+// INIT
+buildHero();
+lucide.createIcons();
+
+// Element SDK
+const defaultConfig = {
+  store_title: 'Souvenirs',
+  background_color: '#faf8f5',
+  text_color: '#2c2c2c',
+  accent_color: '#8b7355',
+  surface_color: '#ffffff',
+  button_color: '#2c2c2c',
+  font_family: 'Cormorant Garamond',
+  font_size: 16
+};
+
+window.elementSdk.init({
+  defaultConfig,
+  onConfigChange: async (config) => {
+    const bg = config.background_color || defaultConfig.background_color;
+    const text = config.text_color || defaultConfig.text_color;
+    const accent = config.accent_color || defaultConfig.accent_color;
+    const font = config.font_family || defaultConfig.font_family;
+    const size = config.font_size || defaultConfig.font_size;
+    const title = config.store_title || defaultConfig.store_title;
+
+    document.body.style.backgroundColor = bg;
+    document.body.style.color = text;
+    document.getElementById('main-title').textContent = title;
+    document.getElementById('main-title').style.fontFamily = `${font}, serif`;
+
+    document.querySelectorAll('h2').forEach(el => {
+      el.style.fontFamily = `${font}, serif`;
+      el.style.fontSize = `${size * 2}px`;
+    });
+  },
+  mapToCapabilities: (config) => ({
+    recolorables: [
+      { get: () => config.background_color || defaultConfig.background_color, set: (v) => { config.background_color = v; window.elementSdk.setConfig({ background_color: v }); } },
+      { get: () => config.surface_color || defaultConfig.surface_color, set: (v) => { config.surface_color = v; window.elementSdk.setConfig({ surface_color: v }); } },
+      { get: () => config.text_color || defaultConfig.text_color, set: (v) => { config.text_color = v; window.elementSdk.setConfig({ text_color: v }); } },
+      { get: () => config.accent_color || defaultConfig.accent_color, set: (v) => { config.accent_color = v; window.elementSdk.setConfig({ accent_color: v }); } },
+      { get: () => config.button_color || defaultConfig.button_color, set: (v) => { config.button_color = v; window.elementSdk.setConfig({ button_color: v }); } }
+    ],
+    borderables: [],
+    fontEditable: { get: () => config.font_family || defaultConfig.font_family, set: (v) => { config.font_family = v; window.elementSdk.setConfig({ font_family: v }); } },
+    fontSizeable: { get: () => config.font_size || defaultConfig.font_size, set: (v) => { config.font_size = v; window.elementSdk.setConfig({ font_size: v }); } }
+  }),
+  mapToEditPanelValues: (config) => new Map([
+    ['store_title', config.store_title || defaultConfig.store_title]
+  ])
+});
+</script>
+ <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a169edd4d37dab2f',t:'MTc4MzI5MTgzMC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>

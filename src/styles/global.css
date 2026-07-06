@@ -20,16 +20,16 @@
   }
 
   body {
-    font-family: 'Open Sans', sans-serif;
-    color: #4A4A4A;
-    background-color: #FAF8F6;
+    font-family: 'Montserrat', sans-serif;
+    color: #3a3a3a;
+    background-color: #faf8f5;
     line-height: 1.6;
     overflow-x: hidden;
   }
 
   h1, h2, h3, h4, h5, h6 {
-    font-family: 'Montserrat', sans-serif;
-    color: #1A1A1A;
+    font-family: 'Cormorant Garamond', serif;
+    color: #2c2c2c;
     line-height: 1.2;
   }
 
@@ -48,9 +48,7 @@
   button {
     cursor: pointer;
     font-family: inherit;
-    border: none;
-    outline: none;
-    background: none;
+    background: transparent;
   }
 
   input, textarea, select {
@@ -63,12 +61,12 @@
   /* ---- Botones ---- */
   .btn {
     @apply inline-flex items-center justify-center gap-2 px-6 py-3 rounded-lg
-           font-heading font-semibold text-sm tracking-wide
+           font-body font-medium text-sm
            transition-all duration-300 ease-in-out;
   }
 
   .btn-primary {
-    @apply bg-primary text-brand-black hover:bg-primary-dark
+    @apply bg-brand-black text-white hover:bg-dark-gray
            hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0;
   }
 
@@ -78,8 +76,8 @@
   }
 
   .btn-outline {
-    @apply border-2 border-primary text-brand-black
-           hover:bg-primary hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0;
+    @apply border-2 border-brand-black text-brand-black
+           hover:bg-brand-black hover:text-white hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0;
   }
 
   .btn-gold {

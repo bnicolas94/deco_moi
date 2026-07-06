@@ -14,10 +14,10 @@ export default {
                 gold: '#FFD700',
                 'rose-gold': '#E0BFB8',
                 silver: '#C0C0C0',
-                'off-white': '#FAF8F6',
+                'off-white': '#faf8f5',
                 'light-gray': '#F5F3F0',
-                'dark-gray': '#4A4A4A',
-                'brand-black': '#1A1A1A',
+                'dark-gray': '#3a3a3a',
+                'brand-black': '#2c2c2c',
                 success: '#4CAF50',
                 error: '#F44336',
                 warning: '#FF9800',
@@ -28,8 +28,8 @@ export default {
                 }
             },
             fontFamily: {
-                heading: ['Montserrat', 'sans-serif'],
-                body: ['Open Sans', 'sans-serif'],
+                heading: ['Cormorant Garamond', 'serif'],
+                body: ['Montserrat', 'sans-serif'],
             },
             fontSize: {
                 '2xs': '0.625rem',
