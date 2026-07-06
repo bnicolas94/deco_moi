@@ -277,22 +277,22 @@ const initialProductionTime =
             {
               product.isOnSale && product.salePrice ? (
                 <>
-                  <span class="price-original text-lg">
+                  <span id="main-original-price-display" class="price-original text-lg">
                     {formatPrice(basePrice)}
                   </span>
-                  <span class="text-2xl font-semibold text-brand-black">
+                  <span id="main-price-display" class="text-2xl font-semibold text-brand-black">
                     {formatPrice(finalPrice)}
                   </span>
                   <span class="badge badge-sale">-{discountPct}%</span>
                 </>
               ) : (
-                <span class="text-2xl font-semibold text-brand-black">
+                <span id="main-price-display" class="text-2xl font-semibold text-brand-black">
                   {formatPrice(finalPrice)}
                 </span>
               )
             }
           </div>
-          <p class="text-sm text-gray-500 font-medium">
+          <p id="main-transfer-price-display" class="text-sm text-gray-500 font-medium">
             {formatPrice(transferPrice)} con transferencia
           </p>
         </div>
@@ -825,15 +825,9 @@ const initialProductionTime =
   const variantSelector = document.getElementById("variant-selector");
   const mainAddToCartBtn = document.getElementById("add-to-cart-main");
   const buyNowBtn = document.getElementById("buy-now-btn");
-  const priceDisplay =
-    document.querySelector(".text-3xl.font-heading.bold") ||
-    document.querySelector(".text-3xl.font-heading.font-bold");
-  const skuDisplay = document.querySelector(
-    ".text-xs.text-gray-400:last-of-type",
-  );
-  const transferPriceDisplay = document.querySelector(
-    ".text-sm.text-success.font-medium",
-  );
+  const priceDisplay = document.getElementById("main-price-display");
+  const skuDisplay = document.querySelector(".text-xs.text-gray-400:last-of-type");
+  const transferPriceDisplay = document.getElementById("main-transfer-price-display");
   const qtyInput = document.getElementById("qty-input") as HTMLInputElement;
 
   let currentBasePrice = parseFloat(
@@ -881,12 +875,7 @@ const initialProductionTime =
 
     if (transferPriceDisplay) {
       const transferPrice = unitPrice * 0.9;
-      transferPriceDisplay.innerHTML = `
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-        ${formatPrice(transferPrice)} con transferencia bancaria (10% off)
-      `;
+      transferPriceDisplay.textContent = `${formatPrice(transferPrice)} con transferencia`;
     }
 
     // Update Estimated Total
