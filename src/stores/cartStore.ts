@@ -1,5 +1,12 @@
 import { atom, computed } from 'nanostores';
 
+export interface SelectedOption {
+    groupName: string;
+    optionName: string;
+    optionId: number;
+    priceModifier: number;
+}
+
 export interface CartItem {
     id: number;
     name: string;
@@ -12,6 +19,7 @@ export interface CartItem {
     customization?: string;
     variantId?: number;
     variantName?: string;
+    selectedOptions?: SelectedOption[];
     priceRules?: any[];
 }
 
@@ -50,11 +58,15 @@ export const $cartTransferTotal = computed($cartTotal, (total) =>
 // Acciones
 export function addToCart(item: Omit<CartItem, 'quantity' | 'price'> & { price?: number }, quantity = 1, openCart = true) {
     const current = $cartItems.get();
-    const existingIndex = current.findIndex((i) =>
-        i.id === item.id &&
-        i.variantId === item.variantId &&
-        i.customization === item.customization
-    );
+    // Build a temporary CartItem to compute the key for matching
+    const tempItem = { ...item, quantity: 0, price: 0 } as CartItem;
+    const newKey = getItemKey(tempItem);
+    const existingIndex = current.findIndex((i) => getItemKey(i) === newKey);
+
+    // Calculate price modifier from selectedOptions
+    const optionsModifier = item.selectedOptions
+        ? item.selectedOptions.reduce((sum, o) => sum + (o.priceModifier || 0), 0)
+        : 0;
 
     if (existingIndex >= 0) {
         const updated = [...current];
@@ -62,29 +74,33 @@ export function addToCart(item: Omit<CartItem, 'quantity' | 'price'> & { price?:
         updated[existingIndex] = {
             ...updated[existingIndex],
             quantity: newQuantity,
-            price: calculateDiscountedPrice(updated[existingIndex].basePrice, newQuantity, updated[existingIndex].priceRules)
+            price: calculateDiscountedPrice(updated[existingIndex].basePrice + optionsModifier, newQuantity, updated[existingIndex].priceRules)
         };
         $cartItems.set(updated);
     } else {
         const basePrice = item.basePrice || item.price || 0;
-        const initialPrice = calculateDiscountedPrice(basePrice, quantity, item.priceRules);
-        $cartItems.set([...current, { ...item, basePrice, price: initialPrice, quantity } as CartItem]);
+        const effectiveBase = basePrice + optionsModifier;
+        const initialPrice = calculateDiscountedPrice(effectiveBase, quantity, item.priceRules);
+        $cartItems.set([...current, { ...item, basePrice: effectiveBase, price: initialPrice, quantity } as CartItem]);
     }
 
     saveToLocalStorage();
     if (openCart) $isCartOpen.set(true);
 }
 
-// Generar una clave única para cada item (Producto + Variante + Personalización)
+// Generar una clave única para cada item (Producto + Variante + Opciones + Personalización)
 export function getItemKey(item: CartItem): string {
-    return `${item.id}-${item.variantId || 'base'}-${item.customization || 'none'}`;
+    const optionsKey = item.selectedOptions && item.selectedOptions.length > 0
+        ? item.selectedOptions.map(o => o.optionId).sort().join('_')
+        : 'none';
+    return `${item.id}-${item.variantId || 'base'}-${optionsKey}-${item.customization || 'none'}`;
 }
 
 export function removeFromCart(id: number | string) {
     const current = $cartItems.get();
     // Soporte para ID numérico antiguo o clave de item
     $cartItems.set(current.filter((i) => {
-        const key = `${i.id}-${i.variantId || 'base'}-${i.customization || 'none'}`;
+        const key = getItemKey(i);
         return i.id !== id && key !== id;
     }));
     saveToLocalStorage();
@@ -98,7 +114,7 @@ export function updateQuantity(id: number | string, quantity: number) {
 
     const current = $cartItems.get();
     const updated = current.map((item) => {
-        const key = `${item.id}-${item.variantId || 'base'}-${item.customization || 'none'}`;
+        const key = getItemKey(item);
         if (item.id === id || key === id) {
             return {
                 ...item,

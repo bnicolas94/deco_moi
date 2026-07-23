@@ -43,6 +43,7 @@ const customization = product.customizationOptions as {
   fields?: string[];
 } | null;
 const priceRules = (product as any).priceRules || [];
+const variantGroups = (product as any).variantGroups || [];
 const productionTimeRules = (product as any).productionTimeRules || [];
 const category = (product as any).category;
 const images = product.images || [];
@@ -299,39 +300,58 @@ const initialProductionTime =
 
         <hr class="my-6 border-gray-200" />
 
-        <!-- Variantes -->
-        {
-          product.variants && product.variants.length > 0 && (
-            <div class="mb-5">
-              <h3 class="text-sm text-dark-gray mb-3">Diseño:</h3>
-              <div class="flex flex-wrap gap-2" id="variant-selector">
-                {product.variants.map((v, i) => (
-                  <button
-                    type="button"
-                    class:list={[
-                      "variant-btn relative flex items-center justify-center px-4 py-2 rounded-lg border transition-all duration-300 overflow-hidden border-gray-200 bg-white text-gray-500 hover:border-gray-400 hover:bg-gray-50",
-                    ]}
-                    data-variant-id={v.id}
-                    data-variant-name={v.name}
-                    data-variant-sku={v.sku || product.sku}
-                    data-variant-price={v.price ? Number(v.price) : finalPrice}
-                    data-variant-stock={v.stock}
-                    data-variant-images={JSON.stringify(v.images || [])}
-                  >
-                    <span class="text-sm font-medium transition-colors">
-                      {v.name}
-                    </span>
-                    {v.stock <= 0 && (
-                      <span class="absolute top-0 right-0 text-[8px] uppercase tracking-tighter text-gray-400 font-bold bg-white px-1">
-                        x
-                      </span>
-                    )}
 
-                    {/* Indicador de selección invisible, JS relies on this for styling */}
-                    <div class="absolute inset-0 bg-transparent opacity-0 pointer-events-none hidden indicator" />
-                  </button>
-                ))}
-              </div>
+
+        <!-- Grupos de Opciones Multi-dimensionales -->
+        {
+          variantGroups && variantGroups.length > 0 && (
+            <div class="mb-5 space-y-4" id="variant-groups-container">
+              {variantGroups.map((group: any) => (
+                <div class="variant-group" data-group-id={group.id} data-group-name={group.name} data-is-required={group.isRequired ? 'true' : 'false'}>
+                  <div class="flex items-center justify-between mb-2">
+                    <h3 class="text-sm text-dark-gray">
+                      {group.name} {group.isRequired && <span class="text-rose-500">*</span>}
+                    </h3>
+                    <span class="text-xs text-gray-400 group-selection-status">
+                      {group.isRequired ? 'Requerido' : 'Opcional'}
+                    </span>
+                  </div>
+                  <div class="flex flex-wrap gap-2">
+                    {group.options.filter((o: any) => o.isActive).map((opt: any) => (
+                      <button
+                        type="button"
+                        class:list={[
+                          "group-opt-btn relative flex items-center justify-center px-4 py-2 rounded-lg border transition-all duration-300 overflow-hidden border-gray-200 bg-white text-gray-500 hover:border-gray-400 hover:bg-gray-50",
+                        ]}
+                        data-option-id={opt.id}
+                        data-option-name={opt.name}
+                        data-option-sku={opt.sku || ""}
+                        data-price-modifier={opt.priceModifier}
+                        data-option-stock={opt.stock}
+                        data-option-images={JSON.stringify(opt.images || [])}
+                      >
+                        {(opt.images && opt.images.length > 0) && (
+                          <img src={opt.images[0]} alt={opt.name} class="w-6 h-6 rounded-full mr-2 object-cover border border-gray-100" />
+                        )}
+                        <span class="text-sm font-medium transition-colors">
+                          {opt.name}
+                        </span>
+                        {Number(opt.stock) <= 0 && (
+                          <span class="absolute top-0 right-0 text-[8px] uppercase tracking-tighter text-gray-400 font-bold bg-white px-1">
+                            x
+                          </span>
+                        )}
+                        {Number(opt.priceModifier) > 0 && (
+                          <span class="ml-1.5 text-[10px] text-gray-400 font-bold bg-gray-100 px-1.5 py-0.5 rounded">
+                            +{formatPrice(Number(opt.priceModifier))}
+                          </span>
+                        )}
+                        <div class="absolute inset-0 bg-transparent opacity-0 pointer-events-none hidden indicator" />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
             </div>
           )
         }
@@ -999,7 +1019,11 @@ const initialProductionTime =
       if (skuDisplay && originalSku)
         skuDisplay.textContent = `SKU: ${originalSku}`;
 
-      updatePricingDisplays(currentBasePrice);
+      if (typeof updateVariantGroupsState === 'function') {
+        updateVariantGroupsState();
+      } else {
+        updatePricingDisplays(currentBasePrice);
+      }
       return;
     }
 
@@ -1113,8 +1137,182 @@ const initialProductionTime =
 
     if (skuDisplay && variantSku) skuDisplay.textContent = `SKU: ${variantSku}`;
 
-    updatePricingDisplays(currentBasePrice);
+    if (typeof updateVariantGroupsState === 'function') {
+      updateVariantGroupsState();
+    } else {
+      updatePricingDisplays(currentBasePrice);
+    }
   });
+
+  // Variant Groups Logic
+  const variantGroupsContainer = document.getElementById("variant-groups-container");
+  
+  function checkVariantGroupsValidity() {
+    if (!variantGroupsContainer) return true;
+    let isValid = true;
+    const groups = variantGroupsContainer.querySelectorAll(".variant-group");
+    groups.forEach(g => {
+      if (g.getAttribute("data-is-required") === 'true') {
+        const selected = g.querySelector(".group-opt-btn.border-brand-black");
+        if (!selected) isValid = false;
+      }
+    });
+    return isValid;
+  }
+
+  function checkVariantGroupsStock() {
+    if (!variantGroupsContainer) return true;
+    let hasStock = true;
+    const groups = variantGroupsContainer.querySelectorAll(".variant-group");
+    groups.forEach(g => {
+      if (g.getAttribute("data-is-required") === 'true') {
+        const selected = g.querySelector(".group-opt-btn.border-brand-black");
+        if (selected) {
+           const stock = parseInt(selected.getAttribute("data-option-stock") || "0");
+           if (stock <= 0) hasStock = false;
+        }
+      }
+    });
+    return hasStock;
+  }
+
+  function getSelectedGroupOptions() {
+    if (!variantGroupsContainer) return [];
+    const options = [];
+    const groups = variantGroupsContainer.querySelectorAll(".variant-group");
+    groups.forEach(g => {
+      const selected = g.querySelector(".group-opt-btn.border-brand-black");
+      if (selected) {
+        options.push({
+          groupId: parseInt(g.getAttribute("data-group-id")),
+          groupName: g.getAttribute("data-group-name"),
+          optionId: parseInt(selected.getAttribute("data-option-id")),
+          optionName: selected.getAttribute("data-option-name"),
+          optionSku: selected.getAttribute("data-option-sku"),
+          priceModifier: parseFloat(selected.getAttribute("data-price-modifier") || "0")
+        });
+      }
+    });
+    return options;
+  }
+
+  function updateVariantGroupsState() {
+    const isValid = checkVariantGroupsValidity();
+    const hasStock = checkVariantGroupsStock();
+    const options = getSelectedGroupOptions();
+    
+    // Add selectedOptions to buttons
+    const optionsStr = JSON.stringify(options);
+    if (mainAddToCartBtn) mainAddToCartBtn.setAttribute("data-selected-options", optionsStr);
+    if (buyNowBtn) buyNowBtn.setAttribute("data-selected-options", optionsStr);
+
+    // Calc total modifier
+    const totalModifier = options.reduce((sum, o) => sum + o.priceModifier, 0);
+
+    // Update pricing displays with base + modifier
+    updatePricingDisplays(currentBasePrice + totalModifier);
+
+    // Manage buttons disabled state
+    const outOfStock = (mainAddToCartBtn?.getAttribute("data-original-text") === "Sin stock" || mainAddToCartBtn?.textContent === "Sin stock") || !hasStock;
+
+    if (mainAddToCartBtn) {
+      if (outOfStock) {
+        mainAddToCartBtn.setAttribute("disabled", "true");
+        mainAddToCartBtn.textContent = "Sin stock";
+      } else if (!isValid) {
+        mainAddToCartBtn.setAttribute("disabled", "true");
+        mainAddToCartBtn.textContent = "Seleccionar opciones";
+      } else {
+        mainAddToCartBtn.removeAttribute("disabled");
+        mainAddToCartBtn.textContent = "Agregar al carrito";
+      }
+    }
+
+    if (buyNowBtn) {
+      if (outOfStock) {
+        buyNowBtn.setAttribute("disabled", "true");
+        buyNowBtn.textContent = "Sin stock";
+      } else if (!isValid) {
+        buyNowBtn.setAttribute("disabled", "true");
+        buyNowBtn.textContent = "Seleccionar opciones";
+      } else {
+        buyNowBtn.removeAttribute("disabled");
+        buyNowBtn.textContent = "Comprar ahora";
+      }
+    }
+  }
+
+  variantGroupsContainer?.addEventListener("click", (e) => {
+    const btn = e.target.closest(".group-opt-btn");
+    if (!btn) return;
+    
+    const group = btn.closest(".variant-group");
+    if (!group) return;
+
+    const isSelected = btn.classList.contains("border-brand-black");
+    
+    // Deselect all in this group
+    group.querySelectorAll(".group-opt-btn").forEach(b => {
+      b.classList.remove("border-brand-black", "shadow-md", "ring-1", "ring-brand-black/5", "bg-brand-black", "text-white");
+      b.classList.add("border-gray-200", "text-gray-500", "bg-white");
+    });
+
+    if (!isSelected) {
+      // Select it
+      btn.classList.remove("border-gray-200", "text-gray-500", "bg-white");
+      btn.classList.add("border-brand-black", "shadow-md", "ring-1", "ring-brand-black/5", "bg-brand-black", "text-white");
+      
+      // Update Images if option has any
+      const optImagesStr = btn.getAttribute("data-option-images");
+      const optImages = optImagesStr ? JSON.parse(optImagesStr) : [];
+      if (optImages && optImages.length > 0) {
+        const mainImage = document.getElementById("main-image");
+        const placeholder = document.getElementById("main-image-placeholder");
+        const thumbnailsContainer = document.getElementById("product-thumbnails");
+        const optName = btn.getAttribute("data-option-name");
+
+        if (mainImage) {
+          mainImage.src = optImages[0];
+        } else if (placeholder) {
+          const img = document.createElement("img");
+          img.id = "main-image";
+          img.src = optImages[0];
+          img.alt = optName || "Opción";
+          img.className = "w-full h-full object-cover";
+          placeholder.replaceWith(img);
+        }
+
+        if (thumbnailsContainer) {
+          if (optImages.length > 1) {
+            thumbnailsContainer.innerHTML = optImages
+              .map(
+                (img, i) => `
+              <button
+                class="product-thumb w-20 h-20 rounded-lg overflow-hidden flex-shrink-0 border-2 transition-all ${i === 0 ? "border-primary" : "border-transparent hover:border-primary/50"}"
+                data-src="${img}"
+              >
+                <img src="${img}" alt="${optName} ${i + 1}" class="w-full h-full object-cover" />
+              </button>
+            `,
+              )
+              .join("");
+            attachThumbnailListeners();
+          } else {
+            thumbnailsContainer.innerHTML = "";
+          }
+        }
+      }
+    } else {
+       // If deselecting, we could restore original images if we want, but typically it's fine.
+    }
+
+    updateVariantGroupsState();
+  });
+
+  // Call it once on load to set initial state
+  if (variantGroupsContainer) {
+    updateVariantGroupsState();
+  }
 
   // Galería de thumbnails
   function attachThumbnailListeners() {

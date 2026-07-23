@@ -1,7 +1,7 @@
 ---
 import AdminLayout from '@/layouts/AdminLayout.astro';
 import { db } from '@/lib/db/connection';
-import { products, categories, mockupTemplates, productionTimeRules, priceRules, meliItemLinks, costItems, productCostItems, productSupplies, supplies } from '@/lib/db/schema';
+import { products, categories, mockupTemplates, productionTimeRules, priceRules, meliItemLinks, costItems, productCostItems, productSupplies, supplies, variantGroups, variantGroupOptions } from '@/lib/db/schema';
 import { eq, asc, and } from 'drizzle-orm';
 import { Save, ArrowLeft, Image as ImageIcon, Trash2, Star, Plus, Clock, ExternalLink } from 'lucide-react';
 import RichTextEditor from '@/components/admin/RichTextEditor';
@@ -97,6 +97,13 @@ gCosts.forEach(gc => {
 
 const allCategories = await db.select().from(categories).orderBy(categories.name);
 const allTemplates = await db.select().from(mockupTemplates).orderBy(mockupTemplates.name);
+
+// Load variant groups with their options
+const existingVariantGroups = isNew ? [] : await db.query.variantGroups.findMany({
+    where: eq(variantGroups.productId, parseInt(id)),
+    with: { options: true },
+    orderBy: asc(variantGroups.displayOrder),
+});
 
 // Process images to identify cover (first one)
 const currentImages = product?.images || [];
@@ -755,84 +762,110 @@ const SUPPLY_ICONS: Record<string, string> = {
                     </div>
                 </div>
 
-                <!-- 3. Product Variants -->
-                <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden accordion-section" data-section="variants">
+                <!-- 6. Variant Groups -->
+                <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden accordion-section" data-section="variantgroups">
                     <button type="button" class="w-full p-6 flex items-center justify-between hover:bg-gray-50/50 transition-colors accordion-toggle">
                         <div class="flex items-center gap-4">
-                            <div class="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600">
-                                <span class="w-2.5 h-6 bg-brand-black rounded-full"></span>
+                            <div class="w-10 h-10 rounded-xl bg-violet-50 flex items-center justify-center text-violet-600">
+                                <span class="w-2.5 h-6 bg-violet-500 rounded-full"></span>
                             </div>
                             <div class="text-left">
-                                <h2 class="text-lg font-bold text-gray-900">Variantes de Producto</h2>
-                                <p class="text-xs text-gray-400 font-medium italic">Tallas, colores, materiales y fotos por variante</p>
+                                <h2 class="text-lg font-bold text-gray-900">Grupos de Opciones</h2>
+                                <p class="text-xs text-gray-400 font-medium italic">Dimensiones múltiples: textura, evento, tamaño, etc.</p>
                             </div>
                         </div>
                         <div class="flex items-center gap-3">
-                            <span id="variant-count-badge" class="px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-600 text-[10px] font-black uppercase">
-                                {variants.length} variantes
+                            <span id="variant-groups-count-badge" class="px-2 py-0.5 rounded-full bg-violet-100 text-violet-600 text-[10px] font-black uppercase">
+                                {existingVariantGroups.length} grupos
                             </span>
                             <Plus className="w-5 h-5 text-gray-400 transition-transform duration-300 accordion-chevron" />
                         </div>
                     </button>
                     <div class="accordion-content hidden transition-all duration-300 ease-in-out">
                         <div class="p-6 border-t border-gray-50">
-                            <div class="flex items-center justify-between mb-8">
+                            <div class="flex items-center justify-between mb-6">
                                 <div>
-                                    <h3 class="text-base font-bold text-gray-900">Listado de Variantes</h3>
-                                    <p class="text-xs text-gray-400 italic">Cada variante puede tener su propio SKU, precio y fotos</p>
+                                    <h3 class="text-base font-bold text-gray-900">Grupos de Opciones</h3>
+                                    <p class="text-xs text-gray-400 italic">Define múltiples ejes de variación. Ej: Textura + Evento</p>
                                 </div>
-                                <button type="button" id="add-variant-btn" class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-600 font-bold rounded-xl hover:bg-indigo-100 transition-all active:scale-95 text-sm">
+                                <button type="button" id="add-variant-group-btn" class="inline-flex items-center gap-2 px-4 py-2 bg-violet-50 text-violet-600 font-bold rounded-xl hover:bg-violet-100 transition-all active:scale-95 text-sm">
                                     <Plus className="w-4 h-4" />
-                                    Añadir Variante
+                                    Añadir Grupo
                                 </button>
                             </div>
 
-                            <div id="variants-container" class="space-y-4">
-                                {variants.length === 0 ? (
-                                    <div id="no-variants-msg" class="text-center py-8 border-2 border-dashed border-gray-100 rounded-2xl">
-                                        <p class="text-sm text-gray-400">No hay variantes definidas. El producto se tratará como unidad única.</p>
+                            <div id="variant-groups-container" class="space-y-6">
+                                {existingVariantGroups.length === 0 ? (
+                                    <div id="no-variant-groups-msg" class="text-center py-8 border-2 border-dashed border-gray-100 rounded-2xl">
+                                        <p class="text-sm text-gray-400">No hay grupos de opciones. El producto usará variantes simples o será unidad única.</p>
                                     </div>
                                 ) : (
-                                    variants.map((v: any, idx: number) => (
-                                        <div class="variant-item grid grid-cols-1 md:grid-cols-12 gap-4 p-4 bg-gray-50/50 rounded-2xl border border-gray-100 relative group animate-in fade-in slide-in-from-top-2">
-                                            <input type="hidden" name={`variant_id_${idx}`} value={v.id} />
-                                            <input type="hidden" name={`variant_existing_images_${idx}`} value={JSON.stringify(v.images || [])} />
-                                            <div class="md:col-span-3">
-                                                <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Nombre / Atributos</label>
-                                                <input type="text" name={`variant_name_${idx}`} value={v.name} placeholder="Ej: Rojo / XL" class="w-full rounded-lg border-gray-200 text-sm h-10 border px-3 focus:ring-indigo-500" required />
-                                            </div>
-                                            <div class="md:col-span-2">
-                                                <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">SKU</label>
-                                                <input type="text" name={`variant_sku_${idx}`} value={v.sku} placeholder="SKU Único" class="w-full rounded-lg border-gray-200 text-sm h-10 border px-3 focus:ring-indigo-500" />
-                                            </div>
-                                            <div class="md:col-span-2">
-                                                <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Precio Opc.</label>
-                                                <input type="number" step="0.01" name={`variant_price_${idx}`} value={v.price} placeholder="Base" class="w-full rounded-lg border-gray-200 text-sm h-10 border px-3 focus:ring-indigo-500" />
-                                            </div>
-                                            <div class="md:col-span-1">
-                                                <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Stock</label>
-                                                <input type="number" name={`variant_stock_${idx}`} value={v.stock} class="w-full rounded-lg border-gray-200 text-sm h-10 border px-3 focus:ring-indigo-500" required />
-                                            </div>
-                                            <div class="md:col-span-3">
-                                                <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Imágenes Varias</label>
-                                                <div class="flex flex-wrap gap-2 mb-2 variant-images-preview" data-idx={idx}>
-                                                    {(v.images || []).map((img: any, imgIdx: number) => (
-                                                        <div class="relative group/img w-10 h-10">
-                                                            <img src={img} class="w-10 h-10 object-cover rounded-lg border border-gray-200" alt={v.name} />
-                                                            <button type="button" class="remove-variant-existing-img absolute -top-1 -right-1 bg-rose-500 text-white rounded-full p-0.5 opacity-0 group-hover/img:opacity-100 transition-opacity z-10" data-idx={idx} data-img-idx={imgIdx}>
-                                                                <Plus className="w-2.5 h-2.5 rotate-45" />
-                                                            </button>
-                                                        </div>
-                                                    ))}
-                                                    <label class="w-10 h-10 rounded-lg border-2 border-dashed border-gray-200 flex items-center justify-center cursor-pointer hover:border-indigo-400 hover:bg-indigo-50 transition-all">
-                                                        <Plus className="w-4 h-4 text-gray-300" />
-                                                        <input type="file" accept="image/*" name={`variant_images_${idx}`} multiple class="hidden variant-image-input" data-idx={idx} />
+                                    existingVariantGroups.map((group: any, gIdx: number) => (
+                                        <div class="variant-group-item bg-violet-50/30 rounded-2xl border border-violet-100/50 overflow-hidden" data-group-idx={gIdx}>
+                                            <div class="p-4 flex items-center justify-between border-b border-violet-100/30">
+                                                <div class="flex items-center gap-3 flex-1">
+                                                    <div class="flex items-center gap-2 flex-1">
+                                                        <label class="block text-[10px] font-bold text-gray-400 uppercase">Nombre del Grupo:</label>
+                                                        <input type="text" class="variant-group-name flex-1 rounded-lg border-gray-200 text-sm h-9 border px-3 focus:ring-violet-500 max-w-[200px]" value={group.name} placeholder="Ej: Textura" required />
+                                                    </div>
+                                                    <label class="flex items-center gap-1.5 text-xs text-gray-500 cursor-pointer">
+                                                        <input type="checkbox" class="variant-group-required rounded border-gray-300 text-violet-600 focus:ring-violet-500" checked={group.isRequired} />
+                                                        <span>Obligatorio</span>
                                                     </label>
                                                 </div>
-                                            </div>
-                                            <div class="md:col-span-1 flex items-end justify-center pb-1">
-                                                <button type="button" class="remove-variant-btn p-2 text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors">
+                                                <button type="button" class="remove-variant-group-btn p-2 text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors ml-2">
                                                     <Trash2 className="w-4 h-4" />
+                                                </button>
+                                            </div>
+                                            <div class="p-4 space-y-2">
+                                                <div class="variant-group-options-container space-y-2">
+                                                    {(group.options || []).map((opt: any, oIdx: number) => (
+                                                        <div class="variant-group-option-item p-3 bg-white rounded-xl border border-gray-100 space-y-3 relative group">
+                                                            <button type="button" class="remove-vg-option-btn absolute -top-2 -right-2 p-1 bg-rose-100 text-rose-600 hover:bg-rose-500 hover:text-white rounded-full transition-colors opacity-0 group-hover:opacity-100 z-10">
+                                                                <Plus className="w-3 h-3 rotate-45" />
+                                                            </button>
+                                                            <div class="flex flex-wrap gap-3">
+                                                                <div class="flex-1 min-w-[150px]">
+                                                                    <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Nombre</label>
+                                                                    <input type="text" class="vg-option-name w-full rounded-lg border-gray-200 text-sm h-8 border px-3 focus:ring-violet-500" value={opt.name} placeholder="Ej: XL" required />
+                                                                </div>
+                                                                <div class="w-32">
+                                                                    <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">SKU</label>
+                                                                    <input type="text" class="vg-option-sku w-full rounded-lg border-gray-200 text-sm h-8 border px-3 focus:ring-violet-500" value={opt.sku || ''} placeholder="Opcional" />
+                                                                </div>
+                                                                <div class="w-24">
+                                                                    <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Precio Opc. (+$)</label>
+                                                                    <input type="number" step="0.01" class="vg-option-price w-full rounded-lg border-gray-200 text-sm h-8 border px-2 focus:ring-violet-500" value={opt.priceModifier ? Number(opt.priceModifier) : 0} placeholder="0" />
+                                                                </div>
+                                                                <div class="w-24">
+                                                                    <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Stock</label>
+                                                                    <input type="number" class="vg-option-stock w-full rounded-lg border-gray-200 text-sm h-8 border px-2 focus:ring-violet-500" value={opt.stock !== undefined && opt.stock !== null ? Number(opt.stock) : 0} placeholder="0" required />
+                                                                </div>
+                                                            </div>
+                                                            <div>
+                                                                <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Imágenes de la opción</label>
+                                                                <input type="hidden" class="vg-option-existing-images" value={JSON.stringify(opt.images || [])} />
+                                                                <div class="flex flex-wrap gap-2 vg-option-images-preview">
+                                                                    {(opt.images || []).map((img: any, imgIdx: number) => (
+                                                                        <div class="relative group/img w-10 h-10">
+                                                                            <img src={img} class="w-10 h-10 object-cover rounded-lg border border-gray-200" alt={opt.name} />
+                                                                            <button type="button" class="remove-vg-existing-img absolute -top-1 -right-1 bg-rose-500 text-white rounded-full p-0.5 opacity-0 group-hover/img:opacity-100 transition-opacity z-10">
+                                                                                <Plus className="w-2.5 h-2.5 rotate-45" />
+                                                                            </button>
+                                                                        </div>
+                                                                    ))}
+                                                                    <label class="w-10 h-10 rounded-lg border-2 border-dashed border-gray-200 flex items-center justify-center cursor-pointer hover:border-violet-400 hover:bg-violet-50 transition-all">
+                                                                        <Plus className="w-4 h-4 text-gray-300" />
+                                                                        <input type="file" accept="image/*" multiple class="hidden vg-option-image-input" />
+                                                                    </label>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                                <button type="button" class="add-vg-option-btn inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-violet-600 hover:bg-violet-50 rounded-lg transition-all">
+                                                    <Plus className="w-3 h-3" />
+                                                    Añadir Opción
                                                 </button>
                                             </div>
                                         </div>
@@ -842,6 +875,8 @@ const SUPPLY_ICONS: Record<string, string> = {
                         </div>
                     </div>
                 </div>
+
+                <!-- Old Product Variants Section Removed -->
             </div>
 
             <div class="lg:col-span-4 space-y-8">
@@ -1024,7 +1059,7 @@ const SUPPLY_ICONS: Record<string, string> = {
     </div>
 </AdminLayout>
 
-<script is:inline define:vars={{ isNew, id: product?.id, allCosts }}>
+<script is:inline define:vars={{ isNew, id: product?.id, allCosts, existingVariantGroups }}>
     // Auto-generate slug from name
     const nameInput = document.getElementById('name');
     const slugInput = document.getElementById('slug');
@@ -1242,33 +1277,146 @@ const SUPPLY_ICONS: Record<string, string> = {
                 }
             }
 
-            // Remove existing variant image
-            const variantRemoveBtn = e.target.closest('.remove-variant-existing-img');
-            if (variantRemoveBtn) {
-                const imgIdx = parseInt(variantRemoveBtn.getAttribute('data-img-idx'));
-                const item = variantRemoveBtn.closest('.variant-item');
-                const input = item.querySelector('input[name^="variant_existing_images_"]');
+            // Handle existing option image removal
+            const vgExistingRemoveBtn = e.target.closest('.remove-vg-existing-img');
+            if (vgExistingRemoveBtn) {
+                const item = vgExistingRemoveBtn.closest('.variant-group-option-item');
+                const imgContainer = vgExistingRemoveBtn.closest('.relative');
                 
-                if (input) {
-                    const images = JSON.parse(input.value);
-                    images.splice(imgIdx, 1);
-                    input.value = JSON.stringify(images);
-                    
-                    // Remove UI element
-                    variantRemoveBtn.closest('.relative').remove();
-                    
-                    // Update indices of remaining buttons in this variant
-                    const container = item.querySelector('.variant-images-preview');
-                    container.querySelectorAll('.remove-variant-existing-img').forEach((b, i) => {
-                        b.setAttribute('data-img-idx', i);
-                    });
+                // Get the hidden input that stores the array of existing images
+                const existingImagesInput = item.querySelector('.vg-option-existing-images');
+                if (existingImagesInput) {
+                    try {
+                        let existingImages = JSON.parse(existingImagesInput.value || '[]');
+                        
+                        // Find the index of the image in the DOM
+                        const previewContainer = item.querySelector('.vg-option-images-preview');
+                        const imgNodes = Array.from(previewContainer.querySelectorAll('.relative.group\\/img'));
+                        const imgIndex = imgNodes.indexOf(imgContainer);
+                        
+                        if (imgIndex > -1 && imgIndex < existingImages.length) {
+                            existingImages.splice(imgIndex, 1);
+                            existingImagesInput.value = JSON.stringify(existingImages);
+                        }
+                    } catch(err) {
+                        console.error('Error updating existing images:', err);
+                    }
                 }
+                
+                imgContainer.remove();
             }
 
-            // Remove new variant image preview
-            const newVariantRemoveBtn = e.target.closest('.remove-variant-new-img');
-            if (newVariantRemoveBtn) {
-                newVariantRemoveBtn.closest('.relative').remove();
+            // Remove new option image preview
+            const vgNewRemoveBtn = e.target.closest('.remove-vg-new-img');
+            if (vgNewRemoveBtn) {
+                vgNewRemoveBtn.closest('.relative').remove();
+            }
+        });
+
+        // ========================================
+        // Variant Groups Logic
+        // ========================================
+        const addGroupBtn = document.getElementById('add-variant-group-btn');
+        const groupsContainer = document.getElementById('variant-groups-container');
+        const noGroupsMsg = document.getElementById('no-variant-groups-msg');
+        let groupCount = document.querySelectorAll('.variant-group-item').length;
+
+        addGroupBtn?.addEventListener('click', () => {
+            if (noGroupsMsg) noGroupsMsg.remove();
+            const gIdx = groupCount++;
+            const div = document.createElement('div');
+            div.className = 'variant-group-item bg-violet-50/30 rounded-2xl border border-violet-100/50 overflow-hidden animate-in fade-in slide-in-from-top-2';
+            div.setAttribute('data-group-idx', gIdx);
+            div.innerHTML = `
+                <div class="p-4 flex items-center justify-between border-b border-violet-100/30">
+                    <div class="flex items-center gap-3 flex-1">
+                        <div class="flex items-center gap-2 flex-1">
+                            <label class="block text-[10px] font-bold text-gray-400 uppercase">Nombre del Grupo:</label>
+                            <input type="text" class="variant-group-name flex-1 rounded-lg border-gray-200 text-sm h-9 border px-3 focus:ring-violet-500 max-w-[200px]" placeholder="Ej: Textura" required />
+                        </div>
+                        <label class="flex items-center gap-1.5 text-xs text-gray-500 cursor-pointer">
+                            <input type="checkbox" class="variant-group-required rounded border-gray-300 text-violet-600 focus:ring-violet-500" checked />
+                            <span>Obligatorio</span>
+                        </label>
+                    </div>
+                    <button type="button" class="remove-variant-group-btn p-2 text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors ml-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-trash-2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>
+                    </button>
+                </div>
+                <div class="p-4 space-y-2">
+                    <div class="variant-group-options-container space-y-2"></div>
+                    <button type="button" class="add-vg-option-btn inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-violet-600 hover:bg-violet-50 rounded-lg transition-all">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" x2="12" y1="5" y2="19"/><line x1="5" x2="19" y1="12" y2="12"/></svg>
+                        Añadir Opción
+                    </button>
+                </div>
+            `;
+            groupsContainer.appendChild(div);
+        });
+
+        // Delegated events for variant groups
+        groupsContainer?.addEventListener('click', (e) => {
+            // Remove group
+            const removeGroupBtn = e.target.closest('.remove-variant-group-btn');
+            if (removeGroupBtn) {
+                removeGroupBtn.closest('.variant-group-item').remove();
+                if (document.querySelectorAll('.variant-group-item').length === 0) {
+                    groupsContainer.innerHTML = `<div id="no-variant-groups-msg" class="text-center py-8 border-2 border-dashed border-gray-100 rounded-2xl"><p class="text-sm text-gray-400">No hay grupos de opciones. El producto usará variantes simples o será unidad única.</p></div>`;
+                }
+                return;
+            }
+
+            // Add option to group
+            const addOptionBtn = e.target.closest('.add-vg-option-btn');
+            if (addOptionBtn) {
+                const groupItem = addOptionBtn.closest('.variant-group-item');
+                const optionsContainer = groupItem.querySelector('.variant-group-options-container');
+                const optDiv = document.createElement('div');
+                optDiv.className = 'variant-group-option-item p-3 bg-white rounded-xl border border-gray-100 space-y-3 relative group animate-in fade-in slide-in-from-top-1';
+                optDiv.innerHTML = `
+                    <button type="button" class="remove-vg-option-btn absolute -top-2 -right-2 p-1 bg-rose-100 text-rose-600 hover:bg-rose-500 hover:text-white rounded-full transition-colors opacity-0 group-hover:opacity-100 z-10">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    </button>
+                    <div class="flex flex-wrap gap-3">
+                        <div class="flex-1 min-w-[150px]">
+                            <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Nombre</label>
+                            <input type="text" class="vg-option-name w-full rounded-lg border-gray-200 text-sm h-8 border px-3 focus:ring-violet-500" placeholder="Ej: XL" required />
+                        </div>
+                        <div class="w-32">
+                            <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">SKU</label>
+                            <input type="text" class="vg-option-sku w-full rounded-lg border-gray-200 text-sm h-8 border px-3 focus:ring-violet-500" placeholder="Opcional" />
+                        </div>
+                        <div class="w-24">
+                            <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Precio (+$)</label>
+                            <input type="number" step="0.01" class="vg-option-price w-full rounded-lg border-gray-200 text-sm h-8 border px-2 focus:ring-violet-500" value="0" placeholder="0" />
+                        </div>
+                        <div class="w-24">
+                            <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Stock</label>
+                            <input type="number" class="vg-option-stock w-full rounded-lg border-gray-200 text-sm h-8 border px-2 focus:ring-violet-500" value="0" placeholder="0" required />
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Imágenes de la opción</label>
+                        <input type="hidden" class="vg-option-existing-images" value="[]" />
+                        <div class="flex flex-wrap gap-2 vg-option-images-preview">
+                            <label class="w-10 h-10 rounded-lg border-2 border-dashed border-gray-200 flex items-center justify-center cursor-pointer hover:border-violet-400 hover:bg-violet-50 transition-all">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-gray-300"><line x1="12" x2="12" y1="5" y2="19"/><line x1="5" x2="19" y1="12" y2="12"/></svg>
+                                <input type="file" accept="image/*" multiple class="hidden vg-option-image-input" />
+                            </label>
+                        </div>
+                    </div>
+                `;
+                optionsContainer.appendChild(optDiv);
+                attachVGOptionImagePreview(optDiv.querySelector('.vg-option-image-input'));
+                optionsContainer.appendChild(optDiv);
+                return;
+            }
+
+            // Remove option from group
+            const removeOptionBtn = e.target.closest('.remove-vg-option-btn');
+            if (removeOptionBtn) {
+                removeOptionBtn.closest('.variant-group-option-item').remove();
+                return;
             }
         });
 
@@ -1396,67 +1544,8 @@ const SUPPLY_ICONS: Record<string, string> = {
             });
         }
 
-        // Variants Logic
-        const addVariantBtn = document.getElementById('add-variant-btn');
-        const variantsContainer = document.getElementById('variants-container');
-        const noVariantsMsg = document.getElementById('no-variants-msg');
-        let variantCount = document.querySelectorAll('.variant-item').length;
-
-        addVariantBtn?.addEventListener('click', () => {
-            if (noVariantsMsg) noVariantsMsg.remove();
-            const variantIdx = variantCount++;
-            const div = document.createElement('div');
-            div.className = 'variant-item grid grid-cols-1 md:grid-cols-12 gap-4 p-4 bg-gray-50/50 rounded-2xl border border-gray-100 relative group animate-in fade-in slide-in-from-top-2';
-            div.innerHTML = `
-                <input type="hidden" name="variant_existing_images_${variantIdx}" value="[]" />
-                <div class="md:col-span-3">
-                    <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Nombre / Atributos</label>
-                    <input type="text" name="variant_name_${variantIdx}" placeholder="Ej: Rojo / XL" class="w-full rounded-lg border-gray-200 text-sm h-10 border px-3 focus:ring-indigo-500" required />
-                </div>
-                <div class="md:col-span-2">
-                    <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">SKU</label>
-                    <input type="text" name="variant_sku_${variantIdx}" placeholder="SKU Único" class="w-full rounded-lg border-gray-200 text-sm h-10 border px-3 focus:ring-indigo-500" />
-                </div>
-                <div class="md:col-span-2">
-                    <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Precio Opc.</label>
-                    <input type="number" step="0.01" name="variant_price_${variantIdx}" placeholder="Base" class="w-full rounded-lg border-gray-200 text-sm h-10 border px-3 focus:ring-indigo-500" />
-                </div>
-                <div class="md:col-span-1">
-                    <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Stock</label>
-                    <input type="number" name="variant_stock_${variantIdx}" value="0" class="w-full rounded-lg border-gray-200 text-sm h-10 border px-3 focus:ring-indigo-500" required />
-                </div>
-                <div class="md:col-span-3">
-                    <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Imágenes Varias</label>
-                    <div class="flex flex-wrap gap-2 mb-2 variant-images-preview" data-idx="${variantIdx}">
-                        <label class="w-10 h-10 rounded-lg border-2 border-dashed border-gray-200 flex items-center justify-center cursor-pointer hover:border-indigo-400 hover:bg-indigo-50 transition-all">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-gray-300"><line x1="12" x2="12" y1="5" y2="19"/><line x1="5" x2="19" y1="12" y2="12"/></svg>
-                            <input type="file" accept="image/*" name="variant_images_${variantIdx}" multiple class="hidden variant-image-input" data-idx="${variantIdx}" />
-                        </label>
-                    </div>
-                </div>
-                <div class="md:col-span-1 flex items-end justify-center pb-1">
-                    <button type="button" class="remove-variant-btn p-2 text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-trash-2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>
-                    </button>
-                </div>`;
-            variantsContainer.appendChild(div);
-            // Attach image preview listener
-            attachVariantImagePreview(div.querySelector('.variant-image-input'));
-        });
-
-        variantsContainer?.addEventListener('click', (e) => {
-            const btn = e.target.closest('.remove-variant-btn');
-            if (btn) {
-                btn.closest('.variant-item').remove();
-                if (document.querySelectorAll('.variant-item').length === 0) {
-                    variantsContainer.innerHTML = `<div id="no-variants-msg" class="text-center py-8 border-2 border-dashed border-gray-100 rounded-2xl"><p class="text-sm text-gray-400">No hay variantes definidas. El producto se tratará como unidad única.</p></div>`;
-                }
-            }
-        });
-
-        // Variant image preview for existing inputs
-        document.querySelectorAll('.variant-image-input').forEach(input => {
-            attachVariantImagePreview(input);
+        document.querySelectorAll('.vg-option-image-input').forEach(input => {
+            attachVGOptionImagePreview(input);
         });
 
         // ========================================
@@ -1548,14 +1637,13 @@ const SUPPLY_ICONS: Record<string, string> = {
         });
     });
 
-    function attachVariantImagePreview(input) {
+    function attachVGOptionImagePreview(input) {
         if (!input) return;
         input.addEventListener('change', (e) => {
             const files = e.target.files;
             if (!files || files.length === 0) return;
             
-            const idx = input.getAttribute('data-idx');
-            const previewContainer = input.closest('.variant-images-preview');
+            const previewContainer = input.closest('.vg-option-images-preview');
 
             for (let i = 0; i < files.length; i++) {
                 const file = files[i];
@@ -1564,9 +1652,9 @@ const SUPPLY_ICONS: Record<string, string> = {
                     const div = document.createElement('div');
                     div.className = 'relative group/img w-10 h-10';
                     div.innerHTML = `
-                        <img src="${reader.result}" class="w-10 h-10 object-cover rounded-lg border border-indigo-200" />
+                        <img src="${reader.result}" class="w-10 h-10 object-cover rounded-lg border border-violet-200" />
                         <div class="absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 group-hover/img:opacity-100 transition-opacity rounded-lg">
-                            <button type="button" class="remove-variant-new-img bg-rose-500 text-white rounded-full p-0.5">
+                            <button type="button" class="remove-vg-new-img bg-rose-500 text-white rounded-full p-0.5">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
                             </button>
                         </div>
@@ -1617,42 +1705,7 @@ const SUPPLY_ICONS: Record<string, string> = {
         const form = event.target;
         const formData = new FormData(form);
         
-        // Collect variants
-        const variants = [];
-        document.querySelectorAll('.variant-item').forEach((item, index) => {
-            const id = item.querySelector(`input[name^="variant_id_"]`)?.value;
-            const name = item.querySelector(`input[name^="variant_name_"]`)?.value;
-            const sku = item.querySelector(`input[name^="variant_sku_"]`)?.value;
-            const price = item.querySelector(`input[name^="variant_price_"]`)?.value;
-            const stock = item.querySelector(`input[name^="variant_stock_"]`)?.value;
-            const existingImagesStr = item.querySelector(`input[name^="variant_existing_images_"]`)?.value;
-            const existingImages = existingImagesStr ? JSON.parse(existingImagesStr) : [];
-            
-            const imageInput = item.querySelector(`.variant-image-input`);
-            const files = imageInput ? imageInput.files : [];
-            
-            if (name) {
-                const imageFieldNames = [];
-                if (files && files.length > 0) {
-                    for (let i = 0; i < files.length; i++) {
-                        const fieldName = `variant_file_${index}_${i}_${Date.now()}`;
-                        formData.append(fieldName, files[i]);
-                        imageFieldNames.push(fieldName);
-                    }
-                }
-
-                variants.push({ 
-                    id: id || null, 
-                    name, 
-                    sku: sku || null, 
-                    price: price ? parseFloat(price) : null, 
-                    stock: parseInt(stock) || 0,
-                    existingImages: existingImages,
-                    imageFieldNames: imageFieldNames
-                });
-            }
-        });
-        formData.append('variants_json', JSON.stringify(variants));
+        // Variants removed
         
         const isActiveEl = document.getElementById('isActive');
         const isFeaturedEl = document.getElementById('isFeatured');
@@ -1723,6 +1776,57 @@ const SUPPLY_ICONS: Record<string, string> = {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ rules: priceRulesData }),
+                });
+
+                // Save variant groups
+                const variantGroupsData = [];
+                const vgFormData = new FormData();
+
+                document.querySelectorAll('.variant-group-item').forEach((groupItem, gIdx) => {
+                    const name = groupItem.querySelector('.variant-group-name')?.value;
+                    const isRequired = groupItem.querySelector('.variant-group-required')?.checked;
+                    const options = [];
+                    groupItem.querySelectorAll('.variant-group-option-item').forEach((optItem, oIdx) => {
+                        const optName = optItem.querySelector('.vg-option-name')?.value;
+                        const optSku = optItem.querySelector('.vg-option-sku')?.value;
+                        const optPrice = optItem.querySelector('.vg-option-price')?.value;
+                        const optStock = optItem.querySelector('.vg-option-stock')?.value;
+                        const existingImagesStr = optItem.querySelector('.vg-option-existing-images')?.value;
+                        const existingImages = existingImagesStr ? JSON.parse(existingImagesStr) : [];
+                        
+                        const imageInput = optItem.querySelector('.vg-option-image-input');
+                        const files = imageInput ? imageInput.files : [];
+                        const imageFieldNames = [];
+                        
+                        if (files && files.length > 0) {
+                            for (let i = 0; i < files.length; i++) {
+                                const fieldName = `vg_file_${gIdx}_${oIdx}_${i}_${Date.now()}`;
+                                vgFormData.append(fieldName, files[i]);
+                                imageFieldNames.push(fieldName);
+                            }
+                        }
+
+                        if (optName) {
+                            options.push({
+                                name: optName,
+                                sku: optSku || null,
+                                stock: parseInt(optStock) || 0,
+                                priceModifier: parseFloat(optPrice) || 0,
+                                existingImages: existingImages,
+                                imageFieldNames: imageFieldNames
+                            });
+                        }
+                    });
+                    if (name) {
+                        variantGroupsData.push({ name, isRequired, options });
+                    }
+                });
+
+                vgFormData.append('groups_json', JSON.stringify(variantGroupsData));
+
+                await fetch(`/api/products/${productId}/variant-groups`, {
+                    method: 'PUT',
+                    body: vgFormData,
                 });
 
                 // --- SAVE COSTOS E INSUMOS ---

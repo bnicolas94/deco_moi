@@ -131,6 +131,11 @@ export default function CartSidebar() {
                                         {item.variantName && (
                                             <p className="text-xs text-accent font-medium mt-0.5">Opción: {item.variantName}</p>
                                         )}
+                                        {item.selectedOptions && item.selectedOptions.length > 0 && (
+                                            <p className="text-xs text-accent/80 font-medium mt-0.5">
+                                                {item.selectedOptions.map(o => `${o.groupName}: ${o.optionName}`).join(' · ')}
+                                            </p>
+                                        )}
                                         {item.customization && (
                                             <p className="text-2xs text-gray-400 mt-0.5">{item.customization}</p>
                                         )}

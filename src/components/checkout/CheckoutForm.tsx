@@ -578,6 +578,11 @@ export default function CheckoutForm({ fields, shippingConfig, bankConfig }: Pro
                                 <div className="flex-1 min-w-0">
                                     <p className="text-sm font-bold text-brand-black truncate">{item.name}</p>
                                     {item.variantName && <p className="text-xs text-accent font-medium">{item.variantName}</p>}
+                                    {item.selectedOptions && item.selectedOptions.length > 0 && (
+                                        <p className="text-xs text-accent/80 font-medium">
+                                            {item.selectedOptions.map((o: any) => `${o.groupName}: ${o.optionName}`).join(' · ')}
+                                        </p>
+                                    )}
                                     <p className="text-xs text-gray-400">Cantidad: {item.quantity}</p>
                                 </div>
                                 <p className="text-sm font-bold text-brand-black whitespace-nowrap">

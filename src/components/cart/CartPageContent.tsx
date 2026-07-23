@@ -89,6 +89,12 @@ export default function CartPageContent() {
                                                 {item.variantName}
                                             </p>
                                         )}
+                                        {item.selectedOptions && item.selectedOptions.length > 0 && (
+                                            <p className="text-xs text-accent/80 font-medium mt-1 inline-flex items-center gap-1">
+                                                <span className="w-1.5 h-1.5 rounded-full bg-accent/60"></span>
+                                                {item.selectedOptions.map(o => `${o.groupName}: ${o.optionName}`).join(' · ')}
+                                            </p>
+                                        )}
                                         {item.customization && (
                                             <div className="mt-2 p-2 bg-off-white rounded-lg border border-gray-100">
                                                 <p className="text-2xs uppercase text-gray-400 font-bold tracking-wider mb-1">Personalización:</p>

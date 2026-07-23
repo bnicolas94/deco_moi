@@ -153,6 +153,7 @@ const canonicalURL = new URL(Astro.url.pathname, Astro.site || 'https://decomoi.
             image: el.dataset.productImage || '',
             variantId: el.dataset.variantId ? parseInt(el.dataset.variantId) : undefined,
             variantName: el.dataset.variantName || undefined,
+            selectedOptions: el.dataset.selectedOptions ? JSON.parse(el.dataset.selectedOptions) : undefined,
           };
           
           console.log('Agregando al carrito:', itemData, 'Cantidad:', qty);
@@ -188,17 +189,23 @@ const canonicalURL = new URL(Astro.url.pathname, Astro.site || 'https://decomoi.
             }
           }
 
+          let selectedOptions;
+          try {
+            selectedOptions = el.dataset.selectedOptions ? JSON.parse(el.dataset.selectedOptions) : undefined;
+          } catch(e) {}
+
           addToCart({
             id: parseInt(el.dataset.productId || '0'),
             name: el.dataset.productName || '',
             slug: el.dataset.productSlug || '',
             sku: variantSku,
             price: variantPrice,
-            basePrice: basePrice,
+            basePrice,
             priceRules: el.dataset.productPricerules ? JSON.parse(el.dataset.productPricerules) : undefined,
             image: el.dataset.productImage || '',
             variantId,
             variantName,
+            selectedOptions,
           }, qty, false); // false = no abrir sidebar, redirigimos directamente
 
           // Redirigir al checkout (el sidebar NO se abre)

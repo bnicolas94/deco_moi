@@ -50,7 +50,10 @@ export class OrderService {
             quantity: item.quantity,
             unitPrice: String(item.price),
             subtotal: String(item.price * item.quantity),
-            customization: item.customization ? { text: item.customization } : null,
+            customization: {
+                ...(item.customization ? { text: item.customization } : {}),
+                ...(item.selectedOptions && item.selectedOptions.length > 0 ? { selectedOptions: item.selectedOptions } : {}),
+            } || null,
             variantId: item.variantId || null,
         }));
 

@@ -1,5 +1,5 @@
 import { db } from '../db/connection';
-import { products, categories, priceRules, productionTimeRules, reviews, mockupTemplates, productVariants } from '../db/schema';
+import { products, categories, priceRules, productionTimeRules, reviews, mockupTemplates, productVariants, variantGroups, variantGroupOptions } from '../db/schema';
 import { eq, and, gte, lte, like, desc, asc, sql, or, inArray } from 'drizzle-orm';
 import type { Product, Category, PriceRule, ProductionTimeRule, ProductFilters, ProductVariant } from '@/types/product';
 import type { MockupTemplate } from '@/types/mockup';
@@ -208,6 +208,13 @@ export async function getProductBySlug(slug: string): Promise<(Product & { mocku
         .where(eq(productionTimeRules.productId, result[0].id))
         .orderBy(asc(productionTimeRules.minQuantity));
 
+    // Obtener grupos de opciones de variantes
+    const groups = await db.query.variantGroups.findMany({
+        where: eq(variantGroups.productId, result[0].id),
+        with: { options: true },
+        orderBy: asc(variantGroups.displayOrder),
+    });
+
     return {
         ...result[0],
         variants: variants as ProductVariant[],
@@ -215,6 +222,7 @@ export async function getProductBySlug(slug: string): Promise<(Product & { mocku
         productionTimeRules: timeRules as ProductionTimeRule[],
         category: category[0] as Category,
         mockupTemplate: mockupTemplate as MockupTemplate | null,
+        variantGroups: groups,
     } as Product & { mockupTemplate?: MockupTemplate | null };
 }
 

@@ -38,7 +38,10 @@ export const POST: APIRoute = async (context) => {
                 unit_price: Number(item.price),
                 quantity: Number(item.quantity),
                 currency_id: 'ARS',
-                description: item.variantName || '',
+                description: [
+                    item.variantName || '',
+                    ...(item.selectedOptions || []).map((o: any) => `${o.groupName}: ${o.optionName}`)
+                ].filter(Boolean).join(' | ') || '',
                 picture_url: picture_url || undefined
             };
         });
@@ -75,6 +78,7 @@ export const POST: APIRoute = async (context) => {
                         price: i.price,
                         quantity: i.quantity,
                         variantId: i.variantId,
+                        selectedOptions: i.selectedOptions || [],
                         sku: i.sku
                     }))),
                     total_amount: total,

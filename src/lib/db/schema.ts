@@ -96,6 +96,31 @@ export const productVariants = pgTable('product_variants', {
 });
 
 // ============================================
+// GRUPOS DE OPCIONES DE VARIANTES
+// ============================================
+export const variantGroups = pgTable('variant_groups', {
+    id: serial('id').primaryKey(),
+    productId: integer('product_id').notNull().references(() => products.id, { onDelete: 'cascade' }),
+    name: varchar('name', { length: 100 }).notNull(),
+    displayOrder: integer('display_order').default(0),
+    isRequired: boolean('is_required').default(true),
+    createdAt: timestamp('created_at').defaultNow(),
+});
+
+export const variantGroupOptions = pgTable('variant_group_options', {
+    id: serial('id').primaryKey(),
+    groupId: integer('group_id').notNull().references(() => variantGroups.id, { onDelete: 'cascade' }),
+    name: varchar('name', { length: 100 }).notNull(),
+    sku: varchar('sku', { length: 50 }).unique(),
+    priceModifier: decimal('price_modifier', { precision: 10, scale: 2 }).default('0'),
+    images: json('images').$type<string[]>().default([]),
+    stock: integer('stock').default(0),
+    displayOrder: integer('display_order').default(0),
+    isActive: boolean('is_active').default(true),
+    createdAt: timestamp('created_at').defaultNow(),
+});
+
+// ============================================
 // USUARIOS / CLIENTES
 // ============================================
 export const users = pgTable('users', {
@@ -266,6 +291,7 @@ export const productsRelations = relations(products, ({ one, many }) => ({
     productionTimeRules: many(productionTimeRules),
     reviews: many(reviews),
     variants: many(productVariants),
+    variantGroups: many(variantGroups),
     mockupTemplate: one(mockupTemplates, {
         fields: [products.mockupTemplateId],
         references: [mockupTemplates.id],
@@ -284,6 +310,21 @@ export const productVariantsRelations = relations(productVariants, ({ one }) => 
     product: one(products, {
         fields: [productVariants.productId],
         references: [products.id],
+    }),
+}));
+
+export const variantGroupsRelations = relations(variantGroups, ({ one, many }) => ({
+    product: one(products, {
+        fields: [variantGroups.productId],
+        references: [products.id],
+    }),
+    options: many(variantGroupOptions),
+}));
+
+export const variantGroupOptionsRelations = relations(variantGroupOptions, ({ one }) => ({
+    group: one(variantGroups, {
+        fields: [variantGroupOptions.groupId],
+        references: [variantGroups.id],
     }),
 }));
 
