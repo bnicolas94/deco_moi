@@ -302,10 +302,20 @@ const initialProductionTime =
 
 
 
+        {/* Descripción corta */}
+        {
+          product.shortDescription && (
+            <div
+              class="rich-text-content text-gray-500 mb-6 leading-relaxed prose prose-sm max-w-none"
+              set:html={product.shortDescription}
+            />
+          )
+        }
+
         <!-- Grupos de Opciones Multi-dimensionales -->
         {
           variantGroups && variantGroups.length > 0 && (
-            <div class="mb-5 space-y-4" id="variant-groups-container">
+            <div class="mb-5 space-y-4" id="variant-groups-container" data-original-images={JSON.stringify(images)} data-product-name={product.name}>
               {variantGroups.map((group: any) => (
                 <div class="variant-group" data-group-id={group.id} data-group-name={group.name} data-is-required={group.isRequired ? 'true' : 'false'}>
                   <div class="flex items-center justify-between mb-2">
@@ -353,16 +363,6 @@ const initialProductionTime =
                 </div>
               ))}
             </div>
-          )
-        }
-
-        {/* Descripción corta */}
-        {
-          product.shortDescription && (
-            <div
-              class="rich-text-content text-gray-500 mb-6 leading-relaxed prose prose-sm max-w-none"
-              set:html={product.shortDescription}
-            />
           )
         }
 
@@ -1303,7 +1303,37 @@ const initialProductionTime =
         }
       }
     } else {
-       // If deselecting, we could restore original images if we want, but typically it's fine.
+       // Restore original images
+       const originalImagesStr = variantGroupsContainer.getAttribute("data-original-images");
+       const originalImages = originalImagesStr ? JSON.parse(originalImagesStr) : [];
+       const productName = variantGroupsContainer.getAttribute("data-product-name");
+       
+       if (originalImages && originalImages.length > 0) {
+         const mainImage = document.getElementById("main-image");
+         const thumbnailsContainer = document.getElementById("product-thumbnails");
+
+         if (mainImage) mainImage.src = originalImages[0];
+         
+         if (thumbnailsContainer) {
+            if (originalImages.length > 1) {
+              thumbnailsContainer.innerHTML = originalImages
+                .map(
+                  (img, i) => `
+                <button
+                  class="product-thumb w-20 h-20 rounded-lg overflow-hidden flex-shrink-0 border-2 transition-all ${i === 0 ? "border-primary" : "border-transparent hover:border-primary/50"}"
+                  data-src="${img}"
+                >
+                  <img src="${img}" alt="${productName} ${i + 1}" class="w-full h-full object-cover" />
+                </button>
+              `,
+                )
+                .join("");
+              attachThumbnailListeners();
+            } else {
+              thumbnailsContainer.innerHTML = "";
+            }
+         }
+       }
     }
 
     updateVariantGroupsState();
