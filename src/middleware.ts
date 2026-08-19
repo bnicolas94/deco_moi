@@ -3,6 +3,7 @@ import { validateSessionToken, SESSION_COOKIE_NAME } from './lib/auth';
 import { db } from './lib/db/connection';
 import { siteConfig } from './lib/db/schema';
 import { eq } from 'drizzle-orm';
+import { isSameOriginRequest, requiresAdminApi, requiresCsrfCheck } from './lib/security/request';
 
 export const onRequest = defineMiddleware(async (context, next) => {
     // 1. Validar sesión primero
@@ -34,11 +35,30 @@ export const onRequest = defineMiddleware(async (context, next) => {
     context.locals.user = user;
 
     const isAdmin = user !== null && user.role === 'admin';
+    const pathname = context.url.pathname;
+
+    // Las APIs administrativas se bloquean por defecto desde un único punto.
+    // Las pocas rutas públicas necesarias están excluidas explícitamente en
+    // requiresAdminApi para evitar que un endpoint nuevo quede expuesto por olvido.
+    if (requiresAdminApi(pathname, context.request.method)) {
+        if (!isAdmin) {
+            return new Response(JSON.stringify({ error: 'No autorizado' }), {
+                status: user ? 403 : 401,
+                headers: { 'Content-Type': 'application/json' },
+            });
+        }
+
+        if (requiresCsrfCheck(context.request.method) && !isSameOriginRequest(context)) {
+            return new Response(JSON.stringify({ error: 'Origen de solicitud no permitido' }), {
+                status: 403,
+                headers: { 'Content-Type': 'application/json' },
+            });
+        }
+    }
 
     // 2. Comprobar Modo Mantenimiento
     // Excepciones: Rutas de admin, API, la propia página de mantenimiento,
     // assets estáticos y administradores logueados nunca son bloqueados
-    const pathname = context.url.pathname;
     const isStaticAsset = pathname.startsWith('/_astro') ||
         pathname.startsWith('/images') ||
         pathname.startsWith('/uploads') ||
