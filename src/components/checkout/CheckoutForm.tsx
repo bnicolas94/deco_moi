@@ -3,7 +3,6 @@ import { useStore } from '@nanostores/preact';
 import {
     $cartItems,
     $cartTotal,
-    $cartTransferTotal,
     clearCart,
     $cartCount
 } from '@/stores/cartStore';
@@ -47,7 +46,6 @@ interface Props {
 export default function CheckoutForm({ fields, shippingConfig, bankConfig }: Props) {
     const items = useStore($cartItems);
     const total = useStore($cartTotal);
-    const transferTotal = useStore($cartTransferTotal);
     const cartCount = useStore($cartCount);
 
     const [formData, setFormData] = useState<Record<string, string>>({});
@@ -73,7 +71,8 @@ export default function CheckoutForm({ fields, shippingConfig, bankConfig }: Pro
         : 0;
 
     // Calcular totales con envío
-    const subtotalForPayment = paymentMethod === 'transfer' ? transferTotal : total;
+    const transferDiscount = Math.min(100, Math.max(0, Number(bankConfig?.discount) || 0));
+    const subtotalForPayment = paymentMethod === 'transfer' ? total * (1 - transferDiscount / 100) : total;
     const grandTotal = subtotalForPayment + shippingCost;
 
     const handleInputChange = (id: string, value: string) => {
@@ -213,7 +212,7 @@ export default function CheckoutForm({ fields, shippingConfig, bankConfig }: Pro
 
                 if (response.ok) {
                     const data = await response.json();
-                    setOrderSuccess({ id: data.orderId, number: data.orderNumber, total: grandTotal });
+                    setOrderSuccess({ id: data.orderId, number: data.orderNumber, total: Number(data.total) });
                     clearCart();
                 } else {
                     const err = await response.json();
@@ -646,48 +645,6 @@ export default function CheckoutForm({ fields, shippingConfig, bankConfig }: Pro
                         <p className="text-center text-xs text-amber-600 mt-3 font-medium">
                             ⚠️ Cotizá el envío antes de finalizar
                         </p>
-                    )}
-
-                    {/* Botón de Simulación (Solo Local/Debug) */}
-                    {(window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') && (
-                        <button
-                            type="button"
-                            onClick={async () => {
-                                if (!confirm('¿Simular un pago exitoso (bypass MP)?')) return;
-                                setIsSubmitting(true);
-                                try {
-                                    const res = await fetch('/api/orders/mock-success', {
-                                        method: 'POST',
-                                        headers: { 'Content-Type': 'application/json' },
-                                        body: JSON.stringify({
-                                            items,
-                                            subtotal: total,
-                                            total: grandTotal,
-                                            shippingCost: shippingCost,
-                                            shippingData: formData,
-                                            shippingMethod: deliveryMethod,
-                                            selectedShipping: selectedShipping || null,
-                                            paymentMethod: 'mock_payment',
-                                            notes: 'Simulación de pago local'
-                                        })
-                                    });
-                                    if (res.ok) {
-                                        const data = await res.json();
-                                        setOrderSuccess({ id: data.orderId, number: data.orderNumber, total: grandTotal });
-                                        clearCart();
-                                    } else {
-                                        alert('Error en la simulación');
-                                    }
-                                } catch (e) {
-                                    alert('Error de conexión');
-                                } finally {
-                                    setIsSubmitting(false);
-                                }
-                            }}
-                            className="w-full mt-4 py-2 border-2 border-dashed border-gray-200 text-gray-400 text-xs font-bold uppercase rounded-xl hover:bg-gray-50 hover:border-gray-300 transition-all"
-                        >
-                            ⚡ Simular Pago Exitoso (Local Debug)
-                        </button>
                     )}
 
                     <p className="text-center text-2xs text-gray-400 mt-4 px-4 uppercase tracking-wider font-bold">
