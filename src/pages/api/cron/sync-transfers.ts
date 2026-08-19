@@ -5,13 +5,22 @@ import { eq, and } from 'drizzle-orm';
 import { PaymentStatus } from '@/types/order';
 import { MercadoPagoConfig, Payment } from 'mercadopago';
 import { EmailService } from '@/lib/services/EmailService';
+import { verifyBearerSecret } from '@/lib/security/request';
 
 const accessToken = import.meta.env.MP_ACCESS_TOKEN || process.env.MP_ACCESS_TOKEN || '';
 const client = new MercadoPagoConfig({ accessToken, options: { timeout: 5000 } });
 
 export const GET: APIRoute = async ({ request }) => {
     try {
-        // En producción podrías agregar autenticación acá, evaluando request.headers.get('Authorization')
+        const cronSecret = import.meta.env.CRON_SECRET || process.env.CRON_SECRET || '';
+        if (!cronSecret) {
+            console.error('CRON_SECRET no está configurado');
+            return new Response('Servicio no configurado', { status: 503 });
+        }
+
+        if (!verifyBearerSecret(request.headers.get('authorization'), cronSecret)) {
+            return new Response('No autorizado', { status: 401 });
+        }
 
         if (!accessToken) {
             return new Response('MP_ACCESS_TOKEN no configurado', { status: 500 });

@@ -6,10 +6,7 @@ export const POST: APIRoute = async (context) => {
         const body = await context.request.json();
         const { items, shippingData, total, subtotal, shippingCost, shippingMethod, selectedShipping } = body;
 
-        console.log('API: Iniciando creación de preferencia MP con', items.length, 'ítems');
-
-        const accessToken = import.meta.env.MP_ACCESS_TOKEN || process.env.MP_ACCESS_TOKEN;
-        console.log('API: Token presente:', !!accessToken, accessToken ? `(Inicia con ${accessToken.substring(0, 10)}...)` : '');
+        console.log('API: Iniciando creación de preferencia MP');
 
         // Validaciones básicas
         if (!items || items.length === 0) {
@@ -90,8 +87,6 @@ export const POST: APIRoute = async (context) => {
             }
         };
 
-        console.log('API: Enviando Preference a MP:', JSON.stringify(preferenceData, null, 2));
-
         const result = await preference.create(preferenceData);
         console.log('API: Preferencia MP creada con ID:', result.id);
 
@@ -103,18 +98,8 @@ export const POST: APIRoute = async (context) => {
     } catch (error: any) {
         console.error('API Error creando preferencia MP:', error);
 
-        // El error en el SDK v2 suele venir en error.apiResponse
-        let errorDetail = error.message;
-        if (error.apiResponse) {
-            try {
-                const apiError = await error.apiResponse.json();
-                errorDetail = JSON.stringify(apiError);
-            } catch (e) { }
-        }
-
         return new Response(JSON.stringify({
-            error: 'Error al iniciar el pago con Mercado Pago',
-            details: errorDetail
+            error: 'Error al iniciar el pago con Mercado Pago'
         }), { status: 500 });
     }
 };
