@@ -10,7 +10,8 @@ import {
     FolderTree,
     TrendingUp,
     Calculator,
-    Globe
+    Globe,
+    KeyRound
 } from 'lucide-react';
 import Toast from '@/components/layout/Toast.astro';
 
@@ -36,6 +37,7 @@ const navItems = [
     { href: '/admin/settings/home', label: 'Constructor Home', icon: LayoutDashboard },
     { href: '/admin/paginas', label: 'Páginas Dinámicas', icon: Globe },
     { href: '/admin/settings/checkout', label: 'Config. Checkout', icon: Settings },
+    { href: '/admin/account', label: 'Mi cuenta', icon: KeyRound },
 ];
 
 const user = Astro.locals.user;
@@ -85,7 +87,7 @@ const user = Astro.locals.user;
                 </nav>
 
                 <div class="p-4 border-t border-slate-800">
-                    <div class="flex items-center gap-3 px-3 py-2 mb-2">
+                    <a href="/admin/account" class="flex items-center gap-3 px-3 py-2 mb-2 rounded-lg hover:bg-slate-800 transition-colors">
                         <div class="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center text-sm font-bold">
                             {user?.name?.charAt(0) || 'A'}
                         </div>
@@ -93,7 +95,7 @@ const user = Astro.locals.user;
                             <p class="text-sm font-medium truncate">{user?.name || 'Admin'}</p>
                             <p class="text-xs text-slate-400 truncate">{user?.email}</p>
                         </div>
-                    </div>
+                    </a>
                     
                     <form action="/api/auth/logout" method="POST">
                         <button type="submit" class="w-full flex items-center px-3 py-2 text-slate-300 hover:bg-red-500/10 hover:text-red-400 rounded-lg transition-colors">
