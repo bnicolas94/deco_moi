@@ -1,13 +1,26 @@
 import type { APIRoute } from 'astro';
 import { db } from '@/lib/db/connection';
 import { products, productVariants, meliItemLinks } from '@/lib/db/schema';
-import { writeFile, mkdir } from 'node:fs/promises';
-import { join } from 'node:path';
-import { randomUUID } from 'node:crypto';
+import { sanitizeRichText } from '@/lib/security/html';
+import {
+    assertMultipartRequest,
+    ImageUploadError,
+    saveUploadedImage,
+    saveUploadedImages,
+} from '@/lib/security/uploads';
 
 export const POST: APIRoute = async (context) => {
     if (!context.locals.user || context.locals.user.role !== 'admin') {
         return new Response('No autorizado', { status: 401 });
+    }
+
+    try {
+        assertMultipartRequest(context.request);
+    } catch (error) {
+        if (error instanceof ImageUploadError) {
+            return new Response(JSON.stringify({ error: error.message }), { status: error.status });
+        }
+        throw error;
     }
 
     let formData: FormData;
@@ -22,51 +35,30 @@ export const POST: APIRoute = async (context) => {
     const price = parseFloat(formData.get('basePrice')?.toString() || '0');
     const stock = parseInt(formData.get('stock')?.toString() || '0');
     const categoryId = parseInt(formData.get('categoryId')?.toString() || '0');
-    const description = formData.get('description')?.toString();
+    const description = sanitizeRichText(formData.get('description')?.toString());
     const sku = formData.get('sku')?.toString() || null;
     const isActive = formData.get('isActive') === 'true'; // Checkbox boolean
     const isFeatured = formData.get('isFeatured') === 'true';
 
-    const imageFiles = formData.getAll('image') as File[];
+    const imageFiles = formData.getAll('image').filter((value): value is File => value instanceof File);
     let imageUrls: string[] = [];
 
-    if (imageFiles && imageFiles.length > 0) {
-        const uploadDir = join(process.cwd(), 'uploads', 'products');
-        await mkdir(uploadDir, { recursive: true });
-
-        for (const imageFile of imageFiles) {
-            if (imageFile.size > 0 && imageFile.name) {
-                try {
-                    const buffer = await imageFile.arrayBuffer();
-                    const ext = imageFile.name.split('.').pop();
-                    const fileName = `${randomUUID()}.${ext}`;
-                    
-                    await writeFile(join(uploadDir, fileName), new Uint8Array(buffer));
-                    
-                    imageUrls.push(`/uploads/products/${fileName}`);
-                } catch (err) {
-                    console.error('Error saving image file:', err);
-                }
-            }
+    try {
+        if (imageFiles.length > 0) {
+            imageUrls = await saveUploadedImages(imageFiles, 'products');
         }
+    } catch (error) {
+        if (error instanceof ImageUploadError) {
+            return new Response(JSON.stringify({ error: error.message }), { status: error.status });
+        }
+        throw error;
     }
 
     // Helper to upload variant images
     async function uploadVariantImage(fieldName: string): Promise<string | null> {
         const file = formData.get(fieldName) as File | null;
         if (!file || file.size <= 0 || !file.name) return null;
-        try {
-            const buffer = await file.arrayBuffer();
-            const ext = file.name.split('.').pop();
-            const fileName = `variant-${randomUUID()}.${ext}`;
-            const uploadDir = join(process.cwd(), 'uploads', 'products');
-            await mkdir(uploadDir, { recursive: true });
-            await writeFile(join(uploadDir, fileName), new Uint8Array(buffer));
-            return `/uploads/products/${fileName}`;
-        } catch (err) {
-            console.error('Error saving variant image:', err);
-            return null;
-        }
+        return saveUploadedImage(file, 'products', 'variant-');
     }
 
     try {
@@ -78,7 +70,7 @@ export const POST: APIRoute = async (context) => {
                 stock,
                 categoryId,
                 description,
-                shortDescription: formData.get('shortDescription')?.toString() || null,
+                shortDescription: sanitizeRichText(formData.get('shortDescription')?.toString()) || null,
                 productionTime: formData.get('productionTime')?.toString() || null,
                 minOrder: formData.get('minOrder') ? parseInt(formData.get('minOrder')!.toString()) : 1,
                 sku,
@@ -131,6 +123,9 @@ export const POST: APIRoute = async (context) => {
 
         return new Response(JSON.stringify({ success: true, id: result.id }), { status: 201 });
     } catch (e) {
+        if (e instanceof ImageUploadError) {
+            return new Response(JSON.stringify({ error: e.message }), { status: e.status });
+        }
         console.error(e);
         return new Response('Error al crear producto', { status: 500 });
     }

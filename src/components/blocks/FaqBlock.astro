@@ -1,4 +1,6 @@
 ---
+import { sanitizeRichText } from '@/lib/security/html';
+
 export interface FaqItem {
     question: string;
     answer: string;
@@ -7,7 +9,7 @@ export interface FaqItem {
 export interface Props {
     title?: string;
     subtitle?: string;
-    items: FaqItem[];
+    items?: FaqItem[];
 }
 
 const {
@@ -54,7 +56,7 @@ const {
                     </summary>
                     
                     <div class="px-6 pb-6 text-gray-600 prose max-w-none" itemscope itemprop="acceptedAnswer" itemtype="https://schema.org/Answer">
-                        <div itemprop="text" set:html={item.answer} />
+                        <div itemprop="text" set:html={sanitizeRichText(item.answer)} />
                     </div>
                 </details>
             ))}

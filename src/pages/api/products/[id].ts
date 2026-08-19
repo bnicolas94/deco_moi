@@ -2,15 +2,28 @@ import type { APIRoute } from 'astro';
 import { db } from '@/lib/db/connection';
 import { products, productVariants, meliItemLinks, productionTimeRules, productCostItems, productSupplies, priceRules, mockupTemplates } from '@/lib/db/schema';
 import { eq, and, notInArray } from 'drizzle-orm';
-import { writeFile, mkdir } from 'node:fs/promises';
-import { join } from 'node:path';
-import { randomUUID } from 'node:crypto';
+import { sanitizePublicUrl, sanitizeRichText } from '@/lib/security/html';
+import {
+    assertMultipartRequest,
+    ImageUploadError,
+    saveUploadedImage,
+    saveUploadedImages,
+} from '@/lib/security/uploads';
 
 export const PUT: APIRoute = async (context) => {
     console.log('--- PUT Product Request ---');
     if (!context.locals.user || context.locals.user.role !== 'admin') {
         console.log('Unauthorized');
         return new Response('No autorizado', { status: 401 });
+    }
+
+    try {
+        assertMultipartRequest(context.request);
+    } catch (error) {
+        if (error instanceof ImageUploadError) {
+            return new Response(JSON.stringify({ error: error.message }), { status: error.status });
+        }
+        throw error;
     }
 
     const id = parseInt(context.params.id!);
@@ -33,7 +46,7 @@ export const PUT: APIRoute = async (context) => {
     const stock = parseInt(stockStr);
     const categoryIdStr = formData.get('categoryId')?.toString() || '0';
     const categoryId = parseInt(categoryIdStr);
-    const description = formData.get('description')?.toString();
+    const description = sanitizeRichText(formData.get('description')?.toString());
     const sku = formData.get('sku')?.toString() || null;
     const isActive = formData.get('isActive') === 'true';
     const isFeatured = formData.get('isFeatured') === 'true';
@@ -41,29 +54,18 @@ export const PUT: APIRoute = async (context) => {
     console.log('Parsed Fields:', { name, slug, price, stock, categoryId, isActive, isFeatured });
 
     // Handle Image Uploads (product images)
-    const imageFiles = formData.getAll('image') as File[];
+    const imageFiles = formData.getAll('image').filter((value): value is File => value instanceof File);
     let newImages: string[] = [];
 
-    if (imageFiles && imageFiles.length > 0) {
+    if (imageFiles.length > 0) {
         console.log(`Processing ${imageFiles.length} new images`);
-        const uploadDir = join(process.cwd(), 'uploads', 'products');
-        await mkdir(uploadDir, { recursive: true });
-
-        for (const imageFile of imageFiles) {
-            if (imageFile.size > 0 && imageFile.name) {
-                try {
-                    const buffer = await imageFile.arrayBuffer();
-                    const ext = imageFile.name.split('.').pop();
-                    const fileName = `${randomUUID()}.${ext}`;
-                    
-                    await writeFile(join(uploadDir, fileName), new Uint8Array(buffer));
-                    
-                    newImages.push(`/uploads/products/${fileName}`);
-                    console.log(`Saved new image: ${fileName}`);
-                } catch (err) {
-                    console.error('Error saving image file:', err);
-                }
+        try {
+            newImages = await saveUploadedImages(imageFiles, 'products');
+        } catch (error) {
+            if (error instanceof ImageUploadError) {
+                return new Response(JSON.stringify({ error: error.message }), { status: error.status });
             }
+            throw error;
         }
     }
 
@@ -71,24 +73,14 @@ export const PUT: APIRoute = async (context) => {
     async function uploadVariantImage(fieldName: string): Promise<string | null> {
         const file = formData.get(fieldName) as File | null;
         if (!file || file.size <= 0 || !file.name) return null;
-        try {
-            const buffer = await file.arrayBuffer();
-            const ext = file.name.split('.').pop();
-            const fileName = `variant-${randomUUID()}.${ext}`;
-            const uploadDir = join(process.cwd(), 'uploads', 'products');
-            await mkdir(uploadDir, { recursive: true });
-            await writeFile(join(uploadDir, fileName), new Uint8Array(buffer));
-            console.log(`Saved variant image: ${fileName}`);
-            return `/uploads/products/${fileName}`;
-        } catch (err) {
-            console.error('Error saving variant image:', err);
-            return null;
-        }
+        return saveUploadedImage(file, 'products', 'variant-');
     }
 
     try {
         // Get existing images from form data (to handle deletions)
-        const keptImages = formData.getAll('existingImages').map(img => img.toString());
+        const keptImages = formData.getAll('existingImages')
+            .map((image) => sanitizePublicUrl(image.toString()))
+            .filter(Boolean);
         const updatedImages = [...keptImages, ...newImages];
 
         await db.transaction(async (tx) => {
@@ -101,7 +93,7 @@ export const PUT: APIRoute = async (context) => {
                     stock,
                     categoryId,
                     description,
-                    shortDescription: formData.get('shortDescription')?.toString() || null,
+                    shortDescription: sanitizeRichText(formData.get('shortDescription')?.toString()) || null,
                     productionTime: formData.get('productionTime')?.toString() || null,
                     minOrder: formData.get('minOrder') ? parseInt(formData.get('minOrder')!.toString()) : 1,
                     sku,
@@ -122,7 +114,9 @@ export const PUT: APIRoute = async (context) => {
 
                 for (const v of variants) {
                     // Determine images for this variant
-                    let variantImages: string[] = v.existingImages || [];
+                    let variantImages: string[] = Array.isArray(v.existingImages)
+                        ? v.existingImages.map((image: unknown) => sanitizePublicUrl(image)).filter(Boolean)
+                        : [];
                     
                     if (v.imageFieldNames && v.imageFieldNames.length > 0) {
                         console.log(`Uploading ${v.imageFieldNames.length} new images for variant ${v.name}`);
@@ -200,6 +194,9 @@ export const PUT: APIRoute = async (context) => {
         console.log('Transaction successful');
         return new Response(JSON.stringify({ success: true }), { status: 200 });
     } catch (e) {
+        if (e instanceof ImageUploadError) {
+            return new Response(JSON.stringify({ error: e.message }), { status: e.status });
+        }
         console.error('Database Error:', e);
         return new Response('Error al actualizar producto', { status: 500 });
     }

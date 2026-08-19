@@ -1,4 +1,6 @@
 ---
+import { clampNumber, sanitizePublicUrl } from '@/lib/security/html';
+
 export interface Props {
     title: string;
     subtitle?: string;
@@ -20,6 +22,11 @@ const {
     align = 'center',
     minHeight = 500,
 } = Astro.props;
+const safeBackgroundImage = sanitizePublicUrl(backgroundImage);
+const safeCtaLink = sanitizePublicUrl(ctaLink);
+const safeOverlayOpacity = clampNumber(overlayOpacity, 50, 0, 100);
+const safeMinHeight = clampNumber(minHeight, 500, 200, 1_200);
+const safeAlign = align === 'left' || align === 'right' ? align : 'center';
 
 const alignmentClasses = {
     left: 'text-left items-start',
@@ -30,11 +37,11 @@ const alignmentClasses = {
 
 <section 
     class="relative flex flex-col justify-center bg-gray-100" 
-    style={`min-height: ${minHeight}px;`}
+    style={`min-height: ${safeMinHeight}px;`}
 >
-    {backgroundImage && (
+    {safeBackgroundImage && (
         <img 
-            src={backgroundImage} 
+            src={safeBackgroundImage}
             alt={title} 
             class="absolute inset-0 w-full h-full object-cover z-0"
         />
@@ -42,11 +49,11 @@ const alignmentClasses = {
     
     <div 
         class="absolute inset-0 bg-black z-10" 
-        style={`opacity: ${overlayOpacity / 100};`}
+        style={`opacity: ${safeOverlayOpacity / 100};`}
     ></div>
 
     <div class="container relative z-20 mx-auto px-4 h-full flex flex-col justify-center">
-        <div class={`flex flex-col w-full max-w-4xl mx-auto ${alignmentClasses[align]}`}>
+        <div class={`flex flex-col w-full max-w-4xl mx-auto ${alignmentClasses[safeAlign]}`}>
             <h1 class="text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-4 drop-shadow-md">
                 {title}
             </h1>
@@ -57,9 +64,9 @@ const alignmentClasses = {
                 </p>
             )}
 
-            {ctaText && ctaLink && (
+            {ctaText && safeCtaLink && (
                 <a 
-                    href={ctaLink} 
+                    href={safeCtaLink}
                     class="bg-brand-primary hover:bg-brand-secondary text-white font-semibold py-3 px-8 rounded-full transition-colors duration-300 shadow-lg"
                 >
                     {ctaText}

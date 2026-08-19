@@ -2,6 +2,7 @@ import type { APIRoute } from 'astro';
 import { db } from '@/lib/db/connection';
 import { pages, pageTemplates } from '@/lib/db/schema';
 import { eq, desc } from 'drizzle-orm';
+import { PageContentError, sanitizePageBlocks } from '@/lib/security/pageBlocks';
 
 export const GET: APIRoute = async (context) => {
     if (!context.locals.user || context.locals.user.role !== 'admin') {
@@ -70,6 +71,8 @@ export const POST: APIRoute = async (context) => {
             }
         }
 
+        initialBlocks = sanitizePageBlocks(initialBlocks);
+
         const [newPage] = await db.insert(pages).values({
             title,
             slug,
@@ -94,6 +97,9 @@ export const POST: APIRoute = async (context) => {
 
         return new Response(JSON.stringify({ success: true, page: newPage }), { status: 201, headers: { 'Content-Type': 'application/json' } });
     } catch (e) {
+        if (e instanceof PageContentError) {
+            return new Response(JSON.stringify({ error: e.message }), { status: 400 });
+        }
         console.error('Error creating page:', e);
         return new Response(JSON.stringify({ error: 'Error al crear página' }), { status: 500 });
     }

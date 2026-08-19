@@ -2,13 +2,21 @@ import type { APIRoute } from 'astro';
 import { db } from '@/lib/db/connection';
 import { variantGroups, variantGroupOptions } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
-import { writeFile, mkdir } from 'node:fs/promises';
-import { join } from 'node:path';
-import { randomUUID } from 'node:crypto';
+import { sanitizePublicUrl } from '@/lib/security/html';
+import { assertMultipartRequest, ImageUploadError, saveUploadedImage } from '@/lib/security/uploads';
 
 export const PUT: APIRoute = async (context) => {
     if (!context.locals.user || context.locals.user.role !== 'admin') {
         return new Response('No autorizado', { status: 401 });
+    }
+
+    try {
+        assertMultipartRequest(context.request);
+    } catch (error) {
+        if (error instanceof ImageUploadError) {
+            return new Response(JSON.stringify({ error: error.message }), { status: error.status });
+        }
+        throw error;
     }
 
     const productId = parseInt(context.params.id!);
@@ -25,24 +33,18 @@ export const PUT: APIRoute = async (context) => {
         return new Response(JSON.stringify({ error: 'Missing groups_json' }), { status: 400 });
     }
 
-    const groups = JSON.parse(groupsJsonStr);
+    let groups: any[];
+    try {
+        groups = JSON.parse(groupsJsonStr);
+        if (!Array.isArray(groups) || groups.length > 20) throw new Error('invalid groups');
+    } catch {
+        return new Response(JSON.stringify({ error: 'Los grupos de opciones no son válidos' }), { status: 400 });
+    }
 
     async function uploadVGOptionImage(fieldName: string): Promise<string | null> {
         const file = formData.get(fieldName) as File | null;
         if (!file || file.size <= 0 || !file.name) return null;
-        try {
-            const buffer = await file.arrayBuffer();
-            const ext = file.name.split('.').pop();
-            const fileName = `vg-opt-${randomUUID()}.${ext}`;
-            const uploadDir = join(process.cwd(), 'uploads', 'products');
-            await mkdir(uploadDir, { recursive: true });
-            await writeFile(join(uploadDir, fileName), new Uint8Array(buffer));
-            console.log(`Saved variant group option image: ${fileName}`);
-            return `/uploads/products/${fileName}`;
-        } catch (err) {
-            console.error('Error saving variant group option image:', err);
-            return null;
-        }
+        return saveUploadedImage(file, 'products', 'vg-opt-');
     }
 
     try {
@@ -64,7 +66,9 @@ export const PUT: APIRoute = async (context) => {
                     if (g.options && g.options.length > 0) {
                         for (let j = 0; j < g.options.length; j++) {
                             const opt = g.options[j];
-                            let optImages = opt.existingImages || [];
+                            let optImages: string[] = Array.isArray(opt.existingImages)
+                                ? opt.existingImages.map((image: unknown) => sanitizePublicUrl(image)).filter(Boolean)
+                                : [];
                             
                             if (opt.imageFieldNames && opt.imageFieldNames.length > 0) {
                                 for (const fieldName of opt.imageFieldNames) {
@@ -93,6 +97,9 @@ export const PUT: APIRoute = async (context) => {
 
         return new Response(JSON.stringify({ success: true }), { status: 200 });
     } catch (e) {
+        if (e instanceof ImageUploadError) {
+            return new Response(JSON.stringify({ error: e.message }), { status: e.status });
+        }
         console.error('Error saving variant groups:', e);
         return new Response(JSON.stringify({ error: 'Error al guardar grupos de opciones' }), { status: 500 });
     }

@@ -1,4 +1,6 @@
 ---
+import { sanitizeRichText } from '@/lib/security/html';
+
 export interface Props {
     content: string;
     maxWidth?: 'narrow' | 'normal' | 'wide';
@@ -23,11 +25,12 @@ const alignClasses = {
     right: 'text-right',
     justify: 'text-justify'
 };
+const safeContent = sanitizeRichText(content);
 ---
 
 <section class="py-12 md:py-16 px-4 bg-white">
     <div class={`mx-auto ${maxWidthClasses[maxWidth]} ${alignClasses[align]}`}>
-        <div class="prose prose-lg md:prose-xl prose-stone max-w-none break-words" set:html={content} />
+        <div class="prose prose-lg md:prose-xl prose-stone max-w-none break-words" set:html={safeContent} />
     </div>
 </section>
 

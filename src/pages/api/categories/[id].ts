@@ -2,6 +2,7 @@ import type { APIRoute } from 'astro';
 import { db } from '@/lib/db/connection';
 import { categories, products } from '@/lib/db/schema';
 import { eq, and, ne, count, sql } from 'drizzle-orm';
+import { assertMultipartRequest, ImageUploadError, saveUploadedImage } from '@/lib/security/uploads';
 
 export const PUT: APIRoute = async (context) => {
     if (!context.locals.user || context.locals.user.role !== 'admin') {
@@ -12,6 +13,7 @@ export const PUT: APIRoute = async (context) => {
     if (isNaN(id)) return new Response('ID inválido', { status: 400 });
 
     try {
+        assertMultipartRequest(context.request);
         const formData = await context.request.formData();
         const name = formData.get('name')?.toString();
         const slug = formData.get('slug')?.toString();
@@ -37,7 +39,7 @@ export const PUT: APIRoute = async (context) => {
 
         // Validate max 4 levels
         if (parentId) {
-            const depth = await getDepth(parentId);
+            const depth = await getDepth(parentId, id);
             if (depth >= 3) {
                 return new Response(JSON.stringify({ error: 'Máximo 4 niveles de jerarquía' }), { status: 400 });
             }
@@ -47,16 +49,7 @@ export const PUT: APIRoute = async (context) => {
         let imageUrl: string | undefined;
         const imageFile = formData.get('image') as File | null;
         if (imageFile && imageFile.size > 0 && imageFile.name) {
-            const { writeFile, mkdir } = await import('node:fs/promises');
-            const { join } = await import('node:path');
-            const { randomUUID } = await import('node:crypto');
-            const buffer = await imageFile.arrayBuffer();
-            const ext = imageFile.name.split('.').pop();
-            const fileName = `cat-${randomUUID()}.${ext}`;
-            const uploadDir = join(process.cwd(), 'public', 'uploads', 'categories');
-            await mkdir(uploadDir, { recursive: true });
-            await writeFile(join(uploadDir, fileName), new Uint8Array(buffer));
-            imageUrl = `/uploads/categories/${fileName}`;
+            imageUrl = await saveUploadedImage(imageFile, 'categories', 'cat-');
         }
 
         const updateData: any = {
@@ -71,6 +64,9 @@ export const PUT: APIRoute = async (context) => {
 
         return new Response(JSON.stringify({ success: true }), { status: 200 });
     } catch (e) {
+        if (e instanceof ImageUploadError) {
+            return new Response(JSON.stringify({ error: e.message }), { status: e.status });
+        }
         console.error('Error updating category:', e);
         return new Response(JSON.stringify({ error: 'Error al actualizar categoría' }), { status: 500 });
     }
@@ -130,10 +126,15 @@ export const DELETE: APIRoute = async (context) => {
     }
 };
 
-async function getDepth(categoryId: number): Promise<number> {
+async function getDepth(categoryId: number, forbiddenId: number): Promise<number> {
     let depth = 0;
     let currentId: number | null = categoryId;
+    const visited = new Set<number>();
     while (currentId) {
+        if (currentId === forbiddenId || visited.has(currentId) || depth >= 4) {
+            return Number.POSITIVE_INFINITY;
+        }
+        visited.add(currentId);
         depth++;
         const parent = await db.select({ parentId: categories.parentId }).from(categories).where(eq(categories.id, currentId));
         currentId = parent[0]?.parentId || null;

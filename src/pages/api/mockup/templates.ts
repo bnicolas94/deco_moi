@@ -2,19 +2,40 @@ import type { APIRoute } from 'astro';
 import { db } from '@/lib/db/connection';
 import { mockupTemplates, products } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
-import fs from 'node:fs/promises';
-import path from 'node:path';
+import { z } from 'zod';
+import { assertMultipartRequest, ImageUploadError, saveUploadedImage } from '@/lib/security/uploads';
 
-// Asegurar que el directorio de upload existe
-const UPLOAD_DIR = path.join(process.cwd(), 'public', 'uploads', 'mockups');
-
-async function ensureUploadDir() {
-    try {
-        await fs.access(UPLOAD_DIR);
-    } catch {
-        await fs.mkdir(UPLOAD_DIR, { recursive: true });
-    }
-}
+const finiteCoordinate = z.number().finite().min(-1000).max(1000);
+const pointSchema = z.object({ x: finiteCoordinate, y: finiteCoordinate });
+const surfaceSchema = z.object({
+    id: z.string().trim().min(1).max(100),
+    name: z.string().trim().min(1).max(100),
+    designArea: z.object({
+        topLeft: pointSchema,
+        topRight: pointSchema,
+        bottomRight: pointSchema,
+        bottomLeft: pointSchema
+    }),
+    sourceArea: z.object({
+        x: finiteCoordinate,
+        y: finiteCoordinate,
+        width: z.number().finite().positive().max(100000),
+        height: z.number().finite().positive().max(100000)
+    }).optional(),
+    transform: z.object({
+        scale: z.number().finite().min(0.01).max(100),
+        rotation: z.number().finite().min(-360).max(360),
+        offsetX: finiteCoordinate,
+        offsetY: finiteCoordinate
+    }).optional(),
+    isActive: z.boolean(),
+    zIndex: z.number().int().min(-100).max(100)
+});
+const surfacesSchema = z.array(surfaceSchema).max(20);
+const defaultTransformSchema = z.object({
+    scale: z.number().finite().min(0.01).max(100),
+    rotation: z.number().finite().min(-360).max(360)
+});
 
 export const GET: APIRoute = async () => {
     try {
@@ -27,13 +48,15 @@ export const GET: APIRoute = async () => {
         }).from(products);
 
         return new Response(JSON.stringify(productList), { status: 200 });
-    } catch (e: any) {
-        return new Response(JSON.stringify({ error: e.message }), { status: 500 });
+    } catch (error) {
+        console.error('Error loading mockup templates:', error);
+        return new Response(JSON.stringify({ error: 'Error al cargar las plantillas' }), { status: 500 });
     }
 }
 
 export const POST: APIRoute = async ({ request }) => {
     try {
+        assertMultipartRequest(request);
         const formData = await request.formData();
         const productId = formData.get('productId');
         const name = formData.get('name');
@@ -45,26 +68,36 @@ export const POST: APIRoute = async ({ request }) => {
             return new Response(JSON.stringify({ error: 'Faltan datos requeridos (productId, name, surfaces, image)' }), { status: 400 });
         }
 
-        const surfaces = JSON.parse(surfacesJson as string);
-        const defaultTransform = defaultTransformJson ? JSON.parse(defaultTransformJson as string) : { scale: 1, rotation: 0 };
+        let parsedSurfaces: unknown;
+        let parsedDefaultTransform: unknown = { scale: 1, rotation: 0 };
+        try {
+            parsedSurfaces = JSON.parse(String(surfacesJson));
+            if (defaultTransformJson) {
+                parsedDefaultTransform = JSON.parse(String(defaultTransformJson));
+            }
+        } catch {
+            return new Response(JSON.stringify({ error: 'La configuración de la plantilla no es válida' }), { status: 400 });
+        }
 
-        // 1. Guardar Imagen
-        await ensureUploadDir();
-        const arrayBuffer = await imageFile.arrayBuffer();
-        const buffer = Buffer.from(arrayBuffer);
-        const fileName = `mockup-${productId}-${Date.now()}.png`;
-        const filePath = path.join(UPLOAD_DIR, fileName);
+        const surfacesResult = surfacesSchema.safeParse(parsedSurfaces);
+        const defaultTransformResult = defaultTransformSchema.safeParse(parsedDefaultTransform);
 
-        await fs.writeFile(filePath, buffer);
-        const publicUrl = `/uploads/mockups/${fileName}`;
-
-        // 2. Verificar producto
+        // 1. Verificar producto antes de guardar archivos
         const pid = Number(productId);
+        const safeName = String(name).trim().slice(0, 200);
+        if (!Number.isSafeInteger(pid) || pid <= 0 || !safeName || !surfacesResult.success || !defaultTransformResult.success) {
+            return new Response(JSON.stringify({ error: 'Datos de plantilla inválidos' }), { status: 400 });
+        }
+        const surfaces = surfacesResult.data;
+        const defaultTransform = defaultTransformResult.data;
         const productList = await db.select().from(products).where(eq(products.id, pid)).limit(1);
         if (!productList.length) {
             return new Response(JSON.stringify({ error: 'Producto no encontrado' }), { status: 404 });
         }
         const product = productList[0];
+
+        // 2. Guardar una imagen validada fuera del directorio público del código.
+        const publicUrl = await saveUploadedImage(imageFile, 'mockups', `mockup-${pid}-`);
 
         // 3. Upsert Template (Buscar si ya existe para este producto o crear uno nuevo)
         // Por simplicidad, buscamos si tiene uno asignado y lo actualizamos, o creamos nuevo.
@@ -78,7 +111,7 @@ export const POST: APIRoute = async ({ request }) => {
             const t = existingTemplates[0];
             await db.update(mockupTemplates)
                 .set({
-                    name: name as string,
+                    name: safeName,
                     mockupImageUrl: publicUrl,
                     surfaces: surfaces,
                     defaultTransform: defaultTransform,
@@ -91,7 +124,7 @@ export const POST: APIRoute = async ({ request }) => {
             const slug = `${product.slug}-mockup`;
             const newTemplate = await db.insert(mockupTemplates).values({
                 productId: pid,
-                name: name as string,
+                name: safeName,
                 slug: slug,
                 mockupImageUrl: publicUrl,
                 surfaces: surfaces,
@@ -117,7 +150,10 @@ export const POST: APIRoute = async ({ request }) => {
         }), { status: 200 });
 
     } catch (error: any) {
+        if (error instanceof ImageUploadError) {
+            return new Response(JSON.stringify({ error: error.message }), { status: error.status });
+        }
         console.error('Error saving mockup template:', error);
-        return new Response(JSON.stringify({ error: error.message }), { status: 500 });
+        return new Response(JSON.stringify({ error: 'Error al guardar la plantilla' }), { status: 500 });
     }
 };
