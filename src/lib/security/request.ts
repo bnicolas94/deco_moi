@@ -37,7 +37,7 @@ export function requiresAdminApi(pathname: string, method: string): boolean {
         return method !== 'GET';
     }
 
-    if (pathname === '/api/orders' || pathname === '/api/orders/mock-success') {
+    if (pathname === '/api/orders') {
         return false;
     }
 

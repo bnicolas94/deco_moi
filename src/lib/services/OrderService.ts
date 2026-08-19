@@ -6,8 +6,11 @@ import { inArray, eq, and } from 'drizzle-orm';
 export interface CreateOrderData {
     items: any[];
     shippingData: any;
+    shippingMethod: 'pickup' | 'delivery';
     total: number;
     subtotal: number;
+    discountAmount: number;
+    shippingCost: number;
     userId: string | null;
     paymentMethod: string;
     paymentId?: string;
@@ -16,7 +19,19 @@ export interface CreateOrderData {
 
 export class OrderService {
     static async createOrderFromCheckout(data: CreateOrderData) {
-        const { items, shippingData, total, subtotal, userId, paymentMethod, paymentId, notes } = data;
+        const {
+            items,
+            shippingData,
+            shippingMethod,
+            total,
+            subtotal,
+            discountAmount,
+            shippingCost,
+            userId,
+            paymentMethod,
+            paymentId,
+            notes,
+        } = data;
 
         // Generar número de orden
         const orderNumber = `DEC-${Math.floor(100000 + Math.random() * 900000)}`;
@@ -31,31 +46,37 @@ export class OrderService {
             status: OrderStatus.PENDING, // Siempre inicia como Pendiente para gestión interna de Deco Moi
             subtotal: String(subtotal),
             total: String(total),
-            discountAmount: "0",
-            shippingCost: "0",
+            discountAmount: String(discountAmount),
+            shippingCost: String(shippingCost),
             paymentMethod: paymentMethod as any,
             paymentStatus: initialPaymentStatus,
             shippingData,
+            shippingMethod,
             notes: notes || `Pago ${paymentMethod} ${paymentId ? '#' + paymentId : ''} procesado.`,
             createdAt: new Date(),
             updatedAt: new Date(),
         }).returning();
 
         // 2. Crear los ítems
-        const itemsToInsert = items.map((item: any) => ({
-            orderId: newOrder.id,
-            productId: item.id,
-            productName: item.name,
-            productSku: item.sku,
-            quantity: item.quantity,
-            unitPrice: String(item.price),
-            subtotal: String(item.price * item.quantity),
-            customization: {
+        const itemsToInsert = items.map((item: any) => {
+            const customization = {
                 ...(item.customization ? { text: item.customization } : {}),
                 ...(item.selectedOptions && item.selectedOptions.length > 0 ? { selectedOptions: item.selectedOptions } : {}),
-            } || null,
-            variantId: item.variantId || null,
-        }));
+            };
+
+            return {
+                orderId: newOrder.id,
+                productId: item.id,
+                productName: item.name,
+                productSku: item.sku,
+                quantity: item.quantity,
+                unitPrice: String(item.price),
+                subtotal: String(item.price * item.quantity),
+                customization: Object.keys(customization).length > 0 ? customization : null,
+                variantId: item.variantId || null,
+                productionTime: item.productionTime || null,
+            };
+        });
 
         const insertedItems = await db.insert(orderItems).values(itemsToInsert).returning();
 

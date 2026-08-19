@@ -1,62 +1,74 @@
 import type { APIRoute } from 'astro';
 import { preference } from '@/lib/mercadopago';
+import {
+    CheckoutValidationError,
+    parseCheckoutRequest,
+    validateCheckoutPayload,
+} from '@/lib/services/CheckoutValidationService';
+
+function jsonResponse(body: unknown, status: number): Response {
+    return new Response(JSON.stringify(body), {
+        status,
+        headers: { 'Content-Type': 'application/json' },
+    });
+}
 
 export const POST: APIRoute = async (context) => {
     try {
-        const body = await context.request.json();
-        const { items, shippingData, total, subtotal, shippingCost, shippingMethod, selectedShipping } = body;
+        const checkout = await validateCheckoutPayload(await parseCheckoutRequest(context.request));
+
+        if (checkout.paymentMethod !== 'mercadopago') {
+            throw new CheckoutValidationError('Método de pago inválido');
+        }
 
         console.log('API: Iniciando creación de preferencia MP');
-
-        // Validaciones básicas
-        if (!items || items.length === 0) {
-            return new Response(JSON.stringify({ error: 'Carrito vacío' }), { status: 400 });
-        }
 
         // URL base del sitio desde .env (limpiando posibles comillas)
         let baseUrl = (import.meta.env.PUBLIC_URL || process.env.PUBLIC_URL || 'http://localhost:4321').replace(/"/g, '');
 
-        // Asegurar protocolo
         if (!baseUrl.startsWith('http')) {
             baseUrl = `https://${baseUrl}`;
         }
 
-        // Construir los items para Mercado Pago
-        const mpItems = items.map((item: any) => {
-            // Asegurar que la imagen sea una URL absoluta si existe
-            let picture_url = item.image;
-            if (picture_url && !picture_url.startsWith('http')) {
-                picture_url = `${baseUrl}${picture_url.startsWith('/') ? '' : '/'}${picture_url}`;
+        // Todos los importes y datos de producto vienen de PostgreSQL, no del navegador.
+        const mpItems = checkout.items.map((item) => {
+            let pictureUrl = item.image;
+            if (pictureUrl && !pictureUrl.startsWith('http')) {
+                pictureUrl = `${baseUrl}${pictureUrl.startsWith('/') ? '' : '/'}${pictureUrl}`;
             }
 
             return {
                 id: String(item.id),
                 title: item.name,
-                unit_price: Number(item.price),
-                quantity: Number(item.quantity),
+                unit_price: item.price,
+                quantity: item.quantity,
                 currency_id: 'ARS',
                 description: [
                     item.variantName || '',
-                    ...(item.selectedOptions || []).map((o: any) => `${o.groupName}: ${o.optionName}`)
-                ].filter(Boolean).join(' | ') || '',
-                picture_url: picture_url || undefined
+                    ...item.selectedOptions.map((option) => `${option.groupName}: ${option.optionName}`),
+                ].filter(Boolean).join(' | '),
+                picture_url: pictureUrl || undefined,
             };
         });
 
-        // Agregar item de envío si corresponde
-        if (shippingCost && Number(shippingCost) > 0) {
+        if (checkout.shippingCost > 0 && checkout.selectedShipping) {
             mpItems.push({
                 id: 'shipping',
-                title: `Envío${selectedShipping?.carrierName ? ` - ${selectedShipping.carrierName}` : ''}`,
-                unit_price: Number(shippingCost),
+                title: `Envío - ${checkout.selectedShipping.carrierName}`,
+                unit_price: checkout.shippingCost,
                 quantity: 1,
                 currency_id: 'ARS',
-                description: selectedShipping?.serviceTypeName || 'Envío a domicilio',
+                description: checkout.selectedShipping.serviceTypeName || 'Envío a domicilio',
+                picture_url: undefined,
             });
         }
 
-        // Crear la preferencia
-        const preferenceData = {
+        const trustedShippingData = {
+            ...checkout.shippingData,
+            selectedShipping: checkout.selectedShipping,
+        };
+
+        const result = await preference.create({
             body: {
                 items: mpItems,
                 back_urls: {
@@ -68,38 +80,27 @@ export const POST: APIRoute = async (context) => {
                 notification_url: `${baseUrl}/api/checkout/webhook`,
                 statement_descriptor: 'DECOMOI',
                 metadata: {
-                    shipping_data: JSON.stringify(shippingData),
-                    order_items: JSON.stringify(items.map((i: any) => ({
-                        id: i.id,
-                        name: i.name,
-                        price: i.price,
-                        quantity: i.quantity,
-                        variantId: i.variantId,
-                        selectedOptions: i.selectedOptions || [],
-                        sku: i.sku
-                    }))),
-                    total_amount: total,
-                    subtotal_amount: subtotal,
-                    shipping_cost: shippingCost || 0,
-                    shipping_method: shippingMethod || 'pickup',
-                    user_id: context.locals.user?.id || null
-                }
-            }
-        };
+                    shipping_data: JSON.stringify(trustedShippingData),
+                    order_items: JSON.stringify(checkout.items.map(({ shippingItem: _shippingItem, ...item }) => item)),
+                    total_amount: checkout.total,
+                    subtotal_amount: checkout.subtotal,
+                    discount_amount: checkout.discountAmount,
+                    shipping_cost: checkout.shippingCost,
+                    shipping_method: checkout.shippingMethod,
+                    user_id: context.locals.user?.id || null,
+                },
+            },
+        });
 
-        const result = await preference.create(preferenceData);
         console.log('API: Preferencia MP creada con ID:', result.id);
 
-        return new Response(JSON.stringify({
-            id: result.id,
-            init_point: result.init_point
-        }), { status: 200 });
+        return jsonResponse({ id: result.id, init_point: result.init_point }, 200);
+    } catch (error) {
+        if (error instanceof CheckoutValidationError) {
+            return jsonResponse({ error: error.message }, error.status);
+        }
 
-    } catch (error: any) {
         console.error('API Error creando preferencia MP:', error);
-
-        return new Response(JSON.stringify({
-            error: 'Error al iniciar el pago con Mercado Pago'
-        }), { status: 500 });
+        return jsonResponse({ error: 'Error al iniciar el pago con Mercado Pago' }, 500);
     }
 };

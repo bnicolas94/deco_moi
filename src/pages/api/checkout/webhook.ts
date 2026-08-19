@@ -7,6 +7,24 @@ import { payments } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { EmailService } from '@/lib/services/EmailService';
 
+const MONEY_TOLERANCE = 0.01;
+
+function parseMoney(value: unknown): number {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed) || parsed < 0) {
+        throw new Error('Importe inválido en metadata de Mercado Pago');
+    }
+    return parsed;
+}
+
+function parsePositiveInteger(value: unknown): number {
+    const parsed = Number(value);
+    if (!Number.isSafeInteger(parsed) || parsed <= 0) {
+        throw new Error('Cantidad inválida en metadata de Mercado Pago');
+    }
+    return parsed;
+}
+
 export const POST: APIRoute = async ({ request }) => {
     try {
         const url = new URL(request.url);
@@ -125,16 +143,46 @@ export const POST: APIRoute = async ({ request }) => {
                     // Flujo normal con preferences
                     const shippingData = JSON.parse(metadata.shipping_data);
                     const items = JSON.parse(metadata.order_items);
-                    const total = metadata.total_amount;
-                    const subtotal = metadata.subtotal_amount;
-                    const userId = metadata.user_id;
+                    const total = parseMoney(metadata.total_amount);
+                    const subtotal = parseMoney(metadata.subtotal_amount);
+                    const discountAmount = parseMoney(metadata.discount_amount || 0);
+                    const shippingCost = parseMoney(metadata.shipping_cost || 0);
+                    const shippingMethod = metadata.shipping_method === 'delivery' ? 'delivery' : 'pickup';
+                    const userId = typeof metadata.user_id === 'string' && metadata.user_id ? metadata.user_id : null;
+                    const paidAmount = parseMoney(paymentData.transaction_amount);
+                    const calculatedTotal = Math.round((subtotal - discountAmount + shippingCost) * 100) / 100;
+
+                    if (
+                        paymentData.currency_id !== 'ARS'
+                        || Math.abs(paidAmount - total) > MONEY_TOLERANCE
+                        || Math.abs(calculatedTotal - total) > MONEY_TOLERANCE
+                    ) {
+                        console.error(`Webhook MP: importe o moneda inválidos para el pago ${id}`);
+                        return new Response(null, { status: 200 });
+                    }
+
+                    if (!Array.isArray(items) || items.length === 0 || !shippingData || typeof shippingData !== 'object' || Array.isArray(shippingData)) {
+                        console.error(`Webhook MP: metadata de orden inválida para el pago ${id}`);
+                        return new Response(null, { status: 200 });
+                    }
+
+                    const itemsSubtotal = Math.round(items.reduce((sum: number, item: any) => (
+                        sum + parseMoney(item.price) * parsePositiveInteger(item.quantity)
+                    ), 0) * 100) / 100;
+                    if (Math.abs(itemsSubtotal - subtotal) > MONEY_TOLERANCE) {
+                        console.error(`Webhook MP: subtotal inconsistente para el pago ${id}`);
+                        return new Response(null, { status: 200 });
+                    }
 
                     // Usar el servicio centralizado para crear la orden
                     const newOrder = await OrderService.createOrderFromCheckout({
                         items,
                         shippingData,
-                        total: Number(total),
-                        subtotal: Number(subtotal),
+                        shippingMethod,
+                        total,
+                        subtotal,
+                        discountAmount,
+                        shippingCost,
                         userId,
                         paymentMethod: 'mercadopago',
                         paymentId: id,

@@ -249,8 +249,6 @@ export async function quoteShipment(
 
     try {
         const url = `${getBaseUrl()}/shipments/quote`;
-        console.log('[Zipnova] URL:', url);
-        console.log('[Zipnova] Request body:', JSON.stringify(body, null, 2));
 
         const response = await fetch(url, {
             method: 'POST',
@@ -269,7 +267,6 @@ export async function quoteShipment(
         }
 
         const data = await response.json();
-        console.log('[Zipnova] Respuesta completa:', JSON.stringify(data, null, 2));
 
         // Buscar el array de resultados — la API puede retornarlo en diferentes estructuras
         let resultsArray: any[] = [];
