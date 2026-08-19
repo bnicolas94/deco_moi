@@ -7,6 +7,38 @@ import { hashPassword, verifyPassword } from '@/lib/auth';
 const redirectWithError = (context: Parameters<APIRoute>[0], error: string) =>
     context.redirect(`/admin/account?error=${error}`, 303);
 
+function isSameOriginRequest(context: Parameters<APIRoute>[0]): boolean {
+    const origin = context.request.headers.get('origin');
+    const fetchSite = context.request.headers.get('sec-fetch-site');
+
+    // Modern browsers provide both headers. Reject an explicitly cross-site
+    // request even if a proxy happens to rewrite Host/URL information.
+    if (fetchSite && fetchSite !== 'same-origin') {
+        return false;
+    }
+
+    if (!origin) {
+        return false;
+    }
+
+    const allowedOrigins = new Set<string>([context.url.origin]);
+    const publicUrl = import.meta.env.PUBLIC_URL || process.env.PUBLIC_URL || 'https://decomoi.com.ar';
+
+    if (publicUrl) {
+        try {
+            allowedOrigins.add(new URL(publicUrl.replace(/"/g, '')).origin);
+        } catch {
+            // Ignore a malformed optional URL and continue with request headers.
+        }
+    }
+
+    try {
+        return allowedOrigins.has(new URL(origin).origin);
+    } catch {
+        return false;
+    }
+}
+
 export const POST: APIRoute = async (context) => {
     const { user, session } = context.locals;
 
@@ -14,8 +46,7 @@ export const POST: APIRoute = async (context) => {
         return new Response('No autorizado', { status: 401 });
     }
 
-    const origin = context.request.headers.get('origin');
-    if (!origin || origin !== context.url.origin) {
+    if (!isSameOriginRequest(context)) {
         return redirectWithError(context, 'invalid_request');
     }
 
