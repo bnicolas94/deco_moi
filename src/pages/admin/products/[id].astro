@@ -856,7 +856,7 @@ const SUPPLY_ICONS: Record<string, string> = {
                                                                     ))}
                                                                     <label class="w-10 h-10 rounded-lg border-2 border-dashed border-gray-200 flex items-center justify-center cursor-pointer hover:border-violet-400 hover:bg-violet-50 transition-all">
                                                                         <Plus className="w-4 h-4 text-gray-300" />
-                                                                        <input type="file" accept="image/*" multiple class="hidden vg-option-image-input" />
+                                                                        <input type="file" accept="image/jpeg,image/png,image/webp" multiple class="hidden vg-option-image-input" />
                                                                     </label>
                                                                 </div>
                                                             </div>
@@ -1027,6 +1027,7 @@ const SUPPLY_ICONS: Record<string, string> = {
                             name="image" 
                             id="image" 
                             multiple
+                            accept="image/jpeg,image/png,image/webp"
                             class="hidden" 
                         />
                     </label>
@@ -1401,7 +1402,7 @@ const SUPPLY_ICONS: Record<string, string> = {
                         <div class="flex flex-wrap gap-2 vg-option-images-preview">
                             <label class="w-10 h-10 rounded-lg border-2 border-dashed border-gray-200 flex items-center justify-center cursor-pointer hover:border-violet-400 hover:bg-violet-50 transition-all">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-gray-300"><line x1="12" x2="12" y1="5" y2="19"/><line x1="5" x2="19" y1="12" y2="12"/></svg>
-                                <input type="file" accept="image/*" multiple class="hidden vg-option-image-input" />
+                                <input type="file" accept="image/jpeg,image/png,image/webp" multiple class="hidden vg-option-image-input" />
                             </label>
                         </div>
                     </div>

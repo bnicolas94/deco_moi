@@ -1,17 +1,19 @@
 import { randomUUID } from 'node:crypto';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
+import sharp from 'sharp';
 
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 const MAX_MULTIPART_BYTES = 50 * 1024 * 1024;
 const MAX_FILES_PER_FIELD = 20;
+const MAX_IMAGE_PIXELS = 40_000_000;
+const MAX_IMAGE_DIMENSION = 2000;
 
 const IMAGE_TYPES = {
     'image/jpeg': 'jpg',
     'image/jpg': 'jpg',
     'image/png': 'png',
     'image/webp': 'webp',
-    'image/gif': 'gif',
 } as const;
 
 type AllowedImageMime = keyof typeof IMAGE_TYPES;
@@ -53,11 +55,6 @@ function hasExpectedSignature(buffer: Uint8Array, mime: AllowedImageMime): boole
             && String.fromCharCode(...buffer.slice(0, 4)) === 'RIFF'
             && String.fromCharCode(...buffer.slice(8, 12)) === 'WEBP';
     }
-    if (mime === 'image/gif') {
-        if (buffer.length < 6) return false;
-        const signature = String.fromCharCode(...buffer.slice(0, 6));
-        return signature === 'GIF87a' || signature === 'GIF89a';
-    }
     return false;
 }
 
@@ -72,7 +69,7 @@ async function prepareImage(file: File): Promise<PreparedImage> {
     const mime = file.type.toLowerCase() as AllowedImageMime;
     const extension = IMAGE_TYPES[mime];
     if (!extension) {
-        throw new ImageUploadError('Formato de imagen no permitido. Usá JPG, PNG, WEBP o GIF.');
+        throw new ImageUploadError('Formato de imagen no permitido. Usá JPG, PNG o WEBP.');
     }
 
     const bytes = new Uint8Array(await file.arrayBuffer());
@@ -80,7 +77,32 @@ async function prepareImage(file: File): Promise<PreparedImage> {
         throw new ImageUploadError('El contenido del archivo no coincide con una imagen válida');
     }
 
-    return { bytes, extension };
+    try {
+        const image = sharp(bytes, {
+            failOn: 'error',
+            limitInputPixels: MAX_IMAGE_PIXELS,
+        });
+        const metadata = await image.metadata();
+        if (!metadata.width || !metadata.height) {
+            throw new Error('Dimensiones de imagen inválidas');
+        }
+
+        // Normalizar orientación, quitar metadatos y guardar un archivo liviano.
+        const optimized = await image
+            .rotate()
+            .resize({
+                width: MAX_IMAGE_DIMENSION,
+                height: MAX_IMAGE_DIMENSION,
+                fit: 'inside',
+                withoutEnlargement: true,
+            })
+            .webp({ quality: 82, alphaQuality: 85, effort: 4, smartSubsample: true })
+            .toBuffer();
+
+        return { bytes: new Uint8Array(optimized), extension: 'webp' };
+    } catch {
+        throw new ImageUploadError('No se pudo procesar la imagen. Verificá que el archivo no esté dañado.');
+    }
 }
 
 async function writePreparedImage(

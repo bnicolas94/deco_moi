@@ -14,6 +14,7 @@ import {
 } from '@/stores/cartStore';
 import * as preactHooks from 'preact/hooks';
 import { useEffect } from 'preact/hooks';
+import { optimizedImageUrl } from '@/lib/images';
 
 function formatPrice(price: number): string {
     return new Intl.NumberFormat('es-AR', {
@@ -110,7 +111,15 @@ export default function CartSidebar() {
                                     {/* Imagen */}
                                     <div className="w-20 h-20 rounded-lg overflow-hidden bg-light-gray flex-shrink-0">
                                         {item.image ? (
-                                            <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+                                            <img
+                                                src={optimizedImageUrl(item.image, 160)}
+                                                alt={item.name}
+                                                width={160}
+                                                height={160}
+                                                loading="lazy"
+                                                decoding="async"
+                                                className="w-full h-full object-cover"
+                                            />
                                         ) : (
                                             <div className="w-full h-full flex items-center justify-center">
                                                 <svg className="w-8 h-8 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">

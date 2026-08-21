@@ -7,6 +7,7 @@ import {
     $cartCount
 } from '@/stores/cartStore';
 import type { CheckoutField } from '@/lib/services/ConfigService';
+import { optimizedImageUrl } from '@/lib/images';
 
 interface ShippingQuoteResult {
     id: string;
@@ -572,7 +573,15 @@ export default function CheckoutForm({ fields, shippingConfig, bankConfig }: Pro
                         {items.map(item => (
                             <div key={`${item.id}-${item.variantId || 'base'}`} className="flex gap-4 pb-4 border-b border-gray-50 last:border-0">
                                 <div className="w-16 h-16 rounded-lg overflow-hidden bg-light-gray flex-shrink-0">
-                                    <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+                                    <img
+                                        src={optimizedImageUrl(item.image, 160)}
+                                        alt={item.name}
+                                        width={160}
+                                        height={160}
+                                        loading="lazy"
+                                        decoding="async"
+                                        className="w-full h-full object-cover"
+                                    />
                                 </div>
                                 <div className="flex-1 min-w-0">
                                     <p className="text-sm font-bold text-brand-black truncate">{item.name}</p>

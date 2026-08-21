@@ -9,6 +9,7 @@ import {
 } from "@/lib/services/ProductService";
 import { formatPrice } from "@/lib/utils/formatters";
 import { sanitizePublicUrl, sanitizeRichText } from "@/lib/security/html";
+import { optimizedImageUrl, responsiveImageSrcSet } from "@/lib/images";
 
 import { MockupGenerator } from "@/components/mockup/MockupGenerator";
 
@@ -156,8 +157,14 @@ const initialProductionTime =
             images.length > 0 ? (
               <img
                 id="main-image"
-                src={images[0]}
+                src={optimizedImageUrl(images[0], 960)}
+                srcset={responsiveImageSrcSet(images[0], [480, 640, 960, 1280])}
+                sizes="(min-width: 1024px) 50vw, 100vw"
                 alt={product.name}
+                width="960"
+                height="960"
+                decoding="async"
+                fetchpriority="high"
                 class="w-full h-full object-cover"
               />
             ) : (
@@ -215,8 +222,12 @@ const initialProductionTime =
                   data-src={img}
                 >
                   <img
-                    src={img}
+                    src={optimizedImageUrl(img, 160)}
                     alt={`${product.name} ${i + 1}`}
+                    width="160"
+                    height="160"
+                    loading="lazy"
+                    decoding="async"
                     class="w-full h-full object-cover"
                   />
                 </button>
@@ -818,6 +829,30 @@ const initialProductionTime =
 </style>
 
 <script>
+  function optimizedUploadImageUrl(source: string, width: number): string {
+    if (!source.startsWith("/uploads/") || /\.gif(?:$|\?)/i.test(source)) return source;
+
+    const path = source.slice("/uploads/".length).split("?")[0];
+    if (!/^(products|categories|mockups)\/[a-z0-9._/-]+$/i.test(path)) return source;
+    return `/media/${path}?w=${width}`;
+  }
+
+  function setResponsiveMainImage(image: HTMLImageElement, source: string): void {
+    const optimized = optimizedUploadImageUrl(source, 960);
+    image.src = optimized;
+    if (optimized !== source) {
+      image.srcset = [480, 640, 960, 1280]
+        .map((width) => `${optimizedUploadImageUrl(source, width)} ${width}w`)
+        .join(", ");
+      image.sizes = "(min-width: 1024px) 50vw, 100vw";
+    } else {
+      image.removeAttribute("srcset");
+    }
+    image.width = 960;
+    image.height = 960;
+    image.decoding = "async";
+  }
+
   // Tabs
   document.querySelectorAll(".tab-btn").forEach((btn) => {
     btn.addEventListener("click", () => {
@@ -987,7 +1022,7 @@ const initialProductionTime =
 
       // Restore Main Image
       if (originalImages.length > 0 && mainImage) {
-        mainImage.src = originalImages[0];
+        setResponsiveMainImage(mainImage, originalImages[0]);
       }
 
       // Restore Thumbnails
@@ -1069,11 +1104,11 @@ const initialProductionTime =
     if (variantImages && variantImages.length > 0) {
       // Update Main Image
       if (mainImage) {
-        mainImage.src = variantImages[0];
+        setResponsiveMainImage(mainImage, variantImages[0]);
       } else if (placeholder) {
         const img = document.createElement("img");
         img.id = "main-image";
-        img.src = variantImages[0];
+        setResponsiveMainImage(img, variantImages[0]);
         img.alt = variantName || "Variante";
         img.className = "w-full h-full object-cover";
         placeholder.replaceWith(img);
@@ -1257,11 +1292,11 @@ const initialProductionTime =
         const optName = btn.getAttribute("data-option-name");
 
         if (mainImage) {
-          mainImage.src = optImages[0];
+          setResponsiveMainImage(mainImage as HTMLImageElement, optImages[0]);
         } else if (placeholder) {
           const img = document.createElement("img");
           img.id = "main-image";
-          img.src = optImages[0];
+          setResponsiveMainImage(img, optImages[0]);
           img.alt = optName || "Opción";
           img.className = "w-full h-full object-cover";
           placeholder.replaceWith(img);
@@ -1286,7 +1321,7 @@ const initialProductionTime =
          const mainImage = document.getElementById("main-image");
          const thumbnailsContainer = document.getElementById("product-thumbnails");
 
-         if (mainImage) mainImage.src = originalImages[0];
+         if (mainImage) setResponsiveMainImage(mainImage as HTMLImageElement, originalImages[0]);
          
          if (thumbnailsContainer) {
             if (originalImages.length > 1) {
@@ -1317,8 +1352,12 @@ const initialProductionTime =
       button.dataset.src = src;
 
       const image = document.createElement("img");
-      image.src = src;
+      image.src = optimizedUploadImageUrl(src, 160);
       image.alt = `${altPrefix} ${index + 1}`;
+      image.width = 160;
+      image.height = 160;
+      image.loading = "lazy";
+      image.decoding = "async";
       image.className = "w-full h-full object-cover";
       button.appendChild(image);
       container.appendChild(button);
@@ -1334,7 +1373,7 @@ const initialProductionTime =
       newThumb.addEventListener("click", () => {
         const src = newThumb.getAttribute("data-src");
         const mainImg = document.getElementById("main-image");
-        if (mainImg && src) mainImg.src = src;
+        if (mainImg && src) setResponsiveMainImage(mainImg as HTMLImageElement, src);
 
         document.querySelectorAll(".product-thumb").forEach((t) => {
           t.classList.remove("border-primary");
