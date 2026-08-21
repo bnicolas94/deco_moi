@@ -2,6 +2,7 @@ import type { APIRoute } from 'astro';
 import { db } from '@/lib/db/connection';
 import { pages } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
+import { PageContentError, sanitizePageBlocks } from '@/lib/security/pageBlocks';
 
 export const GET: APIRoute = async (context) => {
     if (!context.locals.user || context.locals.user.role !== 'admin') {
@@ -49,7 +50,7 @@ export const PUT: APIRoute = async (context) => {
 
         if (body.title !== undefined) updateData.title = body.title;
         if (body.slug !== undefined) updateData.slug = body.slug;
-        if (body.blocks !== undefined) updateData.blocks = body.blocks;
+        if (body.blocks !== undefined) updateData.blocks = sanitizePageBlocks(body.blocks);
         if (body.seoTitle !== undefined) updateData.seoTitle = body.seoTitle;
         if (body.seoDescription !== undefined) updateData.seoDescription = body.seoDescription;
         if (body.ogImage !== undefined) updateData.ogImage = body.ogImage;
@@ -70,6 +71,9 @@ export const PUT: APIRoute = async (context) => {
         
         return new Response(JSON.stringify({ success: true, page: updatedPage }), { status: 200, headers: { 'Content-Type': 'application/json' } });
     } catch (e) {
+        if (e instanceof PageContentError) {
+            return new Response(JSON.stringify({ error: e.message }), { status: 400 });
+        }
         console.error('Error updating page:', e);
         return new Response(JSON.stringify({ error: 'Error al actualizar página' }), { status: 500 });
     }

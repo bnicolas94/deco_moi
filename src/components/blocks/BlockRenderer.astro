@@ -46,7 +46,7 @@ const visibleBlocks = blocks.filter(b => b.isVisible !== false).sort((a, b) => a
         default:
             // Bloque no soportado o en desarrollo
             if (import.meta.env.DEV) {
-                return <div class="p-4 border border-dashed border-red-500 text-red-500 my-4 text-center">Bloque desconocido: {block.type}</div>;
+                return <div class="p-4 border border-dashed border-red-500 text-red-500 my-4 text-center">Bloque desconocido: {(block as { type: string }).type}</div>;
             }
             return null;
     }

@@ -1,8 +1,9 @@
 ---
 import { db } from '@/lib/db/connection';
 import { products, categories } from '@/lib/db/schema';
-import { eq, desc, inArray } from 'drizzle-orm';
+import { and, eq, desc, inArray } from 'drizzle-orm';
 import ProductCard from '../product/ProductCard.astro';
+import { clampNumber, sanitizePublicUrl } from '@/lib/security/html';
 
 export interface Props {
     title?: string;
@@ -23,15 +24,26 @@ const {
     ctaText = 'Ver todos',
     ctaLink = '/productos'
 } = Astro.props;
+const safeCtaLink = sanitizePublicUrl(ctaLink, '/productos');
+const safeLimit = Math.round(clampNumber(limit, 4, 1, 24));
+
+const conditions = [eq(products.isActive, true)];
+if (categoryIds.length > 0) {
+    conditions.push(inArray(products.categoryId, categoryIds));
+}
 
 // Fetch products based on criteria
-let query = db.select({
+const fetchedProducts = await db.select({
     id: products.id,
     name: products.name,
     slug: products.slug,
     description: products.description,
-    price: products.price,
+    shortDescription: products.shortDescription,
+    basePrice: products.basePrice,
     salePrice: products.salePrice,
+    isOnSale: products.isOnSale,
+    isFeatured: products.isFeatured,
+    minOrder: products.minOrder,
     stock: products.stock,
     sku: products.sku,
     images: products.images,
@@ -43,14 +55,9 @@ let query = db.select({
 })
 .from(products)
 .leftJoin(categories, eq(products.categoryId, categories.id))
-.where(eq(products.isActive, true));
-
-// Si el usuario del builder seleccionó categorías específicas
-if (categoryIds.length > 0) {
-    query = query.where(inArray(products.categoryId, categoryIds)) as any;
-}
-
-const fetchedProducts = await query.orderBy(desc(products.createdAt)).limit(limit);
+.where(and(...conditions))
+.orderBy(desc(products.createdAt))
+.limit(safeLimit);
 ---
 
 <section class="py-16 md:py-24 bg-white">
@@ -60,8 +67,8 @@ const fetchedProducts = await query.orderBy(desc(products.createdAt)).limit(limi
                 <h2 class="text-3xl md:text-4xl font-bold text-gray-900 mb-4 font-montserrat">{title}</h2>
                 {subtitle && <p class="text-lg text-gray-600">{subtitle}</p>}
             </div>
-            {showCta && ctaLink && (
-                <a href={ctaLink} class="text-brand-primary font-medium hover:underline flex items-center gap-1">
+            {showCta && safeCtaLink && (
+                <a href={safeCtaLink} class="text-brand-primary font-medium hover:underline flex items-center gap-1">
                     {ctaText} <span aria-hidden="true">&rarr;</span>
                 </a>
             )}

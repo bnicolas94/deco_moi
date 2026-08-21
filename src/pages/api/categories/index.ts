@@ -2,6 +2,7 @@ import type { APIRoute } from 'astro';
 import { db } from '@/lib/db/connection';
 import { categories, products } from '@/lib/db/schema';
 import { eq, count, asc, sql } from 'drizzle-orm';
+import { assertMultipartRequest, ImageUploadError, saveUploadedImage } from '@/lib/security/uploads';
 
 export const GET: APIRoute = async (context) => {
     if (!context.locals.user || context.locals.user.role !== 'admin') {
@@ -38,6 +39,7 @@ export const POST: APIRoute = async (context) => {
     }
 
     try {
+        assertMultipartRequest(context.request);
         const formData = await context.request.formData();
         const name = formData.get('name')?.toString();
         const slug = formData.get('slug')?.toString();
@@ -67,16 +69,7 @@ export const POST: APIRoute = async (context) => {
         let imageUrl: string | null = null;
         const imageFile = formData.get('image') as File | null;
         if (imageFile && imageFile.size > 0 && imageFile.name) {
-            const { writeFile, mkdir } = await import('node:fs/promises');
-            const { join } = await import('node:path');
-            const { randomUUID } = await import('node:crypto');
-            const buffer = await imageFile.arrayBuffer();
-            const ext = imageFile.name.split('.').pop();
-            const fileName = `cat-${randomUUID()}.${ext}`;
-            const uploadDir = join(process.cwd(), 'uploads', 'categories');
-            await mkdir(uploadDir, { recursive: true });
-            await writeFile(join(uploadDir, fileName), new Uint8Array(buffer));
-            imageUrl = `/uploads/categories/${fileName}`;
+            imageUrl = await saveUploadedImage(imageFile, 'categories', 'cat-');
         }
 
         // Get max order for placement
@@ -94,6 +87,9 @@ export const POST: APIRoute = async (context) => {
 
         return new Response(JSON.stringify({ success: true, id: newCategory.id }), { status: 201 });
     } catch (e) {
+        if (e instanceof ImageUploadError) {
+            return new Response(JSON.stringify({ error: e.message }), { status: e.status });
+        }
         console.error('Error creating category:', e);
         return new Response(JSON.stringify({ error: 'Error al crear categoría' }), { status: 500 });
     }
@@ -102,7 +98,10 @@ export const POST: APIRoute = async (context) => {
 async function getDepth(categoryId: number): Promise<number> {
     let depth = 0;
     let currentId: number | null = categoryId;
+    const visited = new Set<number>();
     while (currentId) {
+        if (visited.has(currentId) || depth >= 4) return Number.POSITIVE_INFINITY;
+        visited.add(currentId);
         depth++;
         const parent = await db.select({ parentId: categories.parentId }).from(categories).where(eq(categories.id, currentId));
         currentId = parent[0]?.parentId || null;

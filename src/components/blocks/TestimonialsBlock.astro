@@ -1,4 +1,6 @@
 ---
+import { sanitizeCssColor, sanitizePublicUrl } from '@/lib/security/html';
+
 export interface Testimonial {
     name: string;
     role?: string;
@@ -10,7 +12,7 @@ export interface Testimonial {
 export interface Props {
     title?: string;
     subtitle?: string;
-    testimonials: Testimonial[];
+    testimonials?: Testimonial[];
     backgroundColor?: string;
 }
 
@@ -20,9 +22,10 @@ const {
     testimonials = [],
     backgroundColor = '#ffffff'
 } = Astro.props;
+const safeBackgroundColor = sanitizeCssColor(backgroundColor, '#ffffff');
 ---
 
-<section class="py-16 md:py-24" style={`background-color: ${backgroundColor};`}>
+<section class="py-16 md:py-24" style={`background-color: ${safeBackgroundColor};`}>
     <div class="container mx-auto px-4">
         <div class="text-center max-w-3xl mx-auto mb-16">
             <h2 class="text-3xl md:text-4xl font-bold text-gray-900 mb-4 font-montserrat">{title}</h2>
@@ -52,7 +55,7 @@ const {
                     <div class="flex items-center gap-4 mt-auto">
                         <div class="w-12 h-12 rounded-full overflow-hidden bg-gray-200 shrink-0">
                             {t.image ? (
-                                <img src={t.image} alt={t.name} class="w-full h-full object-cover" loading="lazy" />
+                                <img src={sanitizePublicUrl(t.image)} alt={t.name} class="w-full h-full object-cover" loading="lazy" />
                             ) : (
                                 <div class="w-full h-full flex items-center justify-center bg-brand-primary text-white font-bold text-lg">
                                     {t.name.charAt(0)}

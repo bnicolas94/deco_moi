@@ -8,6 +8,7 @@ import {
   getProductReviews,
 } from "@/lib/services/ProductService";
 import { formatPrice } from "@/lib/utils/formatters";
+import { sanitizePublicUrl, sanitizeRichText } from "@/lib/security/html";
 
 import { MockupGenerator } from "@/components/mockup/MockupGenerator";
 
@@ -16,10 +17,8 @@ if (!slug) return Astro.redirect("/productos");
 
 const product = await getProductBySlug(slug);
 if (!product) return Astro.redirect("/productos");
-console.log(
-  "RENDER PRODUCT SHORT DESCRIPTION:",
-  JSON.stringify(product.shortDescription),
-);
+const safeShortDescription = sanitizeRichText(product.shortDescription);
+const safeDescription = sanitizeRichText(product.description);
 
 const relatedProducts = await getRelatedProducts(
   product.id,
@@ -43,10 +42,18 @@ const customization = product.customizationOptions as {
   fields?: string[];
 } | null;
 const priceRules = (product as any).priceRules || [];
-const variantGroups = (product as any).variantGroups || [];
+const variantGroups = ((product as any).variantGroups || []).map((group: any) => ({
+  ...group,
+  options: Array.isArray(group.options) ? group.options.map((option: any) => ({
+    ...option,
+    images: Array.isArray(option.images)
+      ? option.images.map((image: unknown) => sanitizePublicUrl(image)).filter(Boolean)
+      : [],
+  })) : [],
+}));
 const productionTimeRules = (product as any).productionTimeRules || [];
 const category = (product as any).category;
-const images = product.images || [];
+const images = (product.images || []).map((image: unknown) => sanitizePublicUrl(image)).filter(Boolean);
 const avgRating =
   productReviews.length > 0
     ? (
@@ -304,10 +311,10 @@ const initialProductionTime =
 
         {/* Descripción corta */}
         {
-          product.shortDescription && (
+          safeShortDescription && (
             <div
               class="rich-text-content text-gray-500 mb-6 leading-relaxed prose prose-sm max-w-none"
-              set:html={product.shortDescription}
+              set:html={safeShortDescription}
             />
           )
         }
@@ -635,7 +642,7 @@ const initialProductionTime =
     <div class="tab-content" data-tab-content="descripcion">
       <div
         class="rich-text-content prose prose-sm max-w-none"
-        set:html={product.description}
+        set:html={safeDescription}
       />
     </div>
 
@@ -985,18 +992,7 @@ const initialProductionTime =
 
       // Restore Thumbnails
       if (thumbnailsContainer && originalImages.length > 1) {
-        thumbnailsContainer.innerHTML = originalImages
-          .map(
-            (img: string, i: number) => `
-          <button
-            class="product-thumb w-20 h-20 rounded-lg overflow-hidden flex-shrink-0 border-2 transition-all ${i === 0 ? "border-primary" : "border-transparent hover:border-primary/50"}"
-            data-src="${img}"
-          >
-            <img src="${img}" alt="Original ${i + 1}" class="w-full h-full object-cover" />
-          </button>
-        `,
-          )
-          .join("");
+        renderThumbnails(thumbnailsContainer, originalImages, "Original");
         attachThumbnailListeners();
       } else if (thumbnailsContainer) {
         thumbnailsContainer.innerHTML = "";
@@ -1086,18 +1082,7 @@ const initialProductionTime =
       // Rebuild Thumbnails
       if (thumbnailsContainer) {
         if (variantImages.length > 1) {
-          thumbnailsContainer.innerHTML = variantImages
-            .map(
-              (img, i) => `
-            <button
-              class="product-thumb w-20 h-20 rounded-lg overflow-hidden flex-shrink-0 border-2 transition-all ${i === 0 ? "border-primary" : "border-transparent hover:border-primary/50"}"
-              data-src="${img}"
-            >
-              <img src="${img}" alt="${variantName} ${i + 1}" class="w-full h-full object-cover" />
-            </button>
-          `,
-            )
-            .join("");
+          renderThumbnails(thumbnailsContainer, variantImages, variantName || "Variante");
 
           // Re-attach thumbnail listeners
           attachThumbnailListeners();
@@ -1284,18 +1269,7 @@ const initialProductionTime =
 
         if (thumbnailsContainer) {
           if (optImages.length > 1) {
-            thumbnailsContainer.innerHTML = optImages
-              .map(
-                (img, i) => `
-              <button
-                class="product-thumb w-20 h-20 rounded-lg overflow-hidden flex-shrink-0 border-2 transition-all ${i === 0 ? "border-primary" : "border-transparent hover:border-primary/50"}"
-                data-src="${img}"
-              >
-                <img src="${img}" alt="${optName} ${i + 1}" class="w-full h-full object-cover" />
-              </button>
-            `,
-              )
-              .join("");
+            renderThumbnails(thumbnailsContainer, optImages, optName || "Opción");
             attachThumbnailListeners();
           } else {
             thumbnailsContainer.innerHTML = "";
@@ -1316,18 +1290,7 @@ const initialProductionTime =
          
          if (thumbnailsContainer) {
             if (originalImages.length > 1) {
-              thumbnailsContainer.innerHTML = originalImages
-                .map(
-                  (img, i) => `
-                <button
-                  class="product-thumb w-20 h-20 rounded-lg overflow-hidden flex-shrink-0 border-2 transition-all ${i === 0 ? "border-primary" : "border-transparent hover:border-primary/50"}"
-                  data-src="${img}"
-                >
-                  <img src="${img}" alt="${productName} ${i + 1}" class="w-full h-full object-cover" />
-                </button>
-              `,
-                )
-                .join("");
+              renderThumbnails(thumbnailsContainer, originalImages, productName || "Producto");
               attachThumbnailListeners();
             } else {
               thumbnailsContainer.innerHTML = "";
@@ -1345,6 +1308,23 @@ const initialProductionTime =
   }
 
   // Galería de thumbnails
+  function renderThumbnails(container: HTMLElement, imageUrls: string[], altPrefix: string) {
+    container.replaceChildren();
+    imageUrls.forEach((src, index) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = `product-thumb w-20 h-20 rounded-lg overflow-hidden flex-shrink-0 border-2 transition-all ${index === 0 ? "border-primary" : "border-transparent hover:border-primary/50"}`;
+      button.dataset.src = src;
+
+      const image = document.createElement("img");
+      image.src = src;
+      image.alt = `${altPrefix} ${index + 1}`;
+      image.className = "w-full h-full object-cover";
+      button.appendChild(image);
+      container.appendChild(button);
+    });
+  }
+
   function attachThumbnailListeners() {
     document.querySelectorAll(".product-thumb").forEach((thumb) => {
       // Clone to remove old listeners if re-attaching
