@@ -1,9 +1,24 @@
+import 'dotenv/config';
 import pg from 'pg';
 const { Pool } = pg;
 
+const connectionString = process.env.DATABASE_URL;
+
+if (!connectionString) {
+    throw new Error('DATABASE_URL es obligatoria para ejecutar el seed.');
+}
+
+if (process.env.ALLOW_DATABASE_SEED !== 'DELETE_LOCAL_DATA') {
+    throw new Error(
+        'Seed bloqueado. Usá ALLOW_DATABASE_SEED=DELETE_LOCAL_DATA únicamente sobre una base local descartable.',
+    );
+}
+
 const pool = new Pool({
-    connectionString: process.env.DATABASE_URL || 'postgresql://postgres:NQrNZevdzdngPgxNppBIVMzlGzBocxGs@crossover.proxy.rlwy.net:11100/railway',
-    ssl: { rejectUnauthorized: false },
+    connectionString,
+    ssl: /localhost|127\.0\.0\.1/.test(connectionString)
+        ? false
+        : { rejectUnauthorized: false },
 });
 
 async function seed() {

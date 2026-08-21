@@ -14,7 +14,8 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
-    "migrate": "tsx scripts/migrate.ts"
+    "migrate": "tsx scripts/migrate.ts",
+    "security:secrets": "node scripts/check-secrets.mjs"
   },
   "dependencies": {
     "@astrojs/check": "^0.9.9",
