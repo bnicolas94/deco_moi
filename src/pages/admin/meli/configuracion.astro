@@ -26,9 +26,12 @@ if (Astro.request.method === 'POST') {
         fixedCostAmount1: data.get('amount1')?.toString() || '1115',
         fixedCostThreshold2: data.get('threshold2')?.toString() || '25000',
         fixedCostAmount2: data.get('amount2')?.toString() || '2300',
+        fixedCostThreshold3: data.get('threshold3')?.toString() || '33000',
         fixedCostAmount3: data.get('amount3')?.toString() || '2810',
         freeShippingThreshold: data.get('freeShippingThreshold')?.toString() || '0',
         freeShippingCost: data.get('freeShippingCost')?.toString() || '0',
+        mpCommissionPct: data.get('mpCommissionPct')?.toString() || '0',
+        grossIncomeTaxPct: data.get('grossIncomeTaxPct')?.toString() || '0',
         roundingStrategy: data.get('roundingStrategy')?.toString() || 'round',
         updatedAt: new Date()
       })
@@ -84,6 +87,14 @@ const successParam = new URL(Astro.request.url).searchParams.get('success');
               <div>
                 <label class="block text-sm font-medium mb-1">Costo Cuotas Sin Interés (%)</label>
                 <input type="number" step="0.01" name="installmentsCostPct" class="form-input w-full" value={cf.installmentsCostPct} required />
+              </div>
+              <div>
+                <label class="block text-sm font-medium mb-1">Comisión Mercado Pago estimada (%)</label>
+                <input type="number" step="0.01" min="0" name="mpCommissionPct" class="form-input w-full" value={cf.mpCommissionPct || 0} />
+              </div>
+              <div>
+                <label class="block text-sm font-medium mb-1">Ingresos Brutos estimado (%)</label>
+                <input type="number" step="0.01" min="0" name="grossIncomeTaxPct" class="form-input w-full" value={cf.grossIncomeTaxPct || 0} />
               </div>
               <div>
                 <label class="block text-sm font-medium mb-1">Estrategia de Redondeo</label>
@@ -162,6 +173,8 @@ const successParam = new URL(Astro.request.url).searchParams.get('success');
              <div class="flex justify-between mb-1"><span>Costo Fijo ML:</span> <span class="font-medium text-rose-500" id="simFijo"></span></div>
              <div class="flex justify-between mb-1"><span>Costo Envío ML:</span> <span class="font-medium text-rose-500" id="simEnvio"></span></div>
              <div class="flex justify-between mb-1"><span>Comisión ML:</span> <span class="font-medium text-rose-500" id="simCom"></span></div>
+             <div class="flex justify-between mb-1"><span>Comisión MP:</span> <span class="font-medium text-rose-500" id="simMp"></span></div>
+             <div class="flex justify-between mb-1"><span>Ingresos Brutos:</span> <span class="font-medium text-rose-500" id="simIibb"></span></div>
              <div class="flex justify-between mb-2"><span>Margen Extra:</span> <span class="font-medium text-emerald-500" id="simMargen"></span></div>
              <div class="flex justify-between font-bold text-lg pt-2 border-t border-slate-200 dark:border-slate-700">
                <span>Precio Sugerido ML:</span> <span id="simPriceResult"></span>
@@ -208,6 +221,8 @@ const successParam = new URL(Astro.request.url).searchParams.get('success');
          commissionPct: document.querySelector('input[name="commissionPct"]').value,
          extraMarginPct: document.querySelector('input[name="extraMarginPct"]').value,
          installmentsCostPct: document.querySelector('input[name="installmentsCostPct"]').value,
+         mpCommissionPct: document.querySelector('input[name="mpCommissionPct"]').value,
+         grossIncomeTaxPct: document.querySelector('input[name="grossIncomeTaxPct"]').value,
          threshold1: document.querySelector('input[name="threshold1"]').value,
          amount1: document.querySelector('input[name="amount1"]').value,
          threshold2: document.querySelector('input[name="threshold2"]').value,
@@ -226,7 +241,7 @@ const successParam = new URL(Astro.request.url).searchParams.get('success');
         else if(basePrice <= Number(configObj.threshold2)) fixedCost = Number(configObj.amount2);
         else if(basePrice <= Number(configObj.threshold3)) fixedCost = Number(configObj.amount3);
         
-        const totalDeductionRate = (Number(configObj.commissionPct) + Number(configObj.extraMarginPct) + Number(configObj.installmentsCostPct)) / 100;
+        const totalDeductionRate = (Number(configObj.commissionPct) + Number(configObj.extraMarginPct) + Number(configObj.installmentsCostPct) + Number(configObj.mpCommissionPct) + Number(configObj.grossIncomeTaxPct)) / 100;
         
         if(totalDeductionRate >= 1) {
           alert("Los porcentajes suman más de 100%, cálculo imposible.");
@@ -248,12 +263,16 @@ const successParam = new URL(Astro.request.url).searchParams.get('success');
 
         const mlCommissionAmount = finalPrice * (Number(configObj.commissionPct)/100);
         const extraMarginAmount = finalPrice * (Number(configObj.extraMarginPct)/100);
+        const mpCommissionAmount = finalPrice * (Number(configObj.mpCommissionPct)/100);
+        const grossIncomeTaxAmount = finalPrice * (Number(configObj.grossIncomeTaxPct)/100);
         
-        const netReceived = finalPrice - (finalPrice * ((Number(configObj.commissionPct) + Number(configObj.installmentsCostPct))/100)) - fixedCost - appliedShippingCost;
+        const netReceived = finalPrice - (finalPrice * ((Number(configObj.commissionPct) + Number(configObj.installmentsCostPct) + Number(configObj.mpCommissionPct) + Number(configObj.grossIncomeTaxPct))/100)) - fixedCost - appliedShippingCost;
 
         document.getElementById('simFijo').innerText = '$' + fixedCost.toFixed(2);
         document.getElementById('simEnvio').innerText = '$' + appliedShippingCost.toFixed(2);
         document.getElementById('simCom').innerText = '$' + mlCommissionAmount.toFixed(2);
+        document.getElementById('simMp').innerText = '$' + mpCommissionAmount.toFixed(2);
+        document.getElementById('simIibb').innerText = '$' + grossIncomeTaxAmount.toFixed(2);
         document.getElementById('simMargen').innerText = '$' + extraMarginAmount.toFixed(2);
         document.getElementById('simPriceResult').innerText = '$' + finalPrice.toFixed(0);
         document.getElementById('simNet').innerText = '$' + netReceived.toFixed(2);

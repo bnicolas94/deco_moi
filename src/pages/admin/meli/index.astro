@@ -3,7 +3,7 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
 import { MeliService } from '../../../lib/services/MeliService';
 import { db } from '../../../lib/db/connection';
 import { meliCredentials, meliOrders, meliSyncLog } from '../../../lib/db/schema';
-import { eq, desc } from 'drizzle-orm';
+import { eq, desc, and, gte } from 'drizzle-orm';
 
 // Verificar conexión
 const creds = await db.select().from(meliCredentials).where(eq(meliCredentials.isActive, true)).limit(1);
@@ -25,7 +25,13 @@ let recentOrders: any[] = [];
 let recentLogs: any[] = [];
 
 if (isConnected) {
-  const allOrders = await db.select().from(meliOrders).orderBy(desc(meliOrders.dateCreated));
+  const monthStart = new Date();
+  monthStart.setDate(1);
+  monthStart.setHours(0, 0, 0, 0);
+  const allOrders = await db.select().from(meliOrders).where(and(
+    eq(meliOrders.status, 'paid'),
+    gte(meliOrders.dateCreated, monthStart)
+  )).orderBy(desc(meliOrders.dateCreated));
   ordersCountML = allOrders.length;
   totalSalesML = allOrders.reduce((acc, order) => acc + Number(order.totalAmount), 0);
   recentOrders = allOrders.slice(0, 5);

@@ -8,6 +8,8 @@ export interface MeliPricingConfigType {
     fixedCostAmount3?: string | number | null;
     extraMarginPct?: string | number | null;
     installmentsCostPct?: string | number | null;
+    mpCommissionPct?: string | number | null;
+    grossIncomeTaxPct?: string | number | null;
     freeShippingThreshold?: string | number | null;
     freeShippingCost?: string | number | null;
     roundingStrategy?: string | null;
@@ -43,8 +45,10 @@ export function calculateMeliPrice(basePrice: number, config: MeliPricingConfigT
     const commissionPct = Number(config.commissionPct || 0) / 100;
     const extraMarginPct = Number(config.extraMarginPct || 0) / 100;
     const installmentsCostPct = Number(config.installmentsCostPct || 0) / 100;
+    const mpCommissionPct = Number(config.mpCommissionPct || 0) / 100;
+    const grossIncomeTaxPct = Number(config.grossIncomeTaxPct || 0) / 100;
 
-    const totalDeductionRate = commissionPct + extraMarginPct + installmentsCostPct;
+    const totalDeductionRate = commissionPct + extraMarginPct + installmentsCostPct + mpCommissionPct + grossIncomeTaxPct;
 
     // Evitar división por cero o negativa
     if (totalDeductionRate >= 1) {
@@ -82,8 +86,10 @@ export function calculateNetReceived(meliPrice: number, config: MeliPricingConfi
     const fixedCost = getFixedCostForPrice(basePrice, config);
     const commissionPct = Number(config.commissionPct || 0) / 100;
     const installmentsCostPct = Number(config.installmentsCostPct || 0) / 100;
+    const mpCommissionPct = Number(config.mpCommissionPct || 0) / 100;
+    const grossIncomeTaxPct = Number(config.grossIncomeTaxPct || 0) / 100;
 
-    const totalMlCommission = meliPrice * (commissionPct + installmentsCostPct);
+    const totalMlCommission = meliPrice * (commissionPct + installmentsCostPct + mpCommissionPct + grossIncomeTaxPct);
 
     const freeShippingThreshold = Number(config.freeShippingThreshold || 0);
     const freeShippingCost = Number(config.freeShippingCost || 0);
@@ -99,10 +105,14 @@ export function getPriceBreakdown(basePrice: number, config: MeliPricingConfigTy
     const commissionPct = Number(config.commissionPct || 0) / 100;
     const extraMarginPct = Number(config.extraMarginPct || 0) / 100;
     const installmentsCostPct = Number(config.installmentsCostPct || 0) / 100;
+    const mpCommissionPct = Number(config.mpCommissionPct || 0) / 100;
+    const grossIncomeTaxPct = Number(config.grossIncomeTaxPct || 0) / 100;
 
     const mlCommissionAmount = meliPrice * commissionPct;
     const extraMarginAmount = meliPrice * extraMarginPct;
     const installmentsCostAmount = meliPrice * installmentsCostPct;
+    const mpCommissionAmount = meliPrice * mpCommissionPct;
+    const grossIncomeTaxAmount = meliPrice * grossIncomeTaxPct;
 
     const netReceived = calculateNetReceived(meliPrice, config, basePrice);
 
@@ -119,6 +129,8 @@ export function getPriceBreakdown(basePrice: number, config: MeliPricingConfigTy
         mlCommissionAmount: Number(mlCommissionAmount.toFixed(2)),
         extraMarginAmount: Number(extraMarginAmount.toFixed(2)),
         installmentsCostAmount: Number(installmentsCostAmount.toFixed(2)),
+        mpCommissionAmount: Number(mpCommissionAmount.toFixed(2)),
+        grossIncomeTaxAmount: Number(grossIncomeTaxAmount.toFixed(2)),
         meliPrice,
         netReceived: Number(netReceived.toFixed(2)),
         effectiveMarginPct: Number(effectiveMarginPct.toFixed(2)),

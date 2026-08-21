@@ -1,7 +1,7 @@
 import { db } from '@/lib/db/connection';
-import { orders, orderItems, costItems, productCostItems, orderItemCosts, payments } from '@/lib/db/schema';
+import { orders, orderItems, payments } from '@/lib/db/schema';
 import { OrderStatus, PaymentStatus } from '@/types/order';
-import { inArray, eq, and } from 'drizzle-orm';
+import { CostSnapshotService } from './CostSnapshotService';
 
 export interface CreateOrderData {
     items: any[];
@@ -50,6 +50,9 @@ export class OrderService {
             shippingCost: String(shippingCost),
             paymentMethod: paymentMethod as any,
             paymentStatus: initialPaymentStatus,
+            salesChannel: 'app',
+            financialStatus: 'provisional',
+            paidAt: initialPaymentStatus === PaymentStatus.APPROVED ? new Date() : null,
             shippingData,
             shippingMethod,
             notes: notes || `Pago ${paymentMethod} ${paymentId ? '#' + paymentId : ''} procesado.`,
@@ -58,11 +61,19 @@ export class OrderService {
         }).returning();
 
         // 2. Crear los ítems
-        const itemsToInsert = items.map((item: any) => {
+        const itemsSubtotal = items.reduce((sum: number, item: any) => sum + (Number(item.price) * Number(item.quantity)), 0);
+        let allocatedDiscount = 0;
+        const itemsToInsert = items.map((item: any, index: number) => {
             const customization = {
                 ...(item.customization ? { text: item.customization } : {}),
                 ...(item.selectedOptions && item.selectedOptions.length > 0 ? { selectedOptions: item.selectedOptions } : {}),
             };
+
+            const itemGross = Number(item.price) * Number(item.quantity);
+            const itemDiscount = index === items.length - 1
+                ? Number(discountAmount) - allocatedDiscount
+                : (itemsSubtotal > 0 ? Math.round((Number(discountAmount) * itemGross / itemsSubtotal) * 100) / 100 : 0);
+            allocatedDiscount += itemDiscount;
 
             return {
                 orderId: newOrder.id,
@@ -71,69 +82,22 @@ export class OrderService {
                 productSku: item.sku,
                 quantity: item.quantity,
                 unitPrice: String(item.price),
-                subtotal: String(item.price * item.quantity),
+                subtotal: String(itemGross),
                 customization: Object.keys(customization).length > 0 ? customization : null,
                 variantId: item.variantId || null,
                 productionTime: item.productionTime || null,
+                packQuantity: 1,
+                internalUnits: item.quantity,
+                grossAmount: String(itemGross),
+                discountAmount: String(itemDiscount),
+                netRevenue: String(itemGross - itemDiscount),
             };
         });
 
         const insertedItems = await db.insert(orderItems).values(itemsToInsert).returning();
 
-        // 3. Capturar Costos de Productos
-        const productIds = itemsToInsert.map((i: any) => i.productId);
-        if (productIds.length > 0) {
-            const activeCosts = await db.select({
-                productId: productCostItems.productId,
-                name: costItems.name,
-                type: costItems.type,
-                value: costItems.value,
-                isActive: costItems.isActive
-            })
-                .from(productCostItems)
-                .innerJoin(costItems, eq(productCostItems.costItemId, costItems.id))
-                .where(inArray(productCostItems.productId, productIds));
-
-            const globalCosts = await db.select().from(costItems).where(
-                and(
-                    eq(costItems.isActive, true),
-                    eq(costItems.isGlobal, true)
-                )
-            );
-
-            const costsToInsert: any[] = [];
-            for (const oi of insertedItems) {
-                const linkedPcosts = activeCosts.filter(c => c.productId === oi.productId && c.isActive).map(c => ({ name: c.name, type: c.type, value: c.value }));
-                const gCosts = globalCosts.map(g => ({ name: g.name, type: g.type, value: g.value }));
-
-                const allPcosts = [...linkedPcosts];
-                gCosts.forEach(gc => {
-                    if (!allPcosts.some(p => p.name === gc.name)) {
-                        allPcosts.push(gc);
-                    }
-                });
-
-                for (const pc of allPcosts) {
-                    const configuredValue = Number(pc.value);
-                    let calculatedAmount = 0;
-                    if (pc.type === 'percentage') {
-                        calculatedAmount = Number(oi.unitPrice) * (configuredValue / 100) * oi.quantity;
-                    } else {
-                        calculatedAmount = configuredValue * oi.quantity;
-                    }
-                    costsToInsert.push({
-                        orderItemId: oi.id,
-                        costItemName: pc.name,
-                        costItemType: pc.type,
-                        configuredValue: String(configuredValue),
-                        calculatedAmount: String(calculatedAmount)
-                    });
-                }
-            }
-            if (costsToInsert.length > 0) {
-                await db.insert(orderItemCosts).values(costsToInsert);
-            }
-        }
+        // 3. Congelar costos configurados e insumos al momento de la venta.
+        await CostSnapshotService.replaceConfiguredCosts(insertedItems, 'app');
 
         // 4. Registrar Pago (para idempotencia)
         if (paymentId) {

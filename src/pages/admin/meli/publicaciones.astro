@@ -16,6 +16,8 @@ const allLinksRaw = await db
     basePrice: products.basePrice,
     meliItemId: meliItemLinks.meliItemId,
     meliTitle: meliItemLinks.meliTitle,
+    meliCategoryId: meliItemLinks.meliCategoryId,
+    meliListingType: meliItemLinks.meliListingType,
     syncEnabled: meliItemLinks.syncEnabled,
     lastSyncedPrice: meliItemLinks.lastSyncedPrice,
     lastSyncAt: meliItemLinks.lastSyncAt,
@@ -30,7 +32,7 @@ const allLinks = await Promise.all(allLinksRaw.map(async (link) => {
   if (!link.productId) return { ...link, inversionTotal: 0, targetPrice: null };
 
   const qty = link.packQuantity || 1;
-  const targetPrice = await MeliService.calculateMeliPriceForProduct(link.productId, qty);
+  const targetPrice = await MeliService.calculateMeliPriceForProduct(link.productId, qty, link);
 
   // Recalcular inversión total para mostrar en la columna (usando la nueva lógica de MeliService)
   // Pero para no repetir, simplemente recalculamos aquí brevemente o exponemos una función en MeliService.

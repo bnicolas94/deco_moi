@@ -12,6 +12,8 @@ export const PUT: APIRoute = async ({ request, params }) => {
         if (data.name !== undefined) updateData.name = data.name;
         if (data.type !== undefined) updateData.type = data.type;
         if (data.value !== undefined) updateData.value = parseFloat(data.value).toString();
+        if (data.category !== undefined) updateData.category = data.category;
+        if (data.appliesToChannels !== undefined) updateData.appliesToChannels = data.appliesToChannels;
         if (data.isGlobal !== undefined) updateData.isGlobal = data.isGlobal;
         if (data.isActive !== undefined) updateData.isActive = data.isActive;
         updateData.updatedAt = new Date();

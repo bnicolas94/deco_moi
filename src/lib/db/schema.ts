@@ -169,6 +169,12 @@ export const orders = pgTable('orders', {
     total: decimal('total', { precision: 10, scale: 2 }).notNull(),
     paymentMethod: varchar('payment_method', { length: 50 }).notNull(),
     paymentStatus: varchar('payment_status', { length: 50 }).default('pending'),
+    salesChannel: varchar('sales_channel', { length: 30 }).notNull().default('app'), // 'app' | 'mercadolibre'
+    externalOrderId: varchar('external_order_id', { length: 100 }),
+    externalStatus: varchar('external_status', { length: 50 }),
+    financialStatus: varchar('financial_status', { length: 30 }).notNull().default('provisional'), // 'provisional' | 'reconciled'
+    paidAt: timestamp('paid_at'),
+    cancelledAt: timestamp('cancelled_at'),
     shippingAddressId: integer('shipping_address_id'),
     shippingData: json('shipping_data').$type<Record<string, any>>(),
     shippingMethod: varchar('shipping_method', { length: 50 }).default('pickup'), // 'pickup' | 'delivery'
@@ -177,7 +183,9 @@ export const orders = pgTable('orders', {
     customizationDetails: json('customization_details').$type<Record<string, any>>(),
     createdAt: timestamp('created_at').defaultNow(),
     updatedAt: timestamp('updated_at').defaultNow(),
-});
+}, (table) => ({
+    channelExternalOrderIdx: uniqueIndex('orders_channel_external_order_idx').on(table.salesChannel, table.externalOrderId),
+}));
 
 // ============================================
 // ITEMS DE ORDEN
@@ -194,6 +202,13 @@ export const orderItems = pgTable('order_items', {
     customization: json('customization').$type<Record<string, any>>(),
     variantId: integer('variant_id'), // Referencia a la variante, nullable si no tiene
     productionTime: varchar('production_time', { length: 100 }), // Snapshot del tiempo de producción al crear la orden
+    externalItemId: varchar('external_item_id', { length: 50 }),
+    externalVariationId: varchar('external_variation_id', { length: 50 }),
+    packQuantity: integer('pack_quantity').notNull().default(1),
+    internalUnits: integer('internal_units'),
+    grossAmount: decimal('gross_amount', { precision: 12, scale: 2 }),
+    discountAmount: decimal('discount_amount', { precision: 12, scale: 2 }).default('0'),
+    netRevenue: decimal('net_revenue', { precision: 12, scale: 2 }),
     createdAt: timestamp('created_at').defaultNow(),
 });
 
@@ -427,6 +442,8 @@ export const costItems = pgTable('cost_items', {
     name: varchar('name', { length: 255 }).notNull(),
     type: varchar('type', { length: 50 }).notNull(), // 'percentage' | 'fixed'
     value: decimal('value', { precision: 10, scale: 2 }).notNull(),
+    category: varchar('category', { length: 50 }).notNull().default('operational'),
+    appliesToChannels: json('applies_to_channels').$type<string[]>().notNull().default(['app', 'mercadolibre']),
     isGlobal: boolean('is_global').default(false),
     isActive: boolean('is_active').default(true),
     createdAt: timestamp('created_at').defaultNow(),
@@ -454,6 +471,17 @@ export const orderItemCosts = pgTable('order_item_costs', {
     costItemType: varchar('cost_item_type', { length: 50 }).notNull(), // 'percentage' | 'fixed'
     configuredValue: decimal('configured_value', { precision: 10, scale: 2 }).notNull(),
     calculatedAmount: decimal('calculated_amount', { precision: 10, scale: 2 }).notNull(), // valor en ARS calculado en este momento
+    costCode: varchar('cost_code', { length: 80 }),
+    category: varchar('category', { length: 50 }).notNull().default('operational'),
+    nature: varchar('nature', { length: 20 }).notNull().default('variable'), // 'fixed' | 'variable'
+    calculationBasis: varchar('calculation_basis', { length: 30 }).notNull().default('configured'),
+    source: varchar('source', { length: 30 }).notNull().default('configuration'),
+    salesChannel: varchar('sales_channel', { length: 30 }).notNull().default('app'),
+    isEstimated: boolean('is_estimated').notNull().default(true),
+    affectsProfit: boolean('affects_profit').notNull().default(true),
+    parentCostCode: varchar('parent_cost_code', { length: 80 }),
+    externalReference: varchar('external_reference', { length: 120 }),
+    effectiveAt: timestamp('effective_at').defaultNow(),
     createdAt: timestamp('created_at').defaultNow(),
 });
 
@@ -555,6 +583,8 @@ export const meliPricingConfig = pgTable('meli_pricing_config', {
     freeShippingCost: decimal('free_shipping_cost', { precision: 10, scale: 2 }).default('5000'),
     extraMarginPct: decimal('extra_margin_pct', { precision: 5, scale: 2 }).default('0'),
     installmentsCostPct: decimal('installments_cost_pct', { precision: 5, scale: 2 }).default('0'),
+    mpCommissionPct: decimal('mp_commission_pct', { precision: 5, scale: 2 }).default('0'),
+    grossIncomeTaxPct: decimal('gross_income_tax_pct', { precision: 5, scale: 2 }).default('0'),
     roundingStrategy: varchar('rounding_strategy', { length: 20 }).default('round'), // 'round' | 'ceil' | 'floor'
     isActive: boolean('is_active').default(true),
     createdAt: timestamp('created_at').defaultNow(),
@@ -600,20 +630,29 @@ export const meliOrders = pgTable('meli_orders', {
     totalAmount: decimal('total_amount', { precision: 10, scale: 2 }).notNull(),
     netAmount: decimal('net_amount', { precision: 10, scale: 2 }), // Total menos comisiones ML
     mlCommissionAmount: decimal('ml_commission_amount', { precision: 10, scale: 2 }),
+    taxesAmount: decimal('taxes_amount', { precision: 10, scale: 2 }).default('0'),
+    mpFeeAmount: decimal('mp_fee_amount', { precision: 10, scale: 2 }).default('0'),
+    mappingStatus: varchar('mapping_status', { length: 30 }).notNull().default('pending'), // pending | mapped | unmatched
+    financialStatus: varchar('financial_status', { length: 30 }).notNull().default('provisional'),
     currency: varchar('currency', { length: 10 }).default('ARS'),
     items: json('items').$type<Array<{
         meliItemId: string;
+        variationId: string | null;
         title: string;
         sku: string | null;
         quantity: number;
         unitPrice: number;
         productId: number | null;
+        packQuantity: number;
+        internalUnits: number;
+        saleFee: number;
     }>>(),
     paymentId: varchar('payment_id', { length: 50 }),
     shippingId: varchar('shipping_id', { length: 50 }),
     dateCreated: timestamp('date_created').notNull(),
     rawData: json('raw_data').$type<Record<string, any>>(), // Data cruda de ML para referencia
     importedAt: timestamp('imported_at').defaultNow(),
+    updatedAt: timestamp('updated_at').defaultNow(),
 });
 
 // ============================================

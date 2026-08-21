@@ -36,6 +36,8 @@ export interface MeliOrderResponse {
         };
         quantity: number;
         unit_price: number;
+        full_unit_price?: number;
+        gross_price?: number;
         sale_fee: number;
     }>;
     payments: Array<{
@@ -43,11 +45,22 @@ export interface MeliOrderResponse {
         status: string;
         transaction_amount: number;
         total_paid_amount: number;
+        date_approved?: string;
     }>;
     shipping: {
         id: number;
         status: string;
     };
+    taxes?: {
+        amount?: number;
+        currency_id?: string;
+    } | number;
+    cancel_detail?: {
+        date?: string;
+        code?: string;
+        description?: string;
+        requested_by?: string;
+    } | null;
 }
 
 export async function searchMeliOrders(options: MeliOrderSearchOptions) {

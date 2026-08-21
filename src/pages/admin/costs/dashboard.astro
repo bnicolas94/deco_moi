@@ -21,6 +21,11 @@ const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString()
             </div>
             
             <div class="flex flex-wrap items-center gap-3 bg-gray-50 p-2 rounded-xl border border-gray-100">
+                <select id="channel-filter" class="rounded-lg border-gray-200 text-sm focus:ring-indigo-500 border h-10 px-3 bg-white shadow-sm font-bold">
+                    <option value="all">Todos los canales</option>
+                    <option value="app">App</option>
+                    <option value="mercadolibre">Mercado Libre</option>
+                </select>
                 <select id="quick-date" class="rounded-lg border-gray-200 text-sm focus:ring-indigo-500 border h-10 px-3 bg-white shadow-sm font-medium">
                     <option value="today">Hoy</option>
                     <option value="week">Esta Semana</option>
@@ -56,6 +61,7 @@ const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString()
         </div>
 
         <div id="dashboard-content" class="space-y-8">
+            <div id="unmatched-alert" class="hidden rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-800"></div>
             <!-- Bloque 1: Resumen General -->
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
                 <div class="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 relative overflow-hidden group">
@@ -71,7 +77,7 @@ const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString()
                     <div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity transform group-hover:scale-110">
                         <Package className="w-16 h-16 text-rose-600" />
                     </div>
-                    <h3 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Costos Configurables</h3>
+                    <h3 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Costos Totales</h3>
                     <p class="text-2xl font-black text-rose-600" id="m-costos">$0</p>
                     <p class="text-xs mt-2 text-gray-500 font-medium compare-stat hidden"><span class="text-rose-500 flex items-center inline"><TrendingUp className="w-3 h-3 inline mr-1" /> 0%</span> vs mes ant.</p>
                 </div>
@@ -96,6 +102,14 @@ const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString()
                     </div>
                     <p class="text-xs mt-2 text-emerald-700/70 font-bold compare-stat hidden"><span class="text-emerald-600 flex items-center inline"><TrendingUp className="w-3 h-3 inline mr-1" /> 0%</span> netos vs mes ant.</p>
                 </div>
+            </div>
+
+            <div class="grid grid-cols-2 lg:grid-cols-5 gap-3">
+                <div class="rounded-xl border border-blue-100 bg-blue-50 p-4"><div class="text-[11px] font-bold uppercase text-blue-600">Costo fijo</div><div id="m-fixed" class="text-xl font-black text-blue-900">$0</div></div>
+                <div class="rounded-xl border border-violet-100 bg-violet-50 p-4"><div class="text-[11px] font-bold uppercase text-violet-600">Costo variable</div><div id="m-variable" class="text-xl font-black text-violet-900">$0</div></div>
+                <div class="rounded-xl border border-yellow-100 bg-yellow-50 p-4"><div class="text-[11px] font-bold uppercase text-yellow-700">Cargos ML</div><div id="m-ml-fees" class="text-xl font-black text-yellow-900">$0</div></div>
+                <div class="rounded-xl border border-cyan-100 bg-cyan-50 p-4"><div class="text-[11px] font-bold uppercase text-cyan-700">Comisiones MP</div><div id="m-mp-fees" class="text-xl font-black text-cyan-900">$0</div></div>
+                <div class="rounded-xl border border-orange-100 bg-orange-50 p-4"><div class="text-[11px] font-bold uppercase text-orange-700">Impuestos / IIBB</div><div id="m-taxes" class="text-xl font-black text-orange-900">$0</div></div>
             </div>
 
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -174,6 +188,28 @@ const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString()
                     </table>
                 </div>
             </div>
+
+            <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                <div class="p-5 border-b border-gray-50">
+                    <h2 class="text-lg font-bold text-gray-900 flex items-center gap-2">
+                        <DollarSign className="w-5 h-5 text-emerald-500" /> Rentabilidad por Venta
+                    </h2>
+                    <p class="mt-1 text-xs text-gray-500">Cada fila conserva los costos vigentes al momento de concretarse la operación.</p>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-sm">
+                        <thead class="bg-gray-50 text-[11px] font-bold uppercase text-gray-500">
+                            <tr>
+                                <th class="p-3">Venta</th><th class="p-3">Fecha</th><th class="p-3">Canal</th>
+                                <th class="p-3 text-right">Ingreso</th><th class="p-3 text-right">Fijo</th>
+                                <th class="p-3 text-right">Variable</th><th class="p-3 text-right">ML / MP</th>
+                                <th class="p-3 text-right">IIBB / Imp.</th><th class="p-3 text-right">Resultado</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tb-sales" class="divide-y divide-gray-100"></tbody>
+                    </table>
+                </div>
+            </div>
             
             <!-- Bloque 5: Comparativa se mostrará on-demand a través de UI elements hidden by default que activaremos si compare=true -->
             <!-- En este MVP manejaremos la comparativa directamente inyectando los % de delta en las cards del Bloque 1 -->
@@ -191,6 +227,7 @@ const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString()
 
     // UI Elements
     const dateSelect = qs('#quick-date');
+    const channelSelect = qs('#channel-filter');
     const customDates = qs('#custom-dates');
     const startInput = qs('#date-start');
     const endInput = qs('#date-end');
@@ -235,20 +272,21 @@ const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString()
         }
     });
 
-    [startInput, endInput, compareToggle, btnRefresh].forEach(el => {
+    [startInput, endInput, compareToggle, btnRefresh, channelSelect].forEach(el => {
         el.addEventListener('change', fetchDashboard);
         if (el.tagName === 'BUTTON') el.addEventListener('click', fetchDashboard);
     });
 
     async function fetchDashboard() {
         const { start, end } = getDates();
+        const channel = channelSelect.value;
         loading.classList.remove('hidden');
         content.classList.add('opacity-50', 'pointer-events-none');
         btnRefresh.querySelector('svg').classList.add('animate-spin');
 
         try {
             // Main fetch
-            const res = await fetch(`/api/costs/dashboard-stats?start=${start}&end=${end}`);
+            const res = await fetch(`/api/costs/dashboard-stats?start=${start}&end=${end}&channel=${channel}`);
             const data = await res.json();
             
             let compareData = null;
@@ -265,7 +303,7 @@ const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString()
                 const pStart = sDate.toISOString().split('T')[0];
                 const pEnd = eDate.toISOString().split('T')[0];
                 
-                const resCmp = await fetch(`/api/costs/dashboard-stats?start=${pStart}&end=${pEnd}`);
+                const resCmp = await fetch(`/api/costs/dashboard-stats?start=${pStart}&end=${pEnd}&channel=${channel}`);
                 compareData = await resCmp.json();
             }
 
@@ -303,6 +341,19 @@ const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString()
         
         qs('#m-netos').textContent = fmtMoney(data.summary.ingresosNetos);
         qs('#m-margen').textContent = `${fmtPct(data.summary.margenPorcentaje)} M.N`;
+        qs('#m-fixed').textContent = fmtMoney(data.summary.costosFijos || 0);
+        qs('#m-variable').textContent = fmtMoney(data.summary.costosVariables || 0);
+        qs('#m-ml-fees').textContent = fmtMoney(data.summary.marketplaceFees || 0);
+        qs('#m-mp-fees').textContent = fmtMoney(data.summary.paymentFees || 0);
+        qs('#m-taxes').textContent = fmtMoney(data.summary.taxes || 0);
+
+        const unmatchedAlert = qs('#unmatched-alert');
+        if (data.summary.unmatchedMeliOrders > 0) {
+            unmatchedAlert.textContent = `${data.summary.unmatchedMeliOrders} venta(s) pagada(s) de Mercado Libre todavía no tienen todos sus productos vinculados y no se incluyen en la rentabilidad.`;
+            unmatchedAlert.classList.remove('hidden');
+        } else {
+            unmatchedAlert.classList.add('hidden');
+        }
 
         const compareLabels = qsa('.compare-stat');
         if (compareData) {
@@ -325,7 +376,7 @@ const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString()
             tbCost.innerHTML += `
                 <tr class="hover:bg-gray-50">
                     <td class="p-4 font-bold text-gray-900">${c.name}</td>
-                    <td class="p-4 text-xs font-medium text-gray-500 uppercase">${c.type === 'percentage' ? c.value + '%' : 'Fijo'}</td>
+                    <td class="p-4 text-xs font-medium text-gray-500 uppercase">${c.nature === 'fixed' ? 'Fijo' : 'Variable'}${c.isEstimated ? '<br><span class="text-[9px] text-amber-600">Estimado</span>' : ''}</td>
                     <td class="p-4 text-right text-rose-600 font-bold">${fmtMoney(c.totalAmount)}</td>
                     <td class="p-4 text-right text-gray-700">${fmtPct(pct)}</td>
                 </tr>
@@ -363,20 +414,48 @@ const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString()
         data.breakdownProducts.forEach(p => {
             const neta = p.ingresos - p.costos;
             const pct = p.ingresos > 0 ? (neta / p.ingresos) * 100 : 0;
+            const fixedPct = p.ingresos > 0 ? ((p.fixedCosts || 0) / p.ingresos) * 100 : 0;
+            const variablePct = p.ingresos > 0 ? ((p.variableCosts || 0) / p.ingresos) * 100 : 0;
             const isLoss = neta < 0;
             const warning = p.costos === 0 ? `<br><span class="text-[10px] bg-amber-100 text-amber-700 px-1 py-0.5 rounded">Sin costos configurados</span>` : '';
+            const channelBadge = p.channel === 'mercadolibre' ? '<span class="text-[10px] bg-yellow-100 text-yellow-800 px-1.5 py-0.5 rounded ml-1">ML</span>' : '<span class="text-[10px] bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded ml-1">APP</span>';
+            const publication = p.publicationId ? `<div class="text-[10px] text-gray-400 font-mono mt-1">${p.publicationId} · ${p.internalUnits} u. internas</div>` : '';
             
             tbProd.innerHTML += `
                 <tr class="hover:bg-gray-50 product-row" data-[0]="${p.name.toLowerCase()}" data-[1]="${p.units}" data-[2]="${p.ingresos}" data-[3]="${p.costos}" data-[4]="${neta}" data-[5]="${pct}">
-                    <td class="p-4 font-bold text-gray-900">${p.name} ${warning}</td>
+                    <td class="p-4 font-bold text-gray-900">${p.name} ${channelBadge} ${warning}${publication}</td>
                     <td class="p-4 text-center text-gray-700">${p.units}</td>
                     <td class="p-4 text-right font-medium text-indigo-900">${fmtMoney(p.ingresos)}</td>
-                    <td class="p-4 text-right font-medium text-rose-600">${fmtMoney(p.costos)}</td>
+                    <td class="p-4 text-right font-medium text-rose-600">${fmtMoney(p.costos)}<div class="text-[9px] text-gray-500">F ${fmtMoney(p.fixedCosts || 0)} (${fmtPct(fixedPct)})</div><div class="text-[9px] text-gray-500">V ${fmtMoney(p.variableCosts || 0)} (${fmtPct(variablePct)})</div></td>
                     <td class="p-4 text-right font-black ${isLoss ? 'text-rose-600' : 'text-emerald-600'}">${fmtMoney(neta)}</td>
                     <td class="p-4 text-right font-bold text-gray-600">${fmtPct(pct)}</td>
                 </tr>
             `;
         });
+
+        const tbSales = qs('#tb-sales');
+        tbSales.innerHTML = '';
+        if (!data.breakdownSales || data.breakdownSales.length === 0) {
+            tbSales.innerHTML = '<tr><td colspan="9" class="p-4 text-center text-gray-500">Sin ventas aprobadas en el período.</td></tr>';
+        } else {
+            data.breakdownSales.forEach(s => {
+                const fixedPct = s.ingresos > 0 ? s.fixedCosts / s.ingresos * 100 : 0;
+                const variablePct = s.ingresos > 0 ? s.variableCosts / s.ingresos * 100 : 0;
+                const channelLabel = s.channel === 'mercadolibre' ? 'Mercado Libre' : 'App';
+                const status = s.financialStatus === 'reconciled' && !s.hasEstimates ? '<span class="ml-1 text-[9px] rounded bg-emerald-100 px-1 py-0.5 text-emerald-700">Conciliado</span>' : '<span class="ml-1 text-[9px] rounded bg-amber-100 px-1 py-0.5 text-amber-700">Provisional</span>';
+                tbSales.innerHTML += `<tr class="hover:bg-gray-50">
+                    <td class="p-3 font-bold text-gray-900">${s.orderNumber}${s.externalOrderId ? `<div class="font-mono text-[9px] text-gray-400">ML ${s.externalOrderId}</div>` : ''}</td>
+                    <td class="p-3 text-gray-500">${new Date(s.date).toLocaleDateString('es-AR')}</td>
+                    <td class="p-3 font-medium">${channelLabel}${status}</td>
+                    <td class="p-3 text-right font-bold">${fmtMoney(s.ingresos)}</td>
+                    <td class="p-3 text-right text-blue-700">${fmtMoney(s.fixedCosts)}<div class="text-[9px]">${fmtPct(fixedPct)}</div></td>
+                    <td class="p-3 text-right text-violet-700">${fmtMoney(s.variableCosts)}<div class="text-[9px]">${fmtPct(variablePct)}</div></td>
+                    <td class="p-3 text-right text-yellow-700">${fmtMoney((s.marketplaceFees || 0) + (s.paymentFees || 0))}</td>
+                    <td class="p-3 text-right text-orange-700">${fmtMoney(s.taxes || 0)}</td>
+                    <td class="p-3 text-right font-black ${s.neto < 0 ? 'text-rose-600' : 'text-emerald-600'}">${fmtMoney(s.neto)}</td>
+                </tr>`;
+            });
+        }
     }
 
     // Sort util

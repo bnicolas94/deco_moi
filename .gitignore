@@ -37,8 +37,8 @@ tmp/
 #WooCommerce Old
 .old/
 
-# Bases de datos y respaldos (las migraciones de Drizzle siguen versionadas)
-drizzle/
+# Bases de datos y respaldos (las migraciones SQL de Drizzle sí se versionan)
+drizzle/migrations/meta/
 *.dump
 *.backup
 *.bak

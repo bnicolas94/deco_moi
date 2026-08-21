@@ -9,6 +9,10 @@ export interface Order {
     total: number;
     paymentMethod: PaymentMethod;
     paymentStatus: PaymentStatus;
+    salesChannel?: 'app' | 'mercadolibre';
+    externalOrderId?: string | null;
+    externalStatus?: string | null;
+    financialStatus?: 'provisional' | 'reconciled';
     shippingData: ShippingData | null;
     notes: string | null;
     customizationDetails: Record<string, any> | null;
@@ -27,6 +31,13 @@ export interface OrderItem {
     customization: Record<string, any> | null;
     variantId?: number | null;
     productionTime?: string | null;
+    externalItemId?: string | null;
+    externalVariationId?: string | null;
+    packQuantity?: number;
+    internalUnits?: number | null;
+    grossAmount?: number | null;
+    discountAmount?: number | null;
+    netRevenue?: number | null;
 }
 
 export interface ShippingData {

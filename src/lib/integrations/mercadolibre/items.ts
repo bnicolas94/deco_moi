@@ -17,9 +17,24 @@ export interface MeliListingPricesResponse {
     };
 }
 
-export async function getListingPrices(price: number, listingType: string = 'gold_special'): Promise<MeliListingPricesResponse[]> {
+export async function getListingPrices(price: number, listingType: string = 'gold_special', options: {
+    categoryId?: string | null;
+    currencyId?: string;
+    logisticType?: string | null;
+    shippingMode?: string | null;
+    billableWeight?: number | null;
+} = {}): Promise<MeliListingPricesResponse[]> {
     const token = await getValidAccessToken();
-    const url = `${API_BASE}/sites/MLA/listing_prices?price=${price}&listing_type_id=${listingType}`;
+    const params = new URLSearchParams({
+        price: String(price),
+        listing_type_id: listingType,
+        currency_id: options.currencyId || 'ARS',
+    });
+    if (options.categoryId) params.set('category_id', options.categoryId);
+    if (options.logisticType) params.set('logistic_type', options.logisticType);
+    if (options.shippingMode) params.set('shipping_modes', options.shippingMode);
+    if (options.billableWeight) params.set('billable_weight', String(options.billableWeight));
+    const url = `${API_BASE}/sites/MLA/listing_prices?${params.toString()}`;
 
     const response = await fetch(url, {
         headers: {

@@ -15,7 +15,9 @@
     "db:migrate": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
     "migrate": "tsx scripts/migrate.ts",
-    "security:secrets": "node scripts/check-secrets.mjs"
+    "security:secrets": "node scripts/check-secrets.mjs",
+    "test:profitability": "node --test tests/meli-pricing.test.ts",
+    "db:migrate:meli-profitability": "node scripts/apply-meli-profitability-migration.mjs"
   },
   "dependencies": {
     "@astrojs/check": "^0.9.9",

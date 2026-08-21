@@ -7,6 +7,8 @@ const itemSchema = z.object({
     name: z.string().min(1),
     type: z.enum(['percentage', 'fixed']),
     value: z.number().min(0),
+    category: z.string().min(1).default('operational'),
+    appliesToChannels: z.array(z.enum(['app', 'mercadolibre'])).min(1).default(['app', 'mercadolibre']),
     isGlobal: z.boolean().default(false),
     isActive: z.boolean().default(true)
 });
@@ -23,6 +25,8 @@ export const POST: APIRoute = async ({ request }) => {
             name: parsed.name,
             type: parsed.type,
             value: parsed.value.toString(),
+            category: parsed.category,
+            appliesToChannels: parsed.appliesToChannels,
             isGlobal: parsed.isGlobal,
             isActive: parsed.isActive
         }).returning();
