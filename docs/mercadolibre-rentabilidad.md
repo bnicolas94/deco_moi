@@ -7,9 +7,10 @@
 3. Cada ítem se vincula por publicación + variación; como alternativa se usa el SKU.
 4. Una orden pagada y completamente vinculada crea una orden canónica en `orders` con canal `mercadolibre`.
 5. Se congelan insumos, costos configurados, cantidad de packs y unidades internas.
-6. Se registra el `sale_fee` real informado por la orden y se muestran sus componentes configurados como detalle estimado sin volver a descontarlos.
-7. Rentabilidad incluye la operación y permite filtrar App, Mercado Libre o ambos.
-8. La conciliación de cargos sustituye el cargo operativo por detalles de facturación cuando ML los publica.
+6. Se registra el `marketplace_fee` total informado por la orden; si no está disponible, se usa `sale_fee` por unidad multiplicado por la cantidad.
+7. Se consulta el costo vendedor de Mercado Envíos y, si el shipment todavía no lo informa, se conserva una estimación claramente identificada.
+8. Rentabilidad incluye la operación y permite filtrar App, Mercado Libre o ambos.
+9. La conciliación de cargos sustituye el cargo operativo por detalles de facturación cuando ML los publica.
 
 Las ventas pagadas sin vínculo permanecen visibles en el módulo de ML y generan una alerta en Rentabilidad. Al vincular la publicación se reprocesan automáticamente.
 
@@ -31,7 +32,7 @@ Las ventas pagadas sin vínculo permanecen visibles en el módulo de ML y genera
 
 ## Puesta en marcha
 
-1. Aplicar los cambios del esquema con `npm run db:migrate` o revisar/aplicar `drizzle/migrations/0004_meli_profitability.sql`.
+1. Aplicar los cambios del esquema con `npm run db:migrate` o revisar/aplicar `drizzle/migrations/0004_meli_profitability.sql` y `drizzle/migrations/0005_meli_financial_model.sql`.
 2. Verificar los vínculos y cantidades por pack en `Mercado Libre > Gestión Externa`.
 3. Ejecutar `Importar recientes`; ahora pagina el historial disponible y también actualiza órdenes ya existentes.
 4. Revisar las alertas de publicaciones sin vincular.

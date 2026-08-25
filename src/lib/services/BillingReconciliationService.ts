@@ -79,6 +79,12 @@ export class BillingReconciliationService {
                         eq(orderItemCosts.costCode, 'ml_sale_fee_total')
                     ));
                 }
+                if (categoriesFound.has('shipping_fee')) {
+                    await db.delete(orderItemCosts).where(and(
+                        inArray(orderItemCosts.orderItemId, itemIds),
+                        eq(orderItemCosts.costCode, 'ml_shipping_seller_cost')
+                    ));
+                }
                 for (const category of ['payment_fee', 'tax'] as const) {
                     if (categoriesFound.has(category)) {
                         await db.delete(orderItemCosts).where(and(

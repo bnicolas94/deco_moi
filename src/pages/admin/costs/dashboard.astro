@@ -426,7 +426,7 @@ const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString()
                     <td class="p-4 font-bold text-gray-900">${p.name} ${channelBadge} ${warning}${publication}</td>
                     <td class="p-4 text-center text-gray-700">${p.units}</td>
                     <td class="p-4 text-right font-medium text-indigo-900">${fmtMoney(p.ingresos)}</td>
-                    <td class="p-4 text-right font-medium text-rose-600">${fmtMoney(p.costos)}<div class="text-[9px] text-gray-500">F ${fmtMoney(p.fixedCosts || 0)} (${fmtPct(fixedPct)})</div><div class="text-[9px] text-gray-500">V ${fmtMoney(p.variableCosts || 0)} (${fmtPct(variablePct)})</div></td>
+                    <td class="p-4 text-right font-medium text-rose-600">${fmtMoney(p.costos)}<div class="text-[9px] text-gray-500">F ${fmtMoney(p.fixedCosts || 0)} (${fmtPct(fixedPct)})</div><div class="text-[9px] text-gray-500">V ${fmtMoney(p.variableCosts || 0)} (${fmtPct(variablePct)})</div>${p.shippingCosts ? `<div class="text-[9px] text-sky-600">Envío ${fmtMoney(p.shippingCosts)}</div>` : ''}</td>
                     <td class="p-4 text-right font-black ${isLoss ? 'text-rose-600' : 'text-emerald-600'}">${fmtMoney(neta)}</td>
                     <td class="p-4 text-right font-bold text-gray-600">${fmtPct(pct)}</td>
                 </tr>

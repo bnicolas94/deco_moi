@@ -18,7 +18,22 @@ import { getAuthUrl, exchangeCodeForToken } from '../integrations/mercadolibre/a
 import { calculateMeliPrice, getFixedCostForPrice } from '../integrations/mercadolibre/pricing';
 import { getMeliItem, getListingPrices, updateMeliItem } from '../integrations/mercadolibre/items';
 import { getMeliOrder, searchMeliOrders } from '../integrations/mercadolibre/orders';
+import { getMeliShipment } from '../integrations/mercadolibre/shipments';
+import {
+    allocateMoney,
+    getEstimatedShippingCost,
+    getLineSaleFeeTotal,
+    getOrderMarketplaceFee,
+    getSellerShippingCost,
+} from '../integrations/mercadolibre/financials';
 import type { MeliPricingConfigType } from '../integrations/mercadolibre/pricing';
+
+interface MarketplaceOrderFinancials {
+    marketplaceFeeAmount: number;
+    taxesAmount: number;
+    shippingSellerCost: number;
+    shippingIsEstimated: boolean;
+}
 
 export class MeliService {
 
@@ -258,7 +273,8 @@ export class MeliService {
             quantity: item.quantity,
             unitPrice: item.unit_price,
             grossPrice: Number(item.gross_price || item.full_unit_price * item.quantity || item.unit_price * item.quantity),
-            saleFee: Number(item.sale_fee || 0),
+            saleFeePerUnit: Number(item.sale_fee || 0),
+            saleFee: getLineSaleFeeTotal(item),
             productId,
             variantId,
             packQuantity,
@@ -269,6 +285,37 @@ export class MeliService {
     private static getTaxesAmount(orderData: any): number {
         if (typeof orderData.taxes === 'number') return Number(orderData.taxes);
         return Number(orderData.taxes?.amount || 0);
+    }
+
+    private static async getOrderFinancials(orderData: any, config: any): Promise<MarketplaceOrderFinancials> {
+        const marketplaceFeeAmount = getOrderMarketplaceFee(orderData);
+        const taxesAmount = this.getTaxesAmount(orderData);
+        let shippingSellerCost = 0;
+        let shippingIsEstimated = false;
+
+        if (orderData.shipping?.id) {
+            try {
+                const shipment = await getMeliShipment(orderData.shipping.id);
+                const actualShippingCost = getSellerShippingCost(shipment);
+                if (actualShippingCost !== null) {
+                    shippingSellerCost = actualShippingCost;
+                } else {
+                    shippingSellerCost = getEstimatedShippingCost(Number(orderData.total_amount || 0), config || {});
+                    shippingIsEstimated = shippingSellerCost > 0;
+                }
+            } catch (error) {
+                shippingSellerCost = getEstimatedShippingCost(Number(orderData.total_amount || 0), config || {});
+                shippingIsEstimated = shippingSellerCost > 0;
+                console.warn(`[Meli Shipping] No se pudo obtener el costo real del envío ${orderData.shipping.id}; se usa estimación.`, error);
+            }
+        }
+
+        return {
+            marketplaceFeeAmount,
+            taxesAmount,
+            shippingSellerCost,
+            shippingIsEstimated,
+        };
     }
 
     private static getInternalStatuses(orderData: any) {
@@ -290,7 +337,8 @@ export class MeliService {
         internalItems: Array<any>,
         mappedItems: Array<any>,
         orderData: any,
-        config: any
+        config: any,
+        financials: MarketplaceOrderFinancials
     ) {
         if (internalItems.length === 0) return;
         const internalItemIds = internalItems.map(item => item.id);
@@ -298,15 +346,29 @@ export class MeliService {
             inArray(orderItemCosts.orderItemId, internalItemIds),
             inArray(orderItemCosts.source, ['marketplace_order_api', 'channel_estimate'])
         ));
-        const configuredRows = await db.select({
+        const existingCostRows = await db.select({
             orderItemId: orderItemCosts.orderItemId,
             category: orderItemCosts.category,
+            source: orderItemCosts.source,
         }).from(orderItemCosts).where(inArray(orderItemCosts.orderItemId, internalItemIds));
-        const itemsWithConfiguredTax = new Set(configuredRows.filter(row => row.category === 'tax').map(row => row.orderItemId));
-        const itemsWithConfiguredPaymentFee = new Set(configuredRows.filter(row => row.category === 'payment_fee').map(row => row.orderItemId));
+        const itemsWithConfiguredTax = new Set(existingCostRows.filter(row => row.category === 'tax').map(row => row.orderItemId));
+        const itemsWithConfiguredPaymentFee = new Set(existingCostRows.filter(row => row.category === 'payment_fee').map(row => row.orderItemId));
+        const reconciledItemsByCategory = (category: string) => new Set(existingCostRows
+            .filter(row => row.category === category && row.source === 'billing_reconciliation')
+            .map(row => row.orderItemId));
+        const itemsWithReconciledMarketplaceFee = reconciledItemsByCategory('marketplace_fee');
+        const itemsWithReconciledTax = reconciledItemsByCategory('tax');
+        const itemsWithReconciledPaymentFee = reconciledItemsByCategory('payment_fee');
+        const itemsWithReconciledShipping = reconciledItemsByCategory('shipping_fee');
 
-        const totalRevenue = mappedItems.reduce((sum, item) => sum + (item.unitPrice * item.quantity), 0);
-        const taxesAmount = this.getTaxesAmount(orderData);
+        const feeWeights = mappedItems.map(item => Number(item.saleFee || 0));
+        const revenueWeights = mappedItems.map(item => Number(item.unitPrice || 0) * Number(item.quantity || 0));
+        const marketplaceFeeAllocations = allocateMoney(
+            financials.marketplaceFeeAmount,
+            feeWeights.some(weight => weight > 0) ? feeWeights : revenueWeights
+        );
+        const taxAllocations = allocateMoney(financials.taxesAmount, revenueWeights);
+        const shippingAllocations = allocateMoney(financials.shippingSellerCost, revenueWeights);
         const rows: typeof orderItemCosts.$inferInsert[] = [];
 
         for (const internalItem of internalItems) {
@@ -317,14 +379,14 @@ export class MeliService {
             if (!mapped) continue;
 
             const lineRevenue = Number(internalItem.netRevenue || mapped.unitPrice * mapped.quantity);
-            const lineShare = totalRevenue > 0 ? (mapped.unitPrice * mapped.quantity) / totalRevenue : 0;
-            const actualSaleFee = mapped.saleFee;
+            const mappedIndex = mappedItems.indexOf(mapped);
+            const actualSaleFee = marketplaceFeeAllocations[mappedIndex] || 0;
             const effectiveRate = lineRevenue > 0 ? actualSaleFee / lineRevenue * 100 : 0;
             const estimatedPercentage = lineRevenue * (Number(config?.commissionPct || 0) / 100);
             const estimatedFinancing = lineRevenue * (Number(config?.installmentsCostPct || 0) / 100);
             const estimatedFixed = getFixedCostForPrice(mapped.unitPrice, config || {}) * mapped.quantity;
 
-            if (actualSaleFee > 0) {
+            if (actualSaleFee > 0 && !itemsWithReconciledMarketplaceFee.has(internalItem.id)) {
                 rows.push({
                     orderItemId: internalItem.id,
                     costItemName: 'Cargo por venta Mercado Libre',
@@ -370,8 +432,8 @@ export class MeliService {
                 });
             }
 
-            const allocatedTaxes = taxesAmount * lineShare;
-            if (allocatedTaxes > 0) {
+            const allocatedTaxes = taxAllocations[mappedIndex] || 0;
+            if (allocatedTaxes > 0 && !itemsWithReconciledTax.has(internalItem.id)) {
                 rows.push({
                     orderItemId: internalItem.id,
                     costItemName: 'Impuestos informados por ML',
@@ -408,7 +470,11 @@ export class MeliService {
                 });
             }
 
-            if (Number(config?.mpCommissionPct || 0) > 0 && !itemsWithConfiguredPaymentFee.has(internalItem.id)) {
+            if (
+                Number(config?.mpCommissionPct || 0) > 0
+                && !itemsWithConfiguredPaymentFee.has(internalItem.id)
+                && !itemsWithReconciledPaymentFee.has(internalItem.id)
+            ) {
                 const rate = Number(config.mpCommissionPct);
                 rows.push({
                     orderItemId: internalItem.id,
@@ -425,6 +491,29 @@ export class MeliService {
                     isEstimated: true,
                     affectsProfit: true,
                     externalReference: String(orderData.id),
+                });
+            }
+
+            const allocatedShipping = shippingAllocations[mappedIndex] || 0;
+            if (allocatedShipping > 0 && !itemsWithReconciledShipping.has(internalItem.id)) {
+                rows.push({
+                    orderItemId: internalItem.id,
+                    costItemName: financials.shippingIsEstimated
+                        ? 'Mercado Envíos (estimado)'
+                        : 'Costo vendedor de Mercado Envíos',
+                    costItemType: 'fixed',
+                    configuredValue: allocatedShipping.toFixed(2),
+                    calculatedAmount: allocatedShipping.toFixed(2),
+                    costCode: 'ml_shipping_seller_cost',
+                    category: 'shipping_fee',
+                    nature: 'variable',
+                    calculationBasis: financials.shippingIsEstimated ? 'configured_shipping_estimate' : 'actual_shipment_cost',
+                    source: financials.shippingIsEstimated ? 'channel_estimate' : 'marketplace_order_api',
+                    salesChannel: 'mercadolibre',
+                    isEstimated: financials.shippingIsEstimated,
+                    affectsProfit: true,
+                    externalReference: orderData.shipping?.id ? String(orderData.shipping.id) : String(orderData.id),
+                    effectiveAt: new Date(orderData.date_created),
                 });
             }
         }
@@ -445,14 +534,16 @@ export class MeliService {
             const configData = await db.select().from(meliPricingConfig).where(eq(meliPricingConfig.scope, 'global')).limit(1);
             const config = configData[0] as any;
             const resolvedItems = await Promise.all(orderData.order_items.map(item => this.resolveOrderItem(item)));
-            const totalCommissions = resolvedItems.reduce((sum, item) => sum + item.saleFee, 0);
-            const taxesAmount = this.getTaxesAmount(orderData);
             const mappingStatus = resolvedItems.every(item => item.productId)
                 ? 'mapped'
                 : (resolvedItems.some(item => item.productId) ? 'pending' : 'unmatched');
             const statuses = this.getInternalStatuses(orderData);
+            const financials = await this.getOrderFinancials(orderData, config);
             const primaryPayment = orderData.payments?.find(payment => payment.status === 'approved') || orderData.payments?.[0];
-            const netAmount = orderData.total_amount - totalCommissions - taxesAmount;
+            const netAmount = orderData.total_amount
+                - financials.marketplaceFeeAmount
+                - financials.taxesAmount
+                - financials.shippingSellerCost;
 
             const [meliOrder] = await db.insert(meliOrders).values({
                 meliOrderId: String(orderData.id),
@@ -462,8 +553,9 @@ export class MeliService {
                 buyerEmail: orderData.buyer.email,
                 totalAmount: String(orderData.total_amount),
                 netAmount: String(netAmount),
-                mlCommissionAmount: String(totalCommissions),
-                taxesAmount: String(taxesAmount),
+                mlCommissionAmount: String(financials.marketplaceFeeAmount),
+                taxesAmount: String(financials.taxesAmount),
+                shippingSellerCost: String(financials.shippingSellerCost),
                 currency: orderData.currency_id,
                 items: resolvedItems.map(({ variantId: _variantId, grossPrice: _grossPrice, ...item }) => item),
                 paymentId: primaryPayment?.id ? String(primaryPayment.id) : null,
@@ -481,8 +573,9 @@ export class MeliService {
                     buyerEmail: orderData.buyer.email,
                     totalAmount: String(orderData.total_amount),
                     netAmount: String(netAmount),
-                    mlCommissionAmount: String(totalCommissions),
-                    taxesAmount: String(taxesAmount),
+                    mlCommissionAmount: String(financials.marketplaceFeeAmount),
+                    taxesAmount: String(financials.taxesAmount),
+                    shippingSellerCost: String(financials.shippingSellerCost),
                     currency: orderData.currency_id,
                     items: resolvedItems.map(({ variantId: _variantId, grossPrice: _grossPrice, ...item }) => item),
                     paymentId: primaryPayment?.id ? String(primaryPayment.id) : null,
@@ -566,7 +659,7 @@ export class MeliService {
                 });
                 const insertedItems = await db.insert(orderItems).values(internalItemsInput).returning();
                 await CostSnapshotService.replaceConfiguredCosts(insertedItems, 'mercadolibre');
-                await this.replaceMarketplaceCosts(insertedItems, resolvedItems, orderData, config);
+                await this.replaceMarketplaceCosts(insertedItems, resolvedItems, orderData, config, financials);
 
                 if (primaryPayment?.id) {
                     await db.insert(payments).values({
@@ -586,7 +679,7 @@ export class MeliService {
             if (internalOrder && !internalCreated) {
                 const existingItems = await db.select().from(orderItems).where(eq(orderItems.orderId, internalOrder.id));
                 if (existingItems.length > 0) {
-                    await this.replaceMarketplaceCosts(existingItems, resolvedItems, orderData, config);
+                    await this.replaceMarketplaceCosts(existingItems, resolvedItems, orderData, config, financials);
                 }
             }
 

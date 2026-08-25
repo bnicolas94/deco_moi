@@ -74,15 +74,13 @@ export const GET: APIRoute = async ({ request }) => {
                 }
             }
 
-            const costoRealEnvio = order.salesChannel === 'app' && matchedZone ? Number(matchedZone.realCost) : 0;
+            let costoRealEnvio = order.salesChannel === 'app' && matchedZone ? Number(matchedZone.realCost) : 0;
             const zoneName = order.salesChannel === 'mercadolibre'
-                ? 'Mercado Envíos (pendiente conciliación)'
+                ? 'Mercado Envíos'
                 : (matchedZone ? matchedZone.zone : (order.shippingMethod === 'pickup' ? 'Retiro Local' : customerState));
-            totalEnviosCostosReales += costoRealEnvio;
             const shippingSummary = breakdownShipping.get(zoneName) || { ord: 0, cobrado: 0, costoReal: 0 };
             shippingSummary.ord += 1;
             shippingSummary.cobrado += cobradoEnvio;
-            shippingSummary.costoReal += costoRealEnvio;
             breakdownShipping.set(zoneName, shippingSummary);
 
             let orderCosts = 0;
@@ -92,6 +90,7 @@ export const GET: APIRoute = async ({ request }) => {
             let orderPaymentFees = 0;
             let orderTaxes = 0;
             let orderEstimatedCosts = 0;
+            let orderShippingFees = 0;
             for (const item of order.items) {
                 const itemRevenue = Number(item.netRevenue ?? item.subtotal);
                 ingresosProductos += itemRevenue;
@@ -110,6 +109,7 @@ export const GET: APIRoute = async ({ request }) => {
                     marketplaceFees: 0,
                     paymentFees: 0,
                     taxes: 0,
+                    shippingCosts: 0,
                     estimatedCosts: 0,
                 };
                 productSummary.units += item.quantity;
@@ -137,6 +137,19 @@ export const GET: APIRoute = async ({ request }) => {
                     costSummary.totalAmount += amount;
                     costSummary.isEstimated = costSummary.isEstimated || isEstimated;
                     breakdownCosts.set(costKey, costSummary);
+
+                    if (isEstimated) {
+                        totalEstimatedCosts += amount;
+                        productSummary.estimatedCosts += amount;
+                        orderEstimatedCosts += amount;
+                    }
+
+                    if (category === 'shipping_fee') {
+                        orderShippingFees += amount;
+                        productSummary.shippingCosts += amount;
+                        productSummary.costos += amount;
+                        continue;
+                    }
 
                     totalCostos += amount;
                     orderCosts += amount;
@@ -168,14 +181,16 @@ export const GET: APIRoute = async ({ request }) => {
                         productSummary.taxes += amount;
                         orderTaxes += amount;
                     }
-                    if (isEstimated) {
-                        totalEstimatedCosts += amount;
-                        productSummary.estimatedCosts += amount;
-                        orderEstimatedCosts += amount;
-                    }
                 }
                 breakdownProducts.set(productKey, productSummary);
             }
+
+            if (order.salesChannel === 'mercadolibre') {
+                costoRealEnvio = orderShippingFees;
+            }
+            totalEnviosCostosReales += costoRealEnvio;
+            shippingSummary.costoReal += costoRealEnvio;
+            breakdownShipping.set(zoneName, shippingSummary);
 
             const channelSummary = breakdownChannels.get(order.salesChannel) || { orders: 0, ingresos: 0, costos: 0, neto: 0 };
             channelSummary.orders += 1;

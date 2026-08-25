@@ -632,6 +632,7 @@ export const meliOrders = pgTable('meli_orders', {
     mlCommissionAmount: decimal('ml_commission_amount', { precision: 10, scale: 2 }),
     taxesAmount: decimal('taxes_amount', { precision: 10, scale: 2 }).default('0'),
     mpFeeAmount: decimal('mp_fee_amount', { precision: 10, scale: 2 }).default('0'),
+    shippingSellerCost: decimal('shipping_seller_cost', { precision: 12, scale: 2 }).default('0'),
     mappingStatus: varchar('mapping_status', { length: 30 }).notNull().default('pending'), // pending | mapped | unmatched
     financialStatus: varchar('financial_status', { length: 30 }).notNull().default('provisional'),
     currency: varchar('currency', { length: 10 }).default('ARS'),
@@ -645,6 +646,7 @@ export const meliOrders = pgTable('meli_orders', {
         productId: number | null;
         packQuantity: number;
         internalUnits: number;
+        saleFeePerUnit?: number;
         saleFee: number;
     }>>(),
     paymentId: varchar('payment_id', { length: 50 }),

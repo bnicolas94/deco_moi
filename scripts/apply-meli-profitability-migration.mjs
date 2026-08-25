@@ -12,8 +12,11 @@ if (envPath) {
   loadEnv({ path: envPath, override: false, quiet: true });
 }
 
-const migrationPath = new URL('../drizzle/migrations/0004_meli_profitability.sql', import.meta.url);
-const sql = fs.readFileSync(migrationPath, 'utf8');
+const migrationPaths = [
+  new URL('../drizzle/migrations/0004_meli_profitability.sql', import.meta.url),
+  new URL('../drizzle/migrations/0005_meli_financial_model.sql', import.meta.url),
+];
+const sql = migrationPaths.map((migrationPath) => fs.readFileSync(migrationPath, 'utf8')).join('\n');
 
 const forbiddenStatements = [
   /\bDROP\s+(TABLE|COLUMN|SCHEMA|DATABASE)\b/i,
@@ -82,17 +85,17 @@ try {
         (table_name = 'orders' AND column_name IN ('sales_channel', 'external_order_id', 'financial_status'))
         OR (table_name = 'order_items' AND column_name IN ('internal_units', 'net_revenue', 'pack_quantity'))
         OR (table_name = 'order_item_costs' AND column_name IN ('cost_code', 'category', 'affects_profit'))
-        OR (table_name = 'meli_orders' AND column_name IN ('mapping_status', 'financial_status', 'taxes_amount'))
+        OR (table_name = 'meli_orders' AND column_name IN ('mapping_status', 'financial_status', 'taxes_amount', 'shipping_seller_cost'))
       )
   `);
-  if (verification.rows[0].count !== 12) {
-    throw new Error(`La verificación del esquema encontró ${verification.rows[0].count}/12 columnas esperadas.`);
+  if (verification.rows[0].count !== 13) {
+    throw new Error(`La verificación del esquema encontró ${verification.rows[0].count}/13 columnas esperadas.`);
   }
 
   await client.query('COMMIT');
   console.log('Migración aplicada correctamente dentro de una transacción.');
   console.log('Conteos preservados:', before);
-  console.log('Columnas verificadas: 12/12.');
+  console.log('Columnas verificadas: 13/13.');
 } catch (error) {
   await client.query('ROLLBACK').catch(() => undefined);
   console.error('Migración revertida:', error.message);

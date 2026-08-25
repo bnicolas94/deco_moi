@@ -17,6 +17,8 @@ export interface MeliOrderResponse {
     date_created: string;
     date_closed: string;
     total_amount: number;
+    paid_amount?: number;
+    marketplace_fee?: number;
     currency_id: string;
     buyer: {
         id: number;
@@ -50,7 +52,7 @@ export interface MeliOrderResponse {
     shipping: {
         id: number;
         status: string;
-    };
+    } | null;
     taxes?: {
         amount?: number;
         currency_id?: string;

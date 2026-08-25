@@ -251,6 +251,7 @@ const statusLabel = (status: string) => ({
               <dl class="space-y-2 text-sm">
                 <div class="flex justify-between gap-4"><dt class="text-slate-500">Venta bruta</dt><dd class="font-semibold text-slate-800 dark:text-slate-100">{money(order.totalAmount)}</dd></div>
                 <div class="flex justify-between gap-4"><dt class="text-slate-500">Comisión ML</dt><dd class="font-medium text-rose-600">− {money(order.mlCommissionAmount)}</dd></div>
+                {Number(order.shippingSellerCost || 0) > 0 && <div class="flex justify-between gap-4"><dt class="text-slate-500">Costo Mercado Envíos</dt><dd class="font-medium text-rose-600">− {money(order.shippingSellerCost)}</dd></div>}
                 {Number(order.mpFeeAmount || 0) > 0 && <div class="flex justify-between gap-4"><dt class="text-slate-500">Comisión MP</dt><dd class="font-medium text-rose-600">− {money(order.mpFeeAmount)}</dd></div>}
                 <div class="flex justify-between gap-4"><dt class="text-slate-500">Impuestos / IIBB</dt><dd class="font-medium text-orange-600">− {money(order.taxesAmount)}</dd></div>
                 <div class="mt-3 flex justify-between gap-4 border-t border-slate-200 pt-3 dark:border-slate-700"><dt class="font-semibold text-slate-700 dark:text-slate-200">Neto ML</dt><dd class="text-base font-bold text-emerald-600">{money(order.netAmount)}</dd></div>
