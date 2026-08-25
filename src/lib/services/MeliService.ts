@@ -556,66 +556,70 @@ export class MeliService {
         orderData: any,
         statuses: ReturnType<typeof MeliService.getInternalStatuses>,
         config: any,
-        financials: MarketplaceOrderFinancials
+        financials: MarketplaceOrderFinancials,
+        database: any
     ) {
         const desiredItems = this.buildInternalItemsInput(internalOrder.id, resolvedItems, orderData);
         const lineSubtotal = desiredItems.reduce((sum, item) => sum + Number(item.subtotal), 0);
         const discountAmount = Math.max(0, lineSubtotal - Number(orderData.total_amount || 0));
 
-        await db.transaction(async (tx) => {
-            await tx.update(orders).set({
-                status: statuses.orderStatus,
-                paymentStatus: statuses.paymentStatus,
-                externalStatus: orderData.status,
-                paidAt: statuses.paidAt,
-                cancelledAt: statuses.cancelledAt,
-                subtotal: String(lineSubtotal),
-                discountAmount: String(discountAmount),
-                total: String(orderData.total_amount),
-                shippingMethod: orderData.shipping?.id ? 'delivery' : 'pickup',
-                shippingData: orderData.shipping ? { mercadoLibre: orderData.shipping } : null,
-                updatedAt: new Date(),
-            }).where(eq(orders.id, internalOrder.id));
+        const tx = database;
+        await tx.update(orders).set({
+            status: statuses.orderStatus,
+            paymentStatus: statuses.paymentStatus,
+            externalStatus: orderData.status,
+            paidAt: statuses.paidAt,
+            cancelledAt: statuses.cancelledAt,
+            subtotal: String(lineSubtotal),
+            discountAmount: String(discountAmount),
+            total: String(orderData.total_amount),
+            shippingMethod: orderData.shipping?.id ? 'delivery' : 'pickup',
+            shippingData: orderData.shipping ? { mercadoLibre: orderData.shipping } : null,
+            updatedAt: new Date(),
+        }).where(eq(orders.id, internalOrder.id));
 
-            const existingItems = await tx.select().from(orderItems).where(eq(orderItems.orderId, internalOrder.id));
-            const syncPlan = planOrderItemSync(existingItems, resolvedItems);
-            const existingById = new Map(existingItems.map(item => [item.id, item]));
-            const synchronizedItems: Array<typeof orderItems.$inferSelect> = [];
-            const preserveSnapshotItems: Array<typeof orderItems.$inferSelect> = [];
-            const rebuildSnapshotItems: Array<typeof orderItems.$inferSelect> = [];
+        const existingItems: Array<typeof orderItems.$inferSelect> = await tx.select()
+            .from(orderItems)
+            .where(eq(orderItems.orderId, internalOrder.id));
+        const syncPlan = planOrderItemSync(existingItems, resolvedItems);
+        const existingById = new Map<number, typeof orderItems.$inferSelect>(
+            existingItems.map(item => [item.id, item])
+        );
+        const synchronizedItems: Array<typeof orderItems.$inferSelect> = [];
+        const preserveSnapshotItems: Array<typeof orderItems.$inferSelect> = [];
+        const rebuildSnapshotItems: Array<typeof orderItems.$inferSelect> = [];
 
-            for (const match of syncPlan.matches) {
-                const existingItem = existingById.get(match.existingId)!;
-                const desiredItem = desiredItems[match.desiredIndex];
-                const productChanged = existingItem.productId !== desiredItem.productId;
-                const [updatedItem] = await tx.update(orderItems)
-                    .set(desiredItem)
-                    .where(eq(orderItems.id, existingItem.id))
-                    .returning();
-                synchronizedItems.push(updatedItem);
-                if (productChanged) rebuildSnapshotItems.push(updatedItem);
-                else preserveSnapshotItems.push(updatedItem);
-            }
+        for (const match of syncPlan.matches) {
+            const existingItem = existingById.get(match.existingId)!;
+            const desiredItem = desiredItems[match.desiredIndex];
+            const productChanged = existingItem.productId !== desiredItem.productId;
+            const [updatedItem] = await tx.update(orderItems)
+                .set(desiredItem)
+                .where(eq(orderItems.id, existingItem.id))
+                .returning();
+            synchronizedItems.push(updatedItem);
+            if (productChanged) rebuildSnapshotItems.push(updatedItem);
+            else preserveSnapshotItems.push(updatedItem);
+        }
 
-            for (const desiredIndex of syncPlan.insertIndexes) {
-                const [insertedItem] = await tx.insert(orderItems).values(desiredItems[desiredIndex]).returning();
-                synchronizedItems.push(insertedItem);
-                rebuildSnapshotItems.push(insertedItem);
-            }
+        for (const desiredIndex of syncPlan.insertIndexes) {
+            const [insertedItem] = await tx.insert(orderItems).values(desiredItems[desiredIndex]).returning();
+            synchronizedItems.push(insertedItem);
+            rebuildSnapshotItems.push(insertedItem);
+        }
 
-            if (syncPlan.staleExistingIds.length > 0) {
-                await tx.delete(orderItemCosts).where(inArray(orderItemCosts.orderItemId, syncPlan.staleExistingIds));
-                await tx.delete(orderItems).where(inArray(orderItems.id, syncPlan.staleExistingIds));
-            }
+        if (syncPlan.staleExistingIds.length > 0) {
+            await tx.delete(orderItemCosts).where(inArray(orderItemCosts.orderItemId, syncPlan.staleExistingIds));
+            await tx.delete(orderItems).where(inArray(orderItems.id, syncPlan.staleExistingIds));
+        }
 
-            await CostSnapshotService.rescaleExistingCosts(preserveSnapshotItems, tx);
-            await CostSnapshotService.replaceConfiguredCosts(rebuildSnapshotItems, 'mercadolibre', {
-                database: tx,
-                effectiveAt: new Date(orderData.date_created),
-            });
-            await this.replaceMarketplaceCosts(synchronizedItems, resolvedItems, orderData, config, financials, tx);
-            await tx.update(meliOrders).set({ internalOrderId: internalOrder.id }).where(eq(meliOrders.id, meliOrder.id));
+        await CostSnapshotService.rescaleExistingCosts(preserveSnapshotItems, tx);
+        await CostSnapshotService.replaceConfiguredCosts(rebuildSnapshotItems, 'mercadolibre', {
+            database: tx,
+            effectiveAt: new Date(orderData.date_created),
         });
+        await this.replaceMarketplaceCosts(synchronizedItems, resolvedItems, orderData, config, financials, tx);
+        await tx.update(meliOrders).set({ internalOrderId: internalOrder.id }).where(eq(meliOrders.id, meliOrder.id));
     }
 
     static async importOrder(meliOrderId: string): Promise<{
@@ -626,7 +630,7 @@ export class MeliService {
         error?: string;
     }> {
         try {
-            const existing = await db.select().from(meliOrders).where(eq(meliOrders.meliOrderId, meliOrderId)).limit(1);
+            // External calls and read-only resolution happen before opening the DB transaction.
             const orderData = await getMeliOrder(meliOrderId);
             const configData = await db.select().from(meliPricingConfig).where(eq(meliPricingConfig.scope, 'global')).limit(1);
             const config = configData[0] as any;
@@ -642,29 +646,13 @@ export class MeliService {
                 - financials.taxesAmount
                 - financials.shippingSellerCost;
 
-            const [meliOrder] = await db.insert(meliOrders).values({
-                meliOrderId: String(orderData.id),
-                internalOrderId: existing[0]?.internalOrderId || null,
-                status: orderData.status,
-                buyerNickname: orderData.buyer.nickname,
-                buyerEmail: orderData.buyer.email,
-                totalAmount: String(orderData.total_amount),
-                netAmount: String(netAmount),
-                mlCommissionAmount: String(financials.marketplaceFeeAmount),
-                taxesAmount: String(financials.taxesAmount),
-                shippingSellerCost: String(financials.shippingSellerCost),
-                currency: orderData.currency_id,
-                items: resolvedItems.map(({ variantId: _variantId, grossPrice: _grossPrice, ...item }) => item),
-                paymentId: primaryPayment?.id ? String(primaryPayment.id) : null,
-                shippingId: orderData.shipping?.id ? String(orderData.shipping.id) : null,
-                mappingStatus,
-                financialStatus: existing[0]?.financialStatus || 'provisional',
-                dateCreated: new Date(orderData.date_created),
-                rawData: orderData,
-                updatedAt: new Date(),
-            }).onConflictDoUpdate({
-                target: meliOrders.meliOrderId,
-                set: {
+            const persistence = await db.transaction(async (tx) => {
+                const existing = await tx.select().from(meliOrders)
+                    .where(eq(meliOrders.meliOrderId, meliOrderId))
+                    .limit(1);
+                const [meliOrder] = await tx.insert(meliOrders).values({
+                    meliOrderId: String(orderData.id),
+                    internalOrderId: existing[0]?.internalOrderId || null,
                     status: orderData.status,
                     buyerNickname: orderData.buyer.nickname,
                     buyerEmail: orderData.buyer.email,
@@ -678,100 +666,122 @@ export class MeliService {
                     paymentId: primaryPayment?.id ? String(primaryPayment.id) : null,
                     shippingId: orderData.shipping?.id ? String(orderData.shipping.id) : null,
                     mappingStatus,
+                    financialStatus: existing[0]?.financialStatus || 'provisional',
+                    dateCreated: new Date(orderData.date_created),
                     rawData: orderData,
                     updatedAt: new Date(),
-                }
-            }).returning();
-
-            let internalOrder = meliOrder.internalOrderId
-                ? await db.select().from(orders).where(eq(orders.id, meliOrder.internalOrderId)).limit(1).then(rows => rows[0])
-                : await db.select().from(orders).where(and(
-                    eq(orders.salesChannel, 'mercadolibre'),
-                    eq(orders.externalOrderId, String(orderData.id))
-                )).limit(1).then(rows => rows[0]);
-            let internalCreated = false;
-
-            if (internalOrder) {
-                if (mappingStatus === 'mapped') {
-                    await this.syncExistingInternalOrder(
-                        internalOrder,
-                        meliOrder,
-                        resolvedItems,
-                        orderData,
-                        statuses,
-                        config,
-                        financials
-                    );
-                } else {
-                    await db.update(orders).set({
-                        status: statuses.orderStatus,
-                        paymentStatus: statuses.paymentStatus,
-                        externalStatus: orderData.status,
-                        paidAt: statuses.paidAt,
-                        cancelledAt: statuses.cancelledAt,
-                        total: String(orderData.total_amount),
+                }).onConflictDoUpdate({
+                    target: meliOrders.meliOrderId,
+                    set: {
+                        status: orderData.status,
+                        buyerNickname: orderData.buyer.nickname,
+                        buyerEmail: orderData.buyer.email,
+                        totalAmount: String(orderData.total_amount),
+                        netAmount: String(netAmount),
+                        mlCommissionAmount: String(financials.marketplaceFeeAmount),
+                        taxesAmount: String(financials.taxesAmount),
+                        shippingSellerCost: String(financials.shippingSellerCost),
+                        currency: orderData.currency_id,
+                        items: resolvedItems.map(({ variantId: _variantId, grossPrice: _grossPrice, ...item }) => item),
+                        paymentId: primaryPayment?.id ? String(primaryPayment.id) : null,
+                        shippingId: orderData.shipping?.id ? String(orderData.shipping.id) : null,
+                        mappingStatus,
+                        rawData: orderData,
                         updatedAt: new Date(),
-                    }).where(eq(orders.id, internalOrder.id));
-                    await db.update(meliOrders).set({ internalOrderId: internalOrder.id }).where(eq(meliOrders.id, meliOrder.id));
-                }
-            } else if (statuses.isPaid && mappingStatus === 'mapped') {
-                const internalOrderId = crypto.randomUUID();
-                const lineSubtotal = resolvedItems.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
-                const discountAmount = Math.max(0, lineSubtotal - Number(orderData.total_amount));
-                [internalOrder] = await db.insert(orders).values({
-                    id: internalOrderId,
-                    orderNumber: `ML-${orderData.id}`,
-                    status: statuses.orderStatus,
-                    subtotal: String(lineSubtotal),
-                    discountAmount: String(discountAmount),
-                    shippingCost: '0',
-                    total: String(orderData.total_amount),
-                    paymentMethod: 'mercadopago',
-                    paymentStatus: statuses.paymentStatus,
-                    salesChannel: 'mercadolibre',
-                    externalOrderId: String(orderData.id),
-                    externalStatus: orderData.status,
-                    financialStatus: 'provisional',
-                    paidAt: statuses.paidAt,
-                    cancelledAt: statuses.cancelledAt,
-                    shippingMethod: orderData.shipping?.id ? 'delivery' : 'pickup',
-                    shippingData: orderData.shipping ? { mercadoLibre: orderData.shipping } : null,
-                    notes: `Venta importada desde Mercado Libre #${orderData.id}`,
-                    createdAt: new Date(orderData.date_created),
-                    updatedAt: new Date(),
+                    }
                 }).returning();
 
-                const internalItemsInput = this.buildInternalItemsInput(internalOrder.id, resolvedItems, orderData);
-                const insertedItems = await db.insert(orderItems).values(internalItemsInput).returning();
-                await CostSnapshotService.replaceConfiguredCosts(insertedItems, 'mercadolibre', {
-                    effectiveAt: new Date(orderData.date_created),
-                });
-                await this.replaceMarketplaceCosts(insertedItems, resolvedItems, orderData, config, financials);
+                let internalOrder = meliOrder.internalOrderId
+                    ? await tx.select().from(orders).where(eq(orders.id, meliOrder.internalOrderId)).limit(1).then(rows => rows[0])
+                    : await tx.select().from(orders).where(and(
+                        eq(orders.salesChannel, 'mercadolibre'),
+                        eq(orders.externalOrderId, String(orderData.id))
+                    )).limit(1).then(rows => rows[0]);
+                let internalCreated = false;
 
-                if (primaryPayment?.id) {
-                    await db.insert(payments).values({
-                        orderId: internalOrder.id,
-                        method: 'mercadopago',
-                        status: statuses.paymentStatus,
-                        amount: String(primaryPayment.total_paid_amount || primaryPayment.transaction_amount || orderData.total_amount),
-                        transactionId: String(primaryPayment.id),
-                        metadata: { source: 'mercadolibre', orderId: orderData.id },
+                if (internalOrder) {
+                    if (mappingStatus === 'mapped') {
+                        await this.syncExistingInternalOrder(
+                            internalOrder,
+                            meliOrder,
+                            resolvedItems,
+                            orderData,
+                            statuses,
+                            config,
+                            financials,
+                            tx
+                        );
+                    } else {
+                        await tx.update(orders).set({
+                            status: statuses.orderStatus,
+                            paymentStatus: statuses.paymentStatus,
+                            externalStatus: orderData.status,
+                            paidAt: statuses.paidAt,
+                            cancelledAt: statuses.cancelledAt,
+                            total: String(orderData.total_amount),
+                            updatedAt: new Date(),
+                        }).where(eq(orders.id, internalOrder.id));
+                        await tx.update(meliOrders).set({ internalOrderId: internalOrder.id }).where(eq(meliOrders.id, meliOrder.id));
+                    }
+                } else if (statuses.isPaid && mappingStatus === 'mapped') {
+                    const lineSubtotal = resolvedItems.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
+                    const discountAmount = Math.max(0, lineSubtotal - Number(orderData.total_amount));
+                    [internalOrder] = await tx.insert(orders).values({
+                        id: crypto.randomUUID(),
+                        orderNumber: `ML-${orderData.id}`,
+                        status: statuses.orderStatus,
+                        subtotal: String(lineSubtotal),
+                        discountAmount: String(discountAmount),
+                        shippingCost: '0',
+                        total: String(orderData.total_amount),
+                        paymentMethod: 'mercadopago',
+                        paymentStatus: statuses.paymentStatus,
+                        salesChannel: 'mercadolibre',
+                        externalOrderId: String(orderData.id),
+                        externalStatus: orderData.status,
+                        financialStatus: 'provisional',
+                        paidAt: statuses.paidAt,
+                        cancelledAt: statuses.cancelledAt,
+                        shippingMethod: orderData.shipping?.id ? 'delivery' : 'pickup',
+                        shippingData: orderData.shipping ? { mercadoLibre: orderData.shipping } : null,
+                        notes: `Venta importada desde Mercado Libre #${orderData.id}`,
+                        createdAt: new Date(orderData.date_created),
+                        updatedAt: new Date(),
+                    }).returning();
+
+                    const internalItemsInput = this.buildInternalItemsInput(internalOrder.id, resolvedItems, orderData);
+                    const insertedItems = await tx.insert(orderItems).values(internalItemsInput).returning();
+                    await CostSnapshotService.replaceConfiguredCosts(insertedItems, 'mercadolibre', {
+                        database: tx,
+                        effectiveAt: new Date(orderData.date_created),
                     });
+                    await this.replaceMarketplaceCosts(insertedItems, resolvedItems, orderData, config, financials, tx);
+                    if (primaryPayment?.id) {
+                        await tx.insert(payments).values({
+                            orderId: internalOrder.id,
+                            method: 'mercadopago',
+                            status: statuses.paymentStatus,
+                            amount: String(primaryPayment.total_paid_amount || primaryPayment.transaction_amount || orderData.total_amount),
+                            transactionId: String(primaryPayment.id),
+                            metadata: { source: 'mercadolibre', orderId: orderData.id },
+                        });
+                    }
+                    await tx.update(meliOrders).set({ internalOrderId: internalOrder.id }).where(eq(meliOrders.id, meliOrder.id));
+                    internalCreated = true;
                 }
 
-                await db.update(meliOrders).set({ internalOrderId: internalOrder.id }).where(eq(meliOrders.id, meliOrder.id));
-                internalCreated = true;
-            }
-
-            await db.insert(meliSyncLog).values({
-                type: 'order_import',
-                direction: 'pull',
-                meliOrderId: String(orderData.id),
-                status: 'success',
-                details: { mappingStatus, internalOrderId: internalOrder?.id || null, created: existing.length === 0 },
+                const created = existing.length === 0;
+                await tx.insert(meliSyncLog).values({
+                    type: 'order_import',
+                    direction: 'pull',
+                    meliOrderId: String(orderData.id),
+                    status: 'success',
+                    details: { mappingStatus, internalOrderId: internalOrder?.id || null, created },
+                });
+                return { created, internalCreated };
             });
 
-            return { success: true, created: existing.length === 0, internalCreated, mappingStatus };
+            return { success: true, ...persistence, mappingStatus };
         } catch (e: any) {
             console.error(`Error importing order ${meliOrderId}`, e);
             await db.insert(meliSyncLog).values({

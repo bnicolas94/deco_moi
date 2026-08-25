@@ -14,6 +14,7 @@
 10. Solo se consultan órdenes no conciliadas, en lotes de hasta 60 y comenzando por las menos recientemente procesadas.
 11. Una respuesta HTTP `206` se marca como parcial y se reintenta más adelante sin reemplazar costos con información incompleta.
 12. Costos, insumos y asociaciones se versionan automáticamente; las nuevas importaciones usan la versión vigente en la fecha de venta.
+13. Toda la persistencia local de una importación se confirma en una única transacción; si falla la orden, sus ítems, costos, pago o vínculo, se revierte el conjunto completo y solo queda el log de error.
 
 Las ventas pagadas sin vínculo permanecen visibles en el módulo de ML y generan una alerta en Rentabilidad. Al crear o cambiar un vínculo se reprocesan automáticamente todas las órdenes importadas afectadas, incluso las que ya estaban en Rentabilidad. Las líneas existentes conservan su identidad y sus cargos conciliados; si solo cambia el pack, los costos internos se reescalan usando el valor unitario que ya estaba congelado.
 
