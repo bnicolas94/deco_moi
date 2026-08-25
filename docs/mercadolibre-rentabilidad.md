@@ -10,7 +10,9 @@
 6. Se registra el `marketplace_fee` total informado por la orden; si no está disponible, se usa `sale_fee` por unidad multiplicado por la cantidad.
 7. Se consulta el costo vendedor de Mercado Envíos y, si el shipment todavía no lo informa, se conserva una estimación claramente identificada.
 8. Rentabilidad incluye la operación y permite filtrar App, Mercado Libre o ambos.
-9. La conciliación de cargos sustituye el cargo operativo por detalles de facturación cuando ML los publica.
+9. La conciliación de cargos procesa `results[].details` por orden y sustituye estimaciones por detalles de facturación cuando ML los publica.
+10. Solo se consultan órdenes no conciliadas, en lotes de hasta 60 y comenzando por las menos recientemente procesadas.
+11. Una respuesta HTTP `206` se marca como parcial y se reintenta más adelante sin reemplazar costos con información incompleta.
 
 Las ventas pagadas sin vínculo permanecen visibles en el módulo de ML y generan una alerta en Rentabilidad. Al vincular la publicación se reprocesan automáticamente.
 
@@ -23,6 +25,7 @@ Las ventas pagadas sin vínculo permanecen visibles en el módulo de ML y genera
 - **Impuestos / IIBB:** valor informado por la orden o estimación configurada; el detalle de facturación puede reemplazarlo.
 - **Provisional:** contiene uno o más valores estimados o todavía no fue conciliado.
 - **Conciliado:** los detalles de facturación disponibles fueron registrados.
+- **Detalle parcial:** Mercado Libre respondió con información incompleta; se conservan los costos existentes hasta el próximo intento.
 
 ## Configuración
 

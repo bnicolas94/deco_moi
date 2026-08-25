@@ -12,7 +12,7 @@ export interface Order {
     salesChannel?: 'app' | 'mercadolibre';
     externalOrderId?: string | null;
     externalStatus?: string | null;
-    financialStatus?: 'provisional' | 'reconciled';
+    financialStatus?: 'provisional' | 'partially_reconciled' | 'reconciled';
     shippingData: ShippingData | null;
     notes: string | null;
     customizationDetails: Record<string, any> | null;

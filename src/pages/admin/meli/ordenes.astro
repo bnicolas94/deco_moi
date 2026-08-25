@@ -204,7 +204,7 @@ const statusLabel = (status: string) => ({
               ) : order.status === 'paid' ? (
                 <span class="inline-flex rounded-full bg-sky-100 px-2.5 py-1 text-xs font-bold text-sky-700">Lista para procesar</span>
               ) : null}
-              <span class={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${order.financialStatus === 'reconciled' ? 'bg-sky-100 text-sky-700' : 'bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-300'}`}>{order.financialStatus === 'reconciled' ? 'Cargos reales' : 'Valores estimados'}</span>
+              <span class={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${order.financialStatus === 'reconciled' ? 'bg-sky-100 text-sky-700' : order.financialStatus === 'partially_reconciled' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-300'}`}>{order.financialStatus === 'reconciled' ? 'Cargos reales' : order.financialStatus === 'partially_reconciled' ? 'Detalle parcial' : 'Valores estimados'}</span>
             </div>
           </div>
 
@@ -459,7 +459,7 @@ const statusLabel = (status: string) => ({
         const response = await fetch('/api/meli/reconcile', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
         const result = await response.json();
         if (!response.ok) throw new Error(result.error || 'No se pudieron consultar los cargos facturados');
-        alert(`Conciliación terminada: ${result.data.reconciled} órdenes conciliadas y ${result.data.skipped} todavía sin detalle de facturación.`);
+        alert(`Conciliación terminada: ${result.data.reconciled} órdenes conciliadas, ${result.data.partial || 0} con información parcial para reintentar y ${result.data.skipped} todavía sin detalle de facturación.`);
         window.location.reload();
       } catch (error) {
         alert(error.message || 'Error conciliando cargos');
