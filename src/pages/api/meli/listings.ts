@@ -3,6 +3,7 @@ import { db } from '../../../lib/db/connection';
 import { meliCredentials, meliItemLinks, products, costItems, productCostItems } from '../../../lib/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { getAllSellerItems } from '../../../lib/integrations/mercadolibre/items';
+import { getMeliVariationSku } from '../../../lib/integrations/mercadolibre/stock';
 
 export async function GET({ request }: APIContext) {
     try {
@@ -112,6 +113,7 @@ export async function GET({ request }: APIContext) {
             return {
                 id: meliItemId,
                 variationId: meliVariationId,
+                sellerSku: variationData ? getMeliVariationSku(variationData) : null,
                 title: variationData ? `${baseMLItem.title} - ${variationData.attribute_combinations?.map((c: any) => c.value_name).join(', ')}` : baseMLItem.title,
                 price: variationData ? variationData.price : baseMLItem.price,
                 available_quantity: variationData ? variationData.available_quantity : baseMLItem.available_quantity,

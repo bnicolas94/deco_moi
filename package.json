@@ -16,7 +16,7 @@
     "db:studio": "drizzle-kit studio",
     "migrate": "tsx scripts/migrate.ts",
     "security:secrets": "node scripts/check-secrets.mjs",
-    "test:profitability": "node --test tests/meli-pricing.test.ts tests/meli-financials.test.ts tests/meli-billing.test.ts tests/meli-order-sync.test.ts tests/cost-history.test.ts",
+    "test:profitability": "node --test tests/meli-pricing.test.ts tests/meli-financials.test.ts tests/meli-billing.test.ts tests/meli-order-sync.test.ts tests/cost-history.test.ts tests/meli-stock.test.ts",
     "db:migrate:meli-profitability": "node scripts/apply-meli-profitability-migration.mjs"
   },
   "dependencies": {

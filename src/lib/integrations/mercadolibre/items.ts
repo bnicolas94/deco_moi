@@ -50,9 +50,9 @@ export async function getListingPrices(price: number, listingType: string = 'gol
     return response.json();
 }
 
-export async function getMeliItem(itemId: string) {
+export async function getMeliItem(itemId: string, options: { includeAttributes?: boolean } = {}) {
     const token = await getValidAccessToken();
-    const url = `${API_BASE}/items/${itemId}`;
+    const url = `${API_BASE}/items/${itemId}${options.includeAttributes ? '?include_attributes=all' : ''}`;
 
     const response = await fetch(url, {
         headers: {
@@ -156,7 +156,7 @@ export async function getAllSellerItems(userId: string, limit: number = 50, offs
     const items: any[] = [];
     for (let i = 0; i < itemIds.length; i += 20) {
         const chunk = itemIds.slice(i, i + 20);
-        const itemsUrl = `${API_BASE}/items?ids=${chunk.join(',')}`;
+        const itemsUrl = `${API_BASE}/items?ids=${chunk.join(',')}&include_attributes=all`;
 
         const itemsRes = await fetch(itemsUrl, {
             headers: { Authorization: `Bearer ${token}` }

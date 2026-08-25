@@ -8,6 +8,8 @@ import {
     meliCredentials,
     products,
     productVariants,
+    variantGroups,
+    variantGroupOptions,
     orders,
     orderItems,
     orderItemCosts,
@@ -27,6 +29,11 @@ import {
     getSellerShippingCost,
 } from '../integrations/mercadolibre/financials';
 import { allocateOrderLineRevenue, planOrderItemSync } from '../integrations/mercadolibre/order-sync';
+import {
+    calculateMarketplaceStock,
+    resolveVariationStockSource,
+    type InternalStockSource,
+} from '../integrations/mercadolibre/stock';
 import type { MeliPricingConfigType } from '../integrations/mercadolibre/pricing';
 
 interface MarketplaceOrderFinancials {
@@ -186,51 +193,131 @@ export class MeliService {
         }
     }
 
-    static async syncStock(productId: number): Promise<{ success: boolean; error?: string }> {
-        try {
-            const productData = await db.select().from(products).where(eq(products.id, productId)).limit(1);
-            if (!productData.length) return { success: false, error: 'Product not found' };
+    static async syncStock(productId: number): Promise<{
+        success: boolean;
+        synced: number;
+        failed: number;
+        error?: string;
+        results?: Array<{ linkId: number; meliItemId: string; variationId: string | null; status: 'success' | 'error'; availableQuantity?: number; error?: string }>;
+    }> {
+        const productData = await db.select().from(products).where(eq(products.id, productId)).limit(1);
+        if (!productData.length) return { success: false, synced: 0, failed: 0, error: 'Product not found' };
 
-            const links = await db.select().from(meliItemLinks).where(and(eq(meliItemLinks.productId, productId), eq(meliItemLinks.syncEnabled, true)));
-            if (!links.length) {
-                return { success: false, error: 'Product not linked or sync disabled' };
+        const links = await db.select().from(meliItemLinks).where(and(eq(meliItemLinks.productId, productId), eq(meliItemLinks.syncEnabled, true)));
+        if (!links.length) {
+            return { success: false, synced: 0, failed: 0, error: 'Product not linked or sync disabled' };
+        }
+
+        const [legacyVariants, optionRows] = await Promise.all([
+            db.select({
+                id: productVariants.id,
+                sku: productVariants.sku,
+                stock: productVariants.stock,
+            }).from(productVariants).where(and(
+                eq(productVariants.productId, productId),
+                eq(productVariants.isActive, true)
+            )),
+            db.select({
+                id: variantGroupOptions.id,
+                sku: variantGroupOptions.sku,
+                stock: variantGroupOptions.stock,
+            }).from(variantGroupOptions)
+                .innerJoin(variantGroups, eq(variantGroupOptions.groupId, variantGroups.id))
+                .where(and(
+                    eq(variantGroups.productId, productId),
+                    eq(variantGroupOptions.isActive, true)
+                )),
+        ]);
+
+        const stockSources: InternalStockSource[] = [
+            {
+                id: productData[0].id,
+                sku: productData[0].sku,
+                stock: productData[0].stock,
+                source: 'product',
+            },
+            ...legacyVariants.map(variant => ({ ...variant, source: 'product_variant' as const })),
+            ...optionRows.map(option => ({ ...option, source: 'variant_option' as const })),
+        ];
+        const itemRequests = new Map<string, Promise<any>>();
+        const getItemWithVariations = (itemId: string) => {
+            let request = itemRequests.get(itemId);
+            if (!request) {
+                request = getMeliItem(itemId, { includeAttributes: true });
+                itemRequests.set(itemId, request);
             }
+            return request;
+        };
 
-            const stock = Number(productData[0].stock) || 0;
+        const results: Array<{ linkId: number; meliItemId: string; variationId: string | null; status: 'success' | 'error'; availableQuantity?: number; error?: string }> = [];
 
-            for (const link of links) {
+        for (const link of links) {
+            try {
+                const packQuantity = link.packQuantity ?? 1;
+                let stockSource = stockSources[0];
+
+                if (link.meliVariationId) {
+                    const mlItem = await getItemWithVariations(link.meliItemId);
+                    const variation = mlItem?.variations?.find((candidate: any) => String(candidate.id) === link.meliVariationId);
+                    if (!variation) {
+                        throw new Error(`No se encontró la variación ${link.meliVariationId} en Mercado Libre`);
+                    }
+                    stockSource = resolveVariationStockSource(variation, stockSources);
+                }
+
+                const availableQuantity = calculateMarketplaceStock(stockSource.stock, packQuantity);
                 await updateMeliItem(link.meliItemId, {
-                    available_quantity: stock,
+                    available_quantity: availableQuantity,
                     variationId: link.meliVariationId
                 });
 
+                const details = {
+                    variationId: link.meliVariationId,
+                    source: stockSource.source,
+                    sourceId: stockSource.id,
+                    sourceSku: stockSource.sku,
+                    internalStock: Number(stockSource.stock) || 0,
+                    packQuantity,
+                    availableQuantity,
+                };
                 await db.update(meliItemLinks).set({
-                    lastSyncedStock: stock,
+                    lastSyncedStock: availableQuantity,
                     lastSyncAt: new Date(),
                 }).where(eq(meliItemLinks.id, link.id));
-
                 await db.insert(meliSyncLog).values({
                     type: 'stock_sync',
                     direction: 'push',
                     productId,
                     meliItemId: link.meliItemId,
                     status: 'success',
-                    details: { variationId: link.meliVariationId }
+                    details,
                 });
+                results.push({ linkId: link.id, meliItemId: link.meliItemId, variationId: link.meliVariationId, status: 'success', availableQuantity });
+            } catch (error: any) {
+                const message = error instanceof Error ? error.message : String(error);
+                console.error(`[Meli Stock] Error sincronizando vínculo ${link.id}:`, error);
+                await db.insert(meliSyncLog).values({
+                    type: 'stock_sync',
+                    direction: 'push',
+                    productId,
+                    meliItemId: link.meliItemId,
+                    status: 'error',
+                    details: { variationId: link.meliVariationId, linkId: link.id },
+                    errorMessage: message,
+                });
+                results.push({ linkId: link.id, meliItemId: link.meliItemId, variationId: link.meliVariationId, status: 'error', error: message });
             }
-
-            return { success: true };
-        } catch (e: any) {
-            console.error(e);
-            await db.insert(meliSyncLog).values({
-                type: 'stock_sync',
-                direction: 'push',
-                productId,
-                status: 'error',
-                errorMessage: e.message
-            });
-            return { success: false, error: e.message };
         }
+
+        const synced = results.filter(result => result.status === 'success').length;
+        const failed = results.length - synced;
+        return {
+            success: failed === 0,
+            synced,
+            failed,
+            error: failed > 0 ? `${failed} de ${results.length} vínculos no pudieron sincronizarse` : undefined,
+            results,
+        };
     }
 
     // ── ORDERS IMPORT ─────────────────────────────────────────
