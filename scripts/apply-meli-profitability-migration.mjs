@@ -16,6 +16,7 @@ const migrationPaths = [
   new URL('../drizzle/migrations/0004_meli_profitability.sql', import.meta.url),
   new URL('../drizzle/migrations/0005_meli_financial_model.sql', import.meta.url),
   new URL('../drizzle/migrations/0006_cost_configuration_history.sql', import.meta.url),
+  new URL('../drizzle/migrations/0007_meli_order_import_queue.sql', import.meta.url),
 ];
 const sql = migrationPaths.map((migrationPath) => fs.readFileSync(migrationPath, 'utf8')).join('\n');
 
@@ -120,6 +121,16 @@ try {
   if (historyVerification.rows[0].tables !== 2 || historyVerification.rows[0].triggers !== 4) {
     throw new Error(`Historial de costos incompleto: ${historyVerification.rows[0].tables}/2 tablas y ${historyVerification.rows[0].triggers}/4 triggers.`);
   }
+  const queueVerification = await client.query(`
+    SELECT
+      (SELECT COUNT(*)::int FROM information_schema.tables
+       WHERE table_schema = 'public' AND table_name = 'meli_order_import_queue') AS tables,
+      (SELECT COUNT(*)::int FROM pg_indexes
+       WHERE schemaname = 'public' AND indexname = 'meli_order_import_queue_due_idx') AS indexes
+  `);
+  if (queueVerification.rows[0].tables !== 1 || queueVerification.rows[0].indexes !== 1) {
+    throw new Error(`Cola de órdenes ML incompleta: ${queueVerification.rows[0].tables}/1 tablas y ${queueVerification.rows[0].indexes}/1 índices.`);
+  }
   const openHistory = await client.query(`
     SELECT COUNT(*)::int AS count
     FROM cost_configuration_history
@@ -138,6 +149,7 @@ try {
   console.log('Conteos preservados:', before);
   console.log('Columnas verificadas: 13/13.');
   console.log('Historial de costos verificado: 2 tablas y 4 triggers.');
+  console.log('Cola de órdenes ML verificada: 1 tabla y 1 índice.');
   console.log(`Versiones históricas abiertas: ${openHistory.rows[0].count}/${expectedOpenHistory}.`);
 } catch (error) {
   await client.query('ROLLBACK').catch(() => undefined);

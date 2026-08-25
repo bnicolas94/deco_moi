@@ -1,35 +1,45 @@
 import type { APIRoute } from 'astro';
-import { processOrderWebhook } from '../../../lib/integrations/mercadolibre/webhooks';
-import { MeliService } from '../../../lib/services/MeliService';
+import { enqueueOrderWebhook, MeliWebhookValidationError } from '../../../lib/integrations/mercadolibre/webhooks';
+import { MeliOrderImportQueueService } from '../../../lib/services/MeliOrderImportQueueService';
 
 export const POST: APIRoute = async ({ request }) => {
     try {
         const payload = await request.json();
 
-        // Solo procesamos eventos de órdenes creadas/modificadas
-        if (payload.topic === 'orders_v2') {
-            try {
-                await processOrderWebhook(payload);
-
-                // Importar la orden usando el order_id que viene en el resource
-                const orderIdMatch = payload.resource?.match(/\/orders\/(\d+)/);
-                if (orderIdMatch && orderIdMatch[1]) {
-                    await MeliService.importOrder(orderIdMatch[1]);
-                }
-            } catch (innerErr) {
-                console.error('[Meli Webhook] Error interno procesando webhook:', innerErr);
-                // Aun si falla nuestra logica, ML requiere un 200 OK, sino reintenta enviar miles de veces
-            }
+        if (payload.topic !== 'orders_v2') {
+            return new Response(JSON.stringify({ received: true, ignored: true }), {
+                status: 200,
+                headers: { 'Content-Type': 'application/json' }
+            });
         }
 
-        return new Response(JSON.stringify({ received: true }), {
+        await enqueueOrderWebhook(payload);
+
+        // Best effort inmediato. La cola y el cron conservan el trabajo si el proceso se interrumpe.
+        setTimeout(() => {
+            void MeliOrderImportQueueService.processPending(1).catch(error => {
+                console.error('[Meli Webhook] Falló el procesamiento inmediato de la cola:', error);
+            });
+        }, 0);
+
+        return new Response(JSON.stringify({ received: true, queued: true }), {
             status: 200,
             headers: { 'Content-Type': 'application/json' }
         });
 
     } catch (err) {
+        if (err instanceof MeliWebhookValidationError) {
+            console.warn('[Meli Webhook] Notificación ignorada:', err.message);
+            return new Response(JSON.stringify({ received: true, ignored: true }), {
+                status: 200,
+                headers: { 'Content-Type': 'application/json' }
+            });
+        }
         console.error('[Meli Webhook] Error al recibir webhook:', err);
-        // Errores de parseo u otros => retornamos 200 igual para que ML no reintente locamente
-        return new Response(JSON.stringify({ error: 'invalid payload' }), { status: 200 });
+        // Si no pudimos persistir la notificación, pedimos un reintento a Mercado Libre.
+        return new Response(JSON.stringify({ error: 'notification_not_queued' }), {
+            status: 503,
+            headers: { 'Content-Type': 'application/json' }
+        });
     }
 };

@@ -1,13 +1,15 @@
 import type { APIRoute } from 'astro';
 import { MeliService } from '../../../lib/services/MeliService';
+import { BillingReconciliationService } from '../../../lib/services/BillingReconciliationService';
 
 export const POST: APIRoute = async () => {
     try {
         const result = await MeliService.importRecentOrders();
+        const reconciliation = await BillingReconciliationService.reconcilePendingOrders(60);
 
         return new Response(JSON.stringify({
             success: true,
-            data: result
+            data: { ...result, reconciliation }
         }), {
             status: 200,
             headers: { 'Content-Type': 'application/json' }

@@ -634,6 +634,22 @@ export const meliSyncLog = pgTable('meli_sync_log', {
     createdAt: timestamp('created_at').defaultNow(),
 });
 
+// Cola durable: el webhook confirma recepción rápido y el procesamiento se reintenta aparte.
+export const meliOrderImportQueue = pgTable('meli_order_import_queue', {
+    id: serial('id').primaryKey(),
+    meliOrderId: varchar('meli_order_id', { length: 50 }).notNull().unique(),
+    userId: varchar('user_id', { length: 50 }).notNull(),
+    status: varchar('status', { length: 20 }).notNull().default('pending'),
+    attempts: integer('attempts').notNull().default(0),
+    nextAttemptAt: timestamp('next_attempt_at').notNull().defaultNow(),
+    lastError: text('last_error'),
+    payload: json('payload').$type<Record<string, any>>(),
+    receivedAt: timestamp('received_at').notNull().defaultNow(),
+    processedAt: timestamp('processed_at'),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});
+
 // Tabla: órdenes de MercadoLibre (importadas)
 export const meliOrders = pgTable('meli_orders', {
     id: serial('id').primaryKey(),
