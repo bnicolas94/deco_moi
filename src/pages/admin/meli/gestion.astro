@@ -412,6 +412,9 @@ const allProducts = await db
           });
           const data = await res.json();
           if (data.success) {
+            if (data.reprocessErrors) {
+              alert(`El vínculo se guardó, pero ${data.reprocessErrors} órdenes no pudieron reprocesarse. Podés reintentarlo desde Importar recientes.`);
+            }
             await loadListings();
           } else {
             alert('Error: ' + data.error);

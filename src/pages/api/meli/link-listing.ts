@@ -1,7 +1,7 @@
 import type { APIContext } from 'astro';
 import { db } from '../../../lib/db/connection';
 import { meliItemLinks, meliOrders } from '../../../lib/db/schema';
-import { eq, and, isNull, ne } from 'drizzle-orm';
+import { eq, and, isNull } from 'drizzle-orm';
 import { getMeliItem } from '../../../lib/integrations/mercadolibre/items';
 import { MeliService } from '../../../lib/services/MeliService';
 
@@ -17,7 +17,14 @@ export async function POST({ request }: APIContext) {
             });
         }
 
-        const quantity = Number(packQuantity) || 1;
+        const parsedProductId = Number(productId);
+        const quantity = Math.max(1, Math.trunc(Number(packQuantity) || 1));
+        if (!Number.isInteger(parsedProductId) || parsedProductId <= 0) {
+            return new Response(JSON.stringify({ success: false, error: 'El producto seleccionado no es válido' }), {
+                status: 400,
+                headers: { 'Content-Type': 'application/json' }
+            });
+        }
 
         // Obtener info del item en ML para guardar el título también
         let meliTitle = '';
@@ -49,7 +56,7 @@ export async function POST({ request }: APIContext) {
         if (existing.length > 0) {
             // Ya existe un vínculo para esta publicación/variación, lo actualizamos con el nuevo productId
             await db.update(meliItemLinks).set({
-                productId: Number(productId),
+                productId: parsedProductId,
                 meliTitle: meliTitle || existing[0].meliTitle,
                 meliCategoryId: meliCategoryId || existing[0].meliCategoryId,
                 meliListingType: meliListingType || existing[0].meliListingType,
@@ -60,7 +67,7 @@ export async function POST({ request }: APIContext) {
         } else {
             // Nuevo link
             await db.insert(meliItemLinks).values({
-                productId: Number(productId),
+                productId: parsedProductId,
                 meliItemId,
                 meliVariationId: meliVariationId || null,
                 meliTitle,
@@ -71,17 +78,21 @@ export async function POST({ request }: APIContext) {
             });
         }
 
-        // Una venta que había quedado sin vincular puede entrar ahora en Rentabilidad.
-        const pendingOrders = await db.select().from(meliOrders).where(ne(meliOrders.mappingStatus, 'mapped'));
-        const affectedOrders = pendingOrders.filter(order => order.items?.some(item =>
+        // Reprocesamos también ventas ya vinculadas para actualizar producto, pack y snapshots.
+        const importedOrders = await db.select().from(meliOrders);
+        const affectedOrders = importedOrders.filter(order => order.items?.some(item =>
             item.meliItemId === meliItemId &&
             (!meliVariationId || item.variationId === String(meliVariationId))
         ));
-        for (const pendingOrder of affectedOrders) {
-            await MeliService.importOrder(pendingOrder.meliOrderId);
+        let reprocessedOrders = 0;
+        let reprocessErrors = 0;
+        for (const affectedOrder of affectedOrders) {
+            const outcome = await MeliService.importOrder(affectedOrder.meliOrderId);
+            if (outcome.success) reprocessedOrders++;
+            else reprocessErrors++;
         }
 
-        return new Response(JSON.stringify({ success: true, reprocessedOrders: affectedOrders.length }), {
+        return new Response(JSON.stringify({ success: true, reprocessedOrders, reprocessErrors }), {
             status: 200,
             headers: { 'Content-Type': 'application/json' }
         });

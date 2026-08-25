@@ -415,7 +415,9 @@ const statusLabel = (status: string) => ({
         });
         const result = await response.json();
         if (!response.ok || !result.success) throw new Error(result.error || 'No se pudo guardar el vínculo');
-        saveLink.textContent = `Listo · ${result.reprocessedOrders || 0} reprocesadas`;
+        saveLink.textContent = result.reprocessErrors
+          ? `Guardado · ${result.reprocessedOrders || 0} actualizadas, ${result.reprocessErrors} con error`
+          : `Listo · ${result.reprocessedOrders || 0} reprocesadas`;
         window.setTimeout(() => window.location.reload(), 650);
       } catch (error) {
         linkError.textContent = error.message || 'No se pudo guardar el vínculo';

@@ -33,18 +33,18 @@ export class CostSnapshotService {
      * Rebuilds the internal cost snapshot for sold items. External marketplace,
      * payment and tax rows are deliberately kept separate.
      */
-    static async replaceConfiguredCosts(items: CostSnapshotItem[], channel: SalesChannel): Promise<void> {
+    static async replaceConfiguredCosts(items: CostSnapshotItem[], channel: SalesChannel, database: any = db): Promise<void> {
         if (items.length === 0) return;
 
         const itemIds = items.map(item => item.id);
         const productIds = [...new Set(items.map(item => item.productId))];
 
-        await db.delete(orderItemCosts).where(and(
+        await database.delete(orderItemCosts).where(and(
             inArray(orderItemCosts.orderItemId, itemIds),
             inArray(orderItemCosts.source, ['configuration', 'production'])
         ));
 
-        const linkedCosts = await db.select({
+        const linkedCosts = await database.select({
             productId: productCostItems.productId,
             id: costItems.id,
             name: costItems.name,
@@ -58,12 +58,12 @@ export class CostSnapshotService {
             .innerJoin(costItems, eq(productCostItems.costItemId, costItems.id))
             .where(inArray(productCostItems.productId, productIds));
 
-        const globalCosts = await db.select().from(costItems).where(and(
+        const globalCosts = await database.select().from(costItems).where(and(
             eq(costItems.isActive, true),
             eq(costItems.isGlobal, true)
         ));
 
-        const linkedSupplies = await db.select({
+        const linkedSupplies = await database.select({
             productId: productSupplies.productId,
             supplyId: supplies.id,
             supplyName: supplies.name,
@@ -82,7 +82,7 @@ export class CostSnapshotService {
         for (const item of items) {
             const internalUnits = Number(item.internalUnits || item.quantity || 1);
             const revenueBase = Number(item.netRevenue ?? (Number(item.unitPrice) * item.quantity));
-            const productCosts = linkedCosts.filter(cost =>
+            const productCosts = linkedCosts.filter((cost: any) =>
                 cost.productId === item.productId &&
                 cost.isActive &&
                 appliesToChannel(cost.appliesToChannels, channel)
@@ -91,7 +91,7 @@ export class CostSnapshotService {
             const merged = [...productCosts];
             for (const globalCost of globalCosts) {
                 if (!appliesToChannel(globalCost.appliesToChannels, channel)) continue;
-                if (!merged.some(cost => cost.id === globalCost.id || cost.name === globalCost.name)) {
+                if (!merged.some((cost: any) => cost.id === globalCost.id || cost.name === globalCost.name)) {
                     merged.push({ productId: item.productId, ...globalCost });
                 }
             }
@@ -120,7 +120,7 @@ export class CostSnapshotService {
                 });
             }
 
-            for (const supply of linkedSupplies.filter(s => s.productId === item.productId && s.isActive)) {
+            for (const supply of linkedSupplies.filter((s: any) => s.productId === item.productId && s.isActive)) {
                 let quantityPerUnit = Number(supply.quantity);
                 if (supply.partsUsed && supply.partsTotal && Number(supply.partsTotal) !== 0) {
                     quantityPerUnit = Number(supply.partsUsed) / Number(supply.partsTotal);
@@ -146,7 +146,30 @@ export class CostSnapshotService {
         }
 
         if (rows.length > 0) {
-            await db.insert(orderItemCosts).values(rows);
+            await database.insert(orderItemCosts).values(rows);
+        }
+    }
+
+    /** Recalculates amounts using the unit values already frozen in the snapshot. */
+    static async rescaleExistingCosts(items: CostSnapshotItem[], database: any = db): Promise<void> {
+        if (items.length === 0) return;
+
+        const itemById = new Map(items.map(item => [item.id, item]));
+        const rows = await database.select().from(orderItemCosts).where(and(
+            inArray(orderItemCosts.orderItemId, items.map(item => item.id)),
+            inArray(orderItemCosts.source, ['configuration', 'production'])
+        ));
+
+        for (const row of rows) {
+            const item = itemById.get(row.orderItemId);
+            if (!item) continue;
+            const configuredValue = Number(row.configuredValue || 0);
+            const amount = row.costItemType === 'percentage'
+                ? Number(item.netRevenue ?? (Number(item.unitPrice) * item.quantity)) * configuredValue / 100
+                : configuredValue * Number(item.internalUnits || item.quantity || 1);
+            await database.update(orderItemCosts)
+                .set({ calculatedAmount: toMoney(amount) })
+                .where(eq(orderItemCosts.id, row.id));
         }
     }
 }
