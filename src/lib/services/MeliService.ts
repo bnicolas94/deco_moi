@@ -609,7 +609,10 @@ export class MeliService {
             }
 
             await CostSnapshotService.rescaleExistingCosts(preserveSnapshotItems, tx);
-            await CostSnapshotService.replaceConfiguredCosts(rebuildSnapshotItems, 'mercadolibre', tx);
+            await CostSnapshotService.replaceConfiguredCosts(rebuildSnapshotItems, 'mercadolibre', {
+                database: tx,
+                effectiveAt: new Date(orderData.date_created),
+            });
             await this.replaceMarketplaceCosts(synchronizedItems, resolvedItems, orderData, config, financials, tx);
             await tx.update(meliOrders).set({ internalOrderId: internalOrder.id }).where(eq(meliOrders.id, meliOrder.id));
         });
@@ -740,7 +743,9 @@ export class MeliService {
 
                 const internalItemsInput = this.buildInternalItemsInput(internalOrder.id, resolvedItems, orderData);
                 const insertedItems = await db.insert(orderItems).values(internalItemsInput).returning();
-                await CostSnapshotService.replaceConfiguredCosts(insertedItems, 'mercadolibre');
+                await CostSnapshotService.replaceConfiguredCosts(insertedItems, 'mercadolibre', {
+                    effectiveAt: new Date(orderData.date_created),
+                });
                 await this.replaceMarketplaceCosts(insertedItems, resolvedItems, orderData, config, financials);
 
                 if (primaryPayment?.id) {

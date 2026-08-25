@@ -457,6 +457,21 @@ export const productCostItems = pgTable('product_cost_items', {
     createdAt: timestamp('created_at').defaultNow(),
 });
 
+export const costHistoryMetadata = pgTable('cost_history_metadata', {
+    id: integer('id').primaryKey(),
+    trackingStartedAt: timestamp('tracking_started_at').notNull().defaultNow(),
+});
+
+export const costConfigurationHistory = pgTable('cost_configuration_history', {
+    id: serial('id').primaryKey(),
+    entityType: varchar('entity_type', { length: 40 }).notNull(),
+    entityKey: varchar('entity_key', { length: 80 }).notNull(),
+    snapshot: json('snapshot').$type<Record<string, any>>().notNull(),
+    validFrom: timestamp('valid_from').notNull(),
+    validTo: timestamp('valid_to'),
+    recordedAt: timestamp('recorded_at').notNull().defaultNow(),
+});
+
 export const shippingRealCosts = pgTable('shipping_real_costs', {
     id: serial('id').primaryKey(),
     zone: varchar('zone', { length: 150 }).notNull().unique(), // Ej: 'CABA', 'GBA', 'Centro'
