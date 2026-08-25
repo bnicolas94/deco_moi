@@ -3,6 +3,7 @@ import test from 'node:test';
 import {
     calculateMarketplaceStock,
     getMeliVariationSku,
+    isMeliStockPushEnabled,
     normalizePackQuantity,
     resolveVariationStockSource,
 } from '../src/lib/integrations/mercadolibre/stock.ts';
@@ -11,6 +12,13 @@ const sources = [
     { id: 1, sku: 'PRODUCTO-1', stock: 100, source: 'product' as const },
     { id: 10, sku: 'ROJO-M', stock: 27, source: 'product_variant' as const },
 ];
+
+test('mantiene deshabilitado el envío de stock salvo habilitación explícita', () => {
+    assert.equal(isMeliStockPushEnabled(undefined), false);
+    assert.equal(isMeliStockPushEnabled('false'), false);
+    assert.equal(isMeliStockPushEnabled('true'), true);
+    assert.equal(isMeliStockPushEnabled('1'), true);
+});
 
 test('publica sólo los packs completos disponibles', () => {
     assert.equal(calculateMarketplaceStock(27, 5), 5);

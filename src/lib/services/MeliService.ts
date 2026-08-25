@@ -31,6 +31,7 @@ import {
 import { allocateOrderLineRevenue, planOrderItemSync } from '../integrations/mercadolibre/order-sync';
 import {
     calculateMarketplaceStock,
+    isMeliStockPushEnabled,
     resolveVariationStockSource,
     type InternalStockSource,
 } from '../integrations/mercadolibre/stock';
@@ -197,9 +198,23 @@ export class MeliService {
         success: boolean;
         synced: number;
         failed: number;
+        disabled?: boolean;
         error?: string;
         results?: Array<{ linkId: number; meliItemId: string; variationId: string | null; status: 'success' | 'error'; availableQuantity?: number; error?: string }>;
     }> {
+        const stockPushEnabled = isMeliStockPushEnabled(
+            import.meta.env.MELI_STOCK_PUSH_ENABLED ?? process.env.MELI_STOCK_PUSH_ENABLED
+        );
+        if (!stockPushEnabled) {
+            return {
+                success: false,
+                synced: 0,
+                failed: 0,
+                disabled: true,
+                error: 'La publicación de stock está deshabilitada: Mercado Libre es la fuente de verdad',
+            };
+        }
+
         const productData = await db.select().from(products).where(eq(products.id, productId)).limit(1);
         if (!productData.length) return { success: false, synced: 0, failed: 0, error: 'Product not found' };
 

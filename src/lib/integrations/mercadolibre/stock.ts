@@ -19,6 +19,11 @@ export function normalizePackQuantity(value: unknown): number {
     return quantity;
 }
 
+export function isMeliStockPushEnabled(value: unknown): boolean {
+    if (typeof value !== 'string') return false;
+    return ['1', 'true', 'yes'].includes(value.trim().toLowerCase());
+}
+
 export function calculateMarketplaceStock(stock: unknown, packQuantity: unknown): number {
     const numericStock = Number(stock);
     if (!Number.isFinite(numericStock)) {

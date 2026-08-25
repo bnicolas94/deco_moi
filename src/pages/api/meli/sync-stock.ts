@@ -14,7 +14,7 @@ export const POST: APIRoute = async ({ request }) => {
         const result = await MeliService.syncStock(Number(body.productId));
 
         return new Response(JSON.stringify(result), {
-            status: result.success ? 200 : 400,
+            status: result.success ? 200 : (result.disabled ? 409 : 400),
             headers: { 'Content-Type': 'application/json' }
         });
     } catch (err: any) {

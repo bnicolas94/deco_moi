@@ -103,7 +103,7 @@ const allProducts = await db
             <tr>
               <th class="px-2 first:pl-5 last:pr-5 py-3 whitespace-nowrap w-16"><div class="font-semibold text-center">Img</div></th>
               <th class="px-2 first:pl-5 last:pr-5 py-3 whitespace-normal min-w-48"><div class="font-semibold text-left">Publicación en ML</div></th>
-              <th class="px-2 first:pl-5 last:pr-5 py-3 whitespace-nowrap"><div class="font-semibold text-center">Estado ML</div></th>
+              <th class="px-2 first:pl-5 last:pr-5 py-3 whitespace-nowrap"><div class="font-semibold text-center">Estado / Stock ML</div></th>
               <th class="px-2 first:pl-5 last:pr-5 py-3 whitespace-nowrap"><div class="font-semibold text-left">Vinculación (Catálogo Local)</div></th>
               <th class="px-2 first:pl-5 last:pr-5 py-3 whitespace-nowrap"><div class="font-semibold text-right">Precio en Efect.</div></th>
               <th class="px-2 first:pl-5 last:pr-5 py-3 whitespace-nowrap"><div class="font-semibold text-center">Acciones</div></th>
@@ -332,7 +332,10 @@ const allProducts = await db
           </div>
         </td>
         <td class="px-2 first:pl-5 last:pr-5 py-3 whitespace-nowrap text-center">
-          <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase ${statusClass}">${item.status}</span>
+          <div class="flex flex-col items-center gap-1">
+            <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase ${statusClass}">${item.status}</span>
+            <span class="text-[10px] font-bold text-slate-500 dark:text-slate-300" title="Stock informado por Mercado Libre">Stock ML: ${Number(item.available_quantity || 0)}</span>
+          </div>
         </td>
         <td class="px-2 first:pl-5 last:pr-5 py-3 whitespace-nowrap">
           <div class="max-w-[200px]">${localDataHtml}</div>
@@ -341,14 +344,11 @@ const allProducts = await db
           ${item.localData ? `<span class="font-bold text-slate-700 dark:text-slate-200 text-sm">$${Number(item.localData.inversionTotal).toLocaleString('es-AR', {minimumFractionDigits: 2})}</span>` : '<span class="text-xs text-slate-400">-</span>'}
         </td>
         <td class="px-2 first:pl-5 last:pr-5 py-3 whitespace-nowrap text-center">
-          <div class="flex justify-center gap-1.5">
+          <div class="flex justify-center">
             ${item.localData ? `
               <button class="text-indigo-600 hover:text-white hover:bg-indigo-600 text-[10px] font-bold flex items-center gap-1 sync-price-btn p-1.5 border border-indigo-200 dark:border-indigo-800 rounded-lg transition-all" data-product-id="${item.localData.productId}" title="Sincronizar precio">
                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
                 Precio
-              </button>
-              <button class="text-emerald-600 hover:text-white hover:bg-emerald-600 text-[10px] font-bold flex items-center gap-1 sync-stock-btn p-1.5 border border-emerald-200 dark:border-emerald-800 rounded-lg transition-all" data-product-id="${item.localData.productId}" title="Sincronizar stock según SKU y pack">
-                Stock
               </button>
             ` : `
               <button class="bg-slate-800 dark:bg-indigo-600 text-white hover:bg-slate-900 dark:hover:bg-indigo-700 text-[10px] font-bold px-4 h-8 rounded-lg shadow-sm transition-all save-link-btn" data-dom-id="${domId}">
@@ -463,40 +463,6 @@ const allProducts = await db
       };
     });
 
-    // Sync Stock
-    document.querySelectorAll('.sync-stock-btn').forEach(btn => {
-      btn.onclick = async () => {
-        const productId = btn.getAttribute('data-product-id');
-        btn.disabled = true;
-        const originalHtml = btn.innerHTML;
-        btn.innerText = 'Sync...';
-
-        try {
-          const res = await fetch('/api/meli/sync-stock', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ productId })
-          });
-          const data = await res.json();
-          if (data.success) {
-            alert(`Stock sincronizado en ${data.synced} vínculo${data.synced === 1 ? '' : 's'}.`);
-            await loadListings();
-          } else {
-            const failures = (data.results || [])
-              .filter(result => result.status === 'error')
-              .map(result => `${result.meliItemId}${result.variationId ? ` / ${result.variationId}` : ''}: ${result.error}`)
-              .join('\n');
-            alert(`Error: ${data.error || 'No se pudo sincronizar el stock'}${failures ? `\n\n${failures}` : ''}`);
-            btn.disabled = false;
-            btn.innerHTML = originalHtml;
-          }
-        } catch (e) {
-          alert('Error de red');
-          btn.disabled = false;
-          btn.innerHTML = originalHtml;
-        }
-      };
-    });
   }
 
   showPausedToggle.onchange = () => renderItems(allItems);
