@@ -36,6 +36,8 @@ export interface Product {
     customizationOptions: Record<string, any>;
     minOrder: number;
     productionTime: string | null;
+    productionMinBusinessDays: number;
+    productionMaxBusinessDays: number;
     stock: number;
     isActive: boolean;
     isFeatured: boolean;
@@ -63,6 +65,8 @@ export interface ProductionTimeRule {
     minQuantity: number;
     maxQuantity: number | null;
     productionTime: string;
+    productionMinBusinessDays: number;
+    productionMaxBusinessDays: number;
 }
 
 export interface ProductFilters {

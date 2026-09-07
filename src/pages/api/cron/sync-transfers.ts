@@ -6,6 +6,7 @@ import { PaymentStatus } from '@/types/order';
 import { MercadoPagoConfig, Payment } from 'mercadopago';
 import { EmailService } from '@/lib/services/EmailService';
 import { verifyBearerSecret } from '@/lib/security/request';
+import { buildFulfillmentSnapshot } from '@/lib/shipping/productionLeadTime';
 
 const accessToken = import.meta.env.MP_ACCESS_TOKEN || process.env.MP_ACCESS_TOKEN || '';
 const client = new MercadoPagoConfig({ accessToken, options: { timeout: 5000 } });
@@ -124,8 +125,23 @@ export const GET: APIRoute = async ({ request }) => {
 
             if (matchedOrder) {
                 // Matcheo Exitoso! Confirmar orden
+                const paidAt = new Date();
+                const matchedShipping = (matchedOrder.shippingData || {}) as Record<string, any>;
                 await db.update(orders)
-                    .set({ paymentStatus: PaymentStatus.APPROVED, updatedAt: new Date() })
+                    .set({
+                        paymentStatus: PaymentStatus.APPROVED,
+                        status: matchedOrder.status === 'pending' || matchedOrder.status === 'confirmed'
+                            ? 'processing'
+                            : matchedOrder.status,
+                        paidAt,
+                        shippingData: matchedOrder.shippingMethod === 'delivery'
+                            ? {
+                                ...matchedShipping,
+                                fulfillment: buildFulfillmentSnapshot(matchedShipping.selectedShipping, true, paidAt),
+                            }
+                            : matchedShipping,
+                        updatedAt: paidAt,
+                    })
                     .where(eq(orders.id, matchedOrder.id));
 
                 await db.insert(payments).values({

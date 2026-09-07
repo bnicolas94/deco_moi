@@ -5,6 +5,14 @@ import { normalizeZipnovaQuoteResult } from '../src/lib/shipping/zipnovaQuote.ts
 import { recoverShippingSelection } from '../src/lib/shipping/recoverSelection.ts';
 import { formatIsoDuration, getZipnovaLabelState, normalizeZipnovaShipment } from '../src/lib/shipping/zipnovaShipment.ts';
 import { ClientOrderConfirmationTemplate } from '../src/emails/ClientOrderConfirmation.ts';
+import {
+    addBusinessDays,
+    buildFulfillmentSnapshot,
+    enrichQuoteWithProduction,
+    normalizeProductionLeadTime,
+    resolveCartProductionLeadTime,
+    resolveProductionLeadTime,
+} from '../src/lib/shipping/productionLeadTime.ts';
 
 test('normaliza códigos postales argentinos numéricos y CPA', () => {
     assert.equal(normalizeArgentinePostalCode('1414'), '1414');
@@ -146,4 +154,73 @@ test('el email del comprador usa los campos reales de checkout sin mostrar undef
     assert.match(html, /Lincoln 1242, Wilde, Buenos Aires, CP 1875/);
     assert.match(html, /Correo Argentino/);
     assert.match(html, /21 de septiembre de 2026/);
+});
+
+test('migra en lectura los tiempos históricos escritos como texto', () => {
+    assert.deepEqual(normalizeProductionLeadTime({ productionTime: '3-5 días hábiles' }), {
+        minBusinessDays: 3,
+        maxBusinessDays: 5,
+        label: '3–5 días hábiles',
+    });
+});
+
+test('usa la regla de elaboración correspondiente a la cantidad', () => {
+    const lead = resolveProductionLeadTime(
+        { productionTime: '2 días hábiles', productionMinBusinessDays: 2, productionMaxBusinessDays: 2 },
+        50,
+        [{ minQuantity: 20, maxQuantity: 100, productionMinBusinessDays: 4, productionMaxBusinessDays: 6 }],
+    );
+    assert.equal(lead.label, '4–6 días hábiles');
+});
+
+test('un carrito adopta el mayor plazo de elaboración y no suma productos paralelos', () => {
+    const lead = resolveCartProductionLeadTime([
+        { minBusinessDays: 2, maxBusinessDays: 4, label: '2–4 días hábiles' },
+        { minBusinessDays: 3, maxBusinessDays: 7, label: '3–7 días hábiles' },
+    ]);
+    assert.deepEqual(lead, { minBusinessDays: 3, maxBusinessDays: 7, label: '3–7 días hábiles' });
+});
+
+test('suma elaboración en días hábiles a la fecha logística de Zipnova', () => {
+    assert.equal(addBusinessDays('2026-09-18T12:00:00Z', 3).toISOString(), '2026-09-23T12:00:00.000Z');
+    const quote = enrichQuoteWithProduction({
+        id: 'quote-1',
+        serviceType: 'standard_delivery',
+        serviceTypeName: 'Entrega a domicilio',
+        logisticType: 'carrier_dropoff',
+        logisticTypeName: 'Despacho en sucursal',
+        carrierName: 'Correo Argentino',
+        carrierId: 233,
+        price: 1000,
+        priceInclTax: 1000,
+        estimatedDelivery: '2026-09-18T12:00:00Z',
+        deliveryTimeHours: null,
+    }, { minBusinessDays: 2, maxBusinessDays: 3, label: '2–3 días hábiles' }, new Date('2026-09-07T12:00:00Z'));
+
+    assert.equal(quote.zipnovaEstimatedDelivery, '2026-09-18T12:00:00Z');
+    assert.equal(quote.customerEstimatedDelivery, '2026-09-23T12:00:00.000Z');
+    assert.equal(quote.estimatedDelivery, quote.customerEstimatedDelivery);
+});
+
+test('la producción empieza al aprobar el pago y conserva la promesa al cliente', () => {
+    const pending = buildFulfillmentSnapshot({
+        productionMinBusinessDays: 2,
+        productionMaxBusinessDays: 4,
+        productionTimeLabel: '2–4 días hábiles',
+        quotedAt: '2026-09-07T12:00:00Z',
+        quotedEstimatedDelivery: '2026-09-21T12:00:00Z',
+    }, false, new Date('2026-09-07T12:00:00Z'));
+    assert.equal(pending.status, 'awaiting_payment');
+    assert.equal(pending.productionStartedAt, null);
+
+    const approved = buildFulfillmentSnapshot({
+        productionMinBusinessDays: 2,
+        productionMaxBusinessDays: 4,
+        productionTimeLabel: '2–4 días hábiles',
+        quotedAt: '2026-09-07T12:00:00Z',
+        quotedEstimatedDelivery: '2026-09-21T12:00:00Z',
+    }, true, new Date('2026-09-09T12:00:00Z'));
+    assert.equal(approved.status, 'in_production');
+    assert.equal(approved.productionReadyBy, '2026-09-15T12:00:00.000Z');
+    assert.equal(approved.promisedDelivery, '2026-09-23T12:00:00.000Z');
 });

@@ -61,6 +61,9 @@ export const POST: APIRoute = async (context) => {
     if (order.status === 'cancelled') return json({ error: 'No se puede despachar una orden cancelada.' }, 409);
 
     const shipping = (order.shippingData || {}) as Record<string, any>;
+    if (shipping.fulfillment && shipping.fulfillment.status !== 'ready_for_dispatch') {
+        return json({ error: 'Marcá primero el pedido como listo para despachar.' }, 409);
+    }
     let selected = shipping.selectedShipping as ShippingQuoteResult | undefined;
 
     let requestBody: Record<string, any> = {};
@@ -160,6 +163,9 @@ export const POST: APIRoute = async (context) => {
             ...shipping,
             document,
             selectedShipping: selected,
+            fulfillment: shipping.fulfillment
+                ? { ...shipping.fulfillment, status: 'shipment_created', shipmentCreatedAt: new Date().toISOString() }
+                : shipping.fulfillment,
             zipnovaShipment: shipment,
         };
         await db.update(orders).set({

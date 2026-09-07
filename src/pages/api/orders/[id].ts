@@ -3,6 +3,7 @@ import { db } from '@/lib/db/connection';
 import { orders, orderItems } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { EmailService } from '@/lib/services/EmailService';
+import { buildFulfillmentSnapshot } from '@/lib/shipping/productionLeadTime';
 
 export const PUT: APIRoute = async (context) => {
     if (!context.locals.user || context.locals.user.role !== 'admin') {
@@ -17,16 +18,27 @@ export const PUT: APIRoute = async (context) => {
         if (!currentOrderResult.length) return new Response(JSON.stringify({ error: 'Orden no encontrada' }), { status: 404 });
         const currentOrder = currentOrderResult[0];
 
+        const paymentJustApproved = currentOrder.paymentStatus !== 'approved' && body.paymentStatus === 'approved';
+        const updatedAt = new Date();
+        const currentShipping = (currentOrder.shippingData || {}) as Record<string, any>;
+        const nextShipping = paymentJustApproved && currentOrder.shippingMethod === 'delivery'
+            ? {
+                ...currentShipping,
+                fulfillment: buildFulfillmentSnapshot(currentShipping.selectedShipping, true, updatedAt),
+            }
+            : currentShipping;
         await db.update(orders)
             .set({
-                status: body.status,
+                status: paymentJustApproved && body.status === 'pending' ? 'processing' : body.status,
                 paymentStatus: body.paymentStatus,
-                updatedAt: new Date()
+                paidAt: paymentJustApproved ? updatedAt : currentOrder.paidAt,
+                shippingData: nextShipping,
+                updatedAt,
             })
             .where(eq(orders.id, id));
 
         // Si el estado de pago cambió a 'approved' manualmente, enviar emails
-        if (currentOrder.paymentStatus !== 'approved' && body.paymentStatus === 'approved') {
+        if (paymentJustApproved) {
             EmailService.sendOrderConfirmationEmails(id).catch(err => {
                 console.error('Error al iniciar envío de emails tras confirmación manual:', err);
             });

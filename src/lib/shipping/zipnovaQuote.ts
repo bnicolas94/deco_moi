@@ -16,6 +16,14 @@ export interface ShippingQuoteResult {
     preparationTime?: string;
     shippingTime?: string;
     totalTime?: string;
+    zipnovaEstimatedDelivery?: string;
+    customerEstimatedDelivery?: string;
+    productionMinBusinessDays?: number;
+    productionMaxBusinessDays?: number;
+    productionTimeLabel?: string;
+    productionReadyFrom?: string;
+    productionReadyBy?: string;
+    quotedAt?: string;
     pickupPointId?: number;
     pickupPointName?: string;
     pickupPointAddress?: string;
@@ -36,6 +44,15 @@ function apiValueName(value: any, fallback: string): string {
         crossdock: 'Despacho en centro logístico',
     };
     return names[String(value || '')] || fallback;
+}
+
+function durationMax(value: unknown): string {
+    if (typeof value === 'string') return value;
+    if (value && typeof value === 'object') {
+        const duration = value as Record<string, unknown>;
+        return String(duration.max || duration.min || '');
+    }
+    return '';
 }
 
 export function normalizeZipnovaQuoteResult(result: any, index = 0): ShippingQuoteResult[] {
@@ -59,8 +76,8 @@ export function normalizeZipnovaQuoteResult(result: any, index = 0): ShippingQuo
         estimationExpiresAt: deliveryTime.estimation_expires_at || '',
         deliveryTimeHours: null,
         preparationTime: deliveryTime.times?.preparation || '',
-        shippingTime: deliveryTime.times?.shipping || deliveryTime.times?.carrier || '',
-        totalTime: deliveryTime.times?.total || '',
+        shippingTime: durationMax(deliveryTime.times?.shipping || deliveryTime.times?.carrier),
+        totalTime: durationMax(deliveryTime.times?.total),
     };
 
     if (baseResult.serviceType === 'pickup_point' && pickupPoints.length > 0) {

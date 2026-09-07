@@ -35,8 +35,8 @@ export const ClientOrderConfirmationTemplate = (data: any) => {
         <p><strong>Dirección:</strong> ${addressLine || 'A confirmar'}</p>
         ${selectedShipping.carrierName ? `<p><strong>Transporte:</strong> ${selectedShipping.carrierName}${selectedShipping.serviceTypeName ? ` — ${selectedShipping.serviceTypeName}` : ''}</p>` : ''}
         ${productionTimes.length ? `<p><strong>Preparación del producto:</strong> ${productionTimes.join(' / ')}</p>` : ''}
-        ${estimatedDelivery ? `<p><strong>Fecha máxima estimada por el correo:</strong> ${estimatedDelivery}</p>` : ''}
-        <p style="color:#666;font-size:13px;line-height:1.5;">La fecha es estimada y puede actualizarse al generar el despacho. Cuando el correo habilite el seguimiento, te enviaremos el enlace y la fecha logística vigente.</p>
+        ${estimatedDelivery ? `<p><strong>Entrega total máxima estimada:</strong> ${estimatedDelivery}</p>` : ''}
+        <p style="color:#666;font-size:13px;line-height:1.5;">La fecha informada ya contempla la elaboración y el traslado estimado. Te avisaremos cuando el pedido esté listo y, al generar el despacho, recibirás el seguimiento del correo.</p>
     `;
     const whatsappNumber = process.env.PUBLIC_WHATSAPP_NUMBER || (import.meta as any).env?.PUBLIC_WHATSAPP_NUMBER;
     const contactLinks = [

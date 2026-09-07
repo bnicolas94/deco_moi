@@ -5,6 +5,7 @@ import { products, categories, mockupTemplates, productionTimeRules, priceRules,
 import { eq, asc, and } from 'drizzle-orm';
 import { Save, ArrowLeft, Image as ImageIcon, Trash2, Star, Plus, Clock, ExternalLink } from 'lucide-react';
 import RichTextEditor from '@/components/admin/RichTextEditor';
+import { normalizeProductionLeadTime } from '@/lib/shipping/productionLeadTime';
 
 const { id } = Astro.params;
 const isNew = id === 'new';
@@ -34,6 +35,14 @@ if (!isNew && id) {
     timeRules = await db.select().from(productionTimeRules)
         .where(eq(productionTimeRules.productId, parseInt(id)))
         .orderBy(asc(productionTimeRules.minQuantity));
+    timeRules = timeRules.map((rule) => {
+        const lead = normalizeProductionLeadTime(rule);
+        return {
+            ...rule,
+            productionMinBusinessDays: lead.minBusinessDays,
+            productionMaxBusinessDays: lead.maxBusinessDays,
+        };
+    });
 
     // Load price rules
     priceRulesList = await db.select().from(priceRules)
@@ -136,6 +145,7 @@ allSupplies.forEach(s => {
 });
 
 const supplyCategs = [...new Set(allSupplies.map(s => s.category))].sort();
+const defaultProductionLead = normalizeProductionLeadTime(product);
 const SUPPLY_ICONS: Record<string, string> = {
     'chocolates': '🍫', 'hojas': '📄', 'velas': '🕯️', 'cajas': '📦', 'extras': '✨', 'tejidos': '🧵', 'packaging': '📫', 'etiquetas': '🏷️'
 };
@@ -619,27 +629,9 @@ const SUPPLY_ICONS: Record<string, string> = {
                             </div>
                         </div>
 
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-gray-50">
-                            <div class="space-y-2">
-                                <label class="block text-sm font-bold text-gray-700">Tiempo de Producción (fallback)</label>
-                                <input 
-                                    type="text" 
-                                    name="productionTime" 
-                                    value={product?.productionTime} 
-                                    placeholder="Ej: 3-5 días hábiles (se usa si no hay rangos)"
-                                    class="block w-full rounded-xl border-gray-200 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm h-11 border px-4"
-                                />
-                                <p class="text-[10px] text-gray-400 italic">Se muestra si la cantidad no cae en ningún rango configurado abajo.</p>
-                            </div>
-                            <div class="space-y-2">
-                                <label class="block text-sm font-bold text-gray-700">Pedido Mínimo</label>
-                                <input 
-                                    type="number" 
-                                    name="minOrder" 
-                                    value={product?.minOrder || 1} 
-                                    class="block w-full rounded-xl border-gray-200 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm h-11 border px-4 transition-all"
-                                />
-                            </div>
+                        <div class="pt-4 border-t border-gray-50">
+                            <label class="block text-sm font-bold text-gray-700">Pedido Mínimo</label>
+                            <input type="number" name="minOrder" value={product?.minOrder || 1} class="mt-2 block w-full rounded-xl border-gray-200 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm h-11 border px-4 transition-all" />
                         </div>
                     </div>
                 </div>
@@ -666,6 +658,18 @@ const SUPPLY_ICONS: Record<string, string> = {
                     </button>
                     <div class="accordion-content hidden transition-all duration-300 ease-in-out">
                         <div class="p-6 border-t border-gray-50">
+                            <div class="mb-8 grid grid-cols-1 gap-6 rounded-2xl border border-orange-100 bg-orange-50/30 p-4 md:grid-cols-2">
+                                <div class="space-y-2">
+                                    <label class="block text-sm font-bold text-gray-700">Elaboración mínima</label>
+                                    <input type="number" name="productionMinBusinessDays" value={defaultProductionLead.minBusinessDays} min="0" max="365" class="block h-11 w-full rounded-xl border border-gray-200 px-4 text-sm shadow-sm focus:border-orange-500 focus:ring-orange-500" />
+                                    <p class="text-[10px] italic text-gray-400">Días hábiles mínimos si no aplica un rango.</p>
+                                </div>
+                                <div class="space-y-2">
+                                    <label class="block text-sm font-bold text-gray-700">Elaboración máxima</label>
+                                    <input type="number" name="productionMaxBusinessDays" value={defaultProductionLead.maxBusinessDays} min="0" max="365" class="block h-11 w-full rounded-xl border border-gray-200 px-4 text-sm shadow-sm focus:border-orange-500 focus:ring-orange-500" />
+                                    <p class="text-[10px] italic text-gray-400">La fecha prometida al cliente se calcula con este máximo.</p>
+                                </div>
+                            </div>
                             <div class="flex items-center justify-between mb-8">
                                 <div>
                                     <h3 class="text-base font-bold text-gray-900">Reglas de Producción</h3>
@@ -690,17 +694,21 @@ const SUPPLY_ICONS: Record<string, string> = {
                             ) : (
                                 timeRules.map((rule: any, idx: number) => (
                                     <div class="time-rule-item grid grid-cols-1 md:grid-cols-12 gap-4 p-4 bg-amber-50/30 rounded-2xl border border-amber-100/50 relative group animate-in fade-in slide-in-from-top-2">
-                                        <div class="md:col-span-3">
+                                        <div class="md:col-span-2">
                                             <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Cantidad Mínima</label>
                                             <input type="number" name={`time_rule_min_${idx}`} value={rule.minQuantity} min="1" placeholder="1" class="w-full rounded-lg border-gray-200 text-sm h-10 border px-3 focus:ring-amber-500" required />
                                         </div>
-                                        <div class="md:col-span-3">
+                                        <div class="md:col-span-2">
                                             <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Cantidad Máxima</label>
                                             <input type="number" name={`time_rule_max_${idx}`} value={rule.maxQuantity} placeholder="Sin límite" class="w-full rounded-lg border-gray-200 text-sm h-10 border px-3 focus:ring-amber-500" />
                                         </div>
-                                        <div class="md:col-span-5">
-                                            <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Tiempo de Producción</label>
-                                            <input type="text" name={`time_rule_time_${idx}`} value={rule.productionTime} placeholder="Ej: 5-7 días hábiles" class="w-full rounded-lg border-gray-200 text-sm h-10 border px-3 focus:ring-amber-500" required />
+                                        <div class="md:col-span-3">
+                                            <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Días hábiles mín.</label>
+                                            <input type="number" name={`time_rule_days_min_${idx}`} value={rule.productionMinBusinessDays ?? 0} min="0" max="365" class="w-full rounded-lg border-gray-200 text-sm h-10 border px-3 focus:ring-amber-500" required />
+                                        </div>
+                                        <div class="md:col-span-4">
+                                            <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Días hábiles máx.</label>
+                                            <input type="number" name={`time_rule_days_max_${idx}`} value={rule.productionMaxBusinessDays ?? 0} min="0" max="365" class="w-full rounded-lg border-gray-200 text-sm h-10 border px-3 focus:ring-amber-500" required />
                                         </div>
                                         <div class="md:col-span-1 flex items-end justify-center pb-1">
                                             <button type="button" class="remove-time-rule-btn p-2 text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors">
@@ -1588,17 +1596,21 @@ const SUPPLY_ICONS: Record<string, string> = {
             const div = document.createElement('div');
             div.className = 'time-rule-item grid grid-cols-1 md:grid-cols-12 gap-4 p-4 bg-amber-50/30 rounded-2xl border border-amber-100/50 relative group animate-in fade-in slide-in-from-top-2';
             div.innerHTML = `
-                <div class="md:col-span-3">
+                <div class="md:col-span-2">
                     <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Cantidad Mínima</label>
                     <input type="number" name="time_rule_min_${ruleIdx}" min="1" placeholder="1" class="w-full rounded-lg border-gray-200 text-sm h-10 border px-3 focus:ring-amber-500" required />
                 </div>
-                <div class="md:col-span-3">
+                <div class="md:col-span-2">
                     <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Cantidad Máxima</label>
                     <input type="number" name="time_rule_max_${ruleIdx}" placeholder="Sin límite" class="w-full rounded-lg border-gray-200 text-sm h-10 border px-3 focus:ring-amber-500" />
                 </div>
-                <div class="md:col-span-5">
-                    <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Tiempo de Producción</label>
-                    <input type="text" name="time_rule_time_${ruleIdx}" placeholder="Ej: 5-7 días hábiles" class="w-full rounded-lg border-gray-200 text-sm h-10 border px-3 focus:ring-amber-500" required />
+                <div class="md:col-span-3">
+                    <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Días hábiles mín.</label>
+                    <input type="number" name="time_rule_days_min_${ruleIdx}" min="0" max="365" value="0" class="w-full rounded-lg border-gray-200 text-sm h-10 border px-3 focus:ring-amber-500" required />
+                </div>
+                <div class="md:col-span-4">
+                    <label class="block text-[10px] font-bold text-gray-400 uppercase mb-1">Días hábiles máx.</label>
+                    <input type="number" name="time_rule_days_max_${ruleIdx}" min="0" max="365" value="0" class="w-full rounded-lg border-gray-200 text-sm h-10 border px-3 focus:ring-amber-500" required />
                 </div>
                 <div class="md:col-span-1 flex items-end justify-center pb-1">
                     <button type="button" class="remove-time-rule-btn p-2 text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors">
@@ -1767,12 +1779,14 @@ const SUPPLY_ICONS: Record<string, string> = {
                 document.querySelectorAll('.time-rule-item').forEach((item) => {
                     const minQ = item.querySelector(`input[name^="time_rule_min_"]`)?.value;
                     const maxQ = item.querySelector(`input[name^="time_rule_max_"]`)?.value;
-                    const time = item.querySelector(`input[name^="time_rule_time_"]`)?.value;
-                    if (minQ && time) {
+                    const minDays = item.querySelector(`input[name^="time_rule_days_min_"]`)?.value;
+                    const maxDays = item.querySelector(`input[name^="time_rule_days_max_"]`)?.value;
+                    if (minQ && minDays !== '' && maxDays !== '') {
                         timeRules.push({
                             minQuantity: parseInt(minQ),
                             maxQuantity: maxQ ? parseInt(maxQ) : null,
-                            productionTime: time,
+                            productionMinBusinessDays: parseInt(minDays),
+                            productionMaxBusinessDays: parseInt(maxDays),
                         });
                     }
                 });

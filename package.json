@@ -18,7 +18,8 @@
     "security:secrets": "node scripts/check-secrets.mjs",
     "test:profitability": "node --test tests/meli-pricing.test.ts tests/meli-financials.test.ts tests/meli-billing.test.ts tests/meli-order-sync.test.ts tests/cost-history.test.ts tests/meli-stock.test.ts tests/meli-webhook-queue.test.ts",
     "test:shipping": "node --test tests/shipping.test.ts",
-    "db:migrate:meli-profitability": "node scripts/apply-meli-profitability-migration.mjs"
+    "db:migrate:meli-profitability": "node scripts/apply-meli-profitability-migration.mjs",
+    "db:migrate:production-lead-times": "node scripts/apply-production-lead-times-migration.mjs"
   },
   "dependencies": {
     "@astrojs/check": "^0.9.9",

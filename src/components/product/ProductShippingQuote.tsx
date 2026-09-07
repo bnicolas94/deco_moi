@@ -7,6 +7,8 @@ interface QuoteResult {
     price: number;
     estimatedDelivery: string;
     quotedEstimatedDelivery?: string;
+    customerEstimatedDelivery?: string;
+    productionTimeLabel?: string;
     estimationExpiresAt?: string;
     preparationTime?: string;
     shippingTime?: string;
@@ -159,8 +161,9 @@ export default function ProductShippingQuote({ productId, minimumQuantity }: Pro
                             <div className="min-w-0">
                                 <p className="truncate text-sm font-semibold text-brand-black">{result.carrierName}</p>
                                 <p className="truncate text-[11px] text-gray-500">
-                                    {result.serviceTypeName}{formatDate(result.estimatedDelivery) ? ` · Fecha máxima estimada: ${formatDate(result.estimatedDelivery)}` : ''}
+                                    {result.serviceTypeName}{formatDate(result.estimatedDelivery) ? ` · Entrega total estimada: ${formatDate(result.estimatedDelivery)}` : ''}
                                 </p>
+                                {result.productionTimeLabel && <p className="text-[10px] text-gray-400">Incluye {result.productionTimeLabel} de elaboración</p>}
                             </div>
                             <span className="whitespace-nowrap text-sm font-bold text-brand-black">{formatPrice(result.price)}</span>
                         </div>

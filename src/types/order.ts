@@ -31,6 +31,8 @@ export interface OrderItem {
     customization: Record<string, any> | null;
     variantId?: number | null;
     productionTime?: string | null;
+    productionMinBusinessDays?: number | null;
+    productionMaxBusinessDays?: number | null;
     externalItemId?: string | null;
     externalVariationId?: string | null;
     packQuantity?: number;

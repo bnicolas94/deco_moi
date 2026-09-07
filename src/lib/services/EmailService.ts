@@ -215,6 +215,13 @@ export class EmailService {
 
             const customerEmail = order.shippingData?.email;
             if (!customerEmail) return;
+            const fulfillment = (order.shippingData as any)?.fulfillment;
+            const readyBy = fulfillment?.productionReadyBy
+                ? new Date(fulfillment.productionReadyBy).toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' })
+                : '';
+            const promisedDelivery = fulfillment?.promisedDelivery
+                ? new Date(fulfillment.promisedDelivery).toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' })
+                : '';
 
             const subject = `✅ ¡Pago confirmado! — Orden #${order.orderNumber}`;
             const html = `
@@ -226,6 +233,8 @@ export class EmailService {
                     <p>Hola <strong>${order.shippingData?.full_name || 'Cliente'}</strong>,</p>
                     <p>Te informamos que hemos recibido y validado correctamente tu transferencia bancaria para la orden <strong>#${order.orderNumber}</strong>.</p>
                     <p>Tu pedido ya se encuentra en estado <strong>Aprobado</strong> y estamos trabajando en su preparación.</p>
+                    ${fulfillment?.productionTimeLabel ? `<p>El tiempo estimado de elaboración es de <strong>${fulfillment.productionTimeLabel}</strong>${readyBy ? `, con finalización prevista hasta el ${readyBy}` : ''}.</p>` : ''}
+                    ${promisedDelivery ? `<p>La entrega total se estima hasta el <strong>${promisedDelivery}</strong>.</p>` : ''}
                     
                     <div style="background: #f9f9f9; padding: 15px; border-radius: 8px; margin: 20px 0;">
                         <p style="margin: 0;"><strong>Resumen del pago:</strong></p>

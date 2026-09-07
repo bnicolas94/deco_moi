@@ -21,6 +21,7 @@ const mappedOrders = allOrders.map(o => {
         customerName: shipping?.full_name || o.user?.name || 'Invitado',
         customerEmail: shipping?.email || o.user?.email || 'N/A',
         date: o.createdAt,
+        fulfillment: shipping?.fulfillment,
         shipmentLabelState: getZipnovaLabelState(shipping?.zipnovaShipment),
     };
 });
@@ -250,6 +251,14 @@ const paymentStatusColors: Record<string, string> = {
                                         ) : order.zipnovaShipmentId ? (
                                             <a href={`/admin/orders/${order.id}`} class="inline-flex items-center rounded-full border border-amber-100 bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-700 hover:bg-amber-100">
                                                 <Clock className="mr-1.5 h-3 w-3" /> Generando etiqueta
+                                            </a>
+                                        ) : order.paymentStatus === 'approved' && order.fulfillment?.status === 'in_production' ? (
+                                            <a href={`/admin/orders/${order.id}`} class="inline-flex items-center rounded-full border border-amber-100 bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-700 hover:bg-amber-100">
+                                                <Clock className="mr-1.5 h-3 w-3" /> En elaboración
+                                            </a>
+                                        ) : order.paymentStatus === 'approved' && order.fulfillment?.status === 'ready_for_dispatch' ? (
+                                            <a href={`/admin/orders/${order.id}`} class="inline-flex items-center rounded-full border border-emerald-100 bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700 hover:bg-emerald-100">
+                                                <Package className="mr-1.5 h-3 w-3" /> Listo para despachar
                                             </a>
                                         ) : order.paymentStatus === 'approved' ? (
                                             <a href={`/admin/orders/${order.id}`} class="inline-flex items-center rounded-full border border-indigo-100 bg-indigo-50 px-2.5 py-1 text-xs font-bold text-indigo-700 hover:bg-indigo-100">

@@ -111,7 +111,7 @@ export const AdminOrderConfirmationTemplate = (data: any) => {
                 ${!isPickup ? `<p><strong>Dirección:</strong> ${addressLine || 'A confirmar'}</p>` : ''}
                 ${selectedShipping.carrierName ? `<p><strong>Transporte:</strong> ${selectedShipping.carrierName}${selectedShipping.serviceTypeName ? ` — ${selectedShipping.serviceTypeName}` : ''}</p>` : ''}
                 ${productionTimes.length ? `<p><strong>Preparación:</strong> ${productionTimes.join(' / ')}</p>` : ''}
-                ${estimatedDelivery ? `<p><strong>Fecha máxima estimada:</strong> ${estimatedDelivery}</p>` : ''}
+                ${estimatedDelivery ? `<p><strong>Entrega total máxima estimada:</strong> ${estimatedDelivery}</p>` : ''}
             </div>
 
             ${order.notes ? `

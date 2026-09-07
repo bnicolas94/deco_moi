@@ -36,6 +36,8 @@ export const products = pgTable('products', {
     customizationOptions: json('customization_options').$type<Record<string, any>>().default({}),
     minOrder: integer('min_order').default(1),
     productionTime: varchar('production_time', { length: 50 }),
+    productionMinBusinessDays: integer('production_min_business_days').notNull().default(0),
+    productionMaxBusinessDays: integer('production_max_business_days').notNull().default(0),
     stock: integer('stock').default(0),
     isActive: boolean('is_active').default(true),
     isFeatured: boolean('is_featured').default(false),
@@ -76,6 +78,8 @@ export const productionTimeRules = pgTable('production_time_rules', {
     minQuantity: integer('min_quantity').notNull(),
     maxQuantity: integer('max_quantity'),
     productionTime: varchar('production_time', { length: 100 }).notNull(),
+    productionMinBusinessDays: integer('production_min_business_days').notNull().default(0),
+    productionMaxBusinessDays: integer('production_max_business_days').notNull().default(0),
     createdAt: timestamp('created_at').defaultNow(),
 });
 
@@ -202,6 +206,8 @@ export const orderItems = pgTable('order_items', {
     customization: json('customization').$type<Record<string, any>>(),
     variantId: integer('variant_id'), // Referencia a la variante, nullable si no tiene
     productionTime: varchar('production_time', { length: 100 }), // Snapshot del tiempo de producción al crear la orden
+    productionMinBusinessDays: integer('production_min_business_days'),
+    productionMaxBusinessDays: integer('production_max_business_days'),
     externalItemId: varchar('external_item_id', { length: 50 }),
     externalVariationId: varchar('external_variation_id', { length: 50 }),
     packQuantity: integer('pack_quantity').notNull().default(1),

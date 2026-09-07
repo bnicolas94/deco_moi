@@ -1,11 +1,12 @@
 import type { APIRoute } from 'astro';
 import { and, eq } from 'drizzle-orm';
 import { db } from '@/lib/db/connection';
-import { products } from '@/lib/db/schema';
+import { products, productionTimeRules } from '@/lib/db/schema';
 import { calculatePrice, getProductPriceRules } from '@/lib/services/ProductService';
 import { getShippingConfig, quoteShipment } from '@/lib/services/ShippingService';
 import { normalizeArgentinePostalCode, resolveArgentinePostalCode } from '@/lib/shipping/postalCode';
 import { isSameOriginRequest } from '@/lib/security/request';
+import { enrichQuoteWithProduction, resolveProductionLeadTime } from '@/lib/shipping/productionLeadTime';
 
 const MAX_QUANTITY = 1_000;
 const RATE_LIMIT_WINDOW_MS = 10 * 60 * 1_000;
@@ -63,8 +64,13 @@ export const POST: APIRoute = async (context) => {
         const basePrice = product.isOnSale && product.salePrice
             ? Number(product.salePrice)
             : Number(product.basePrice);
-        const rules = await getProductPriceRules(product.id);
+        const [rules, timeRules] = await Promise.all([
+            getProductPriceRules(product.id),
+            db.select().from(productionTimeRules).where(eq(productionTimeRules.productId, product.id)),
+        ]);
         const declaredValue = Math.round(calculatePrice(basePrice, rules, quantity) * quantity * 100) / 100;
+        const productionLead = resolveProductionLeadTime(product, quantity, timeRules);
+        const quotedAt = new Date();
 
         let location = { city: '', state: '', postalCode };
         if (!config.flatRateEnabled) {
@@ -94,6 +100,7 @@ export const POST: APIRoute = async (context) => {
             .filter((result) => result.serviceType !== 'pickup_point')
             .sort((a, b) => a.price - b.price)
             .slice(0, 4)
+            .map((result) => enrichQuoteWithProduction(result, productionLead, quotedAt))
             .map((result) => config.freeShippingEnabled && declaredValue >= config.freeShippingThreshold
                 ? { ...result, carrierCost: result.price, price: 0, priceInclTax: 0 }
                 : result);
@@ -106,6 +113,7 @@ export const POST: APIRoute = async (context) => {
             results: homeDelivery,
             location,
             quantity,
+            productionLead,
             usesProductDimensions: Boolean(product.weight && product.height && product.width && product.length),
         });
     } catch (error) {

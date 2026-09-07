@@ -52,6 +52,7 @@ const paymentStatusOptions = [
 const shipping = order.shippingData as any;
 const selectedShipping = shipping?.selectedShipping;
 const shipment = shipping?.zipnovaShipment;
+const fulfillment = shipping?.fulfillment;
 const trackingUrl = sanitizePublicUrl(shipment?.trackingExternal || shipment?.tracking);
 const labelState = getZipnovaLabelState(shipment);
 const formatShippingDate = (value: unknown, includeTime = false) => {
@@ -70,6 +71,17 @@ const quotedDelivery = formatShippingDate(
     selectedShipping?.quotedEstimatedDelivery || (!shipment ? selectedShipping?.estimatedDelivery : null),
 );
 const currentDelivery = formatShippingDate(shipment?.estimatedDelivery);
+const productionStarted = formatShippingDate(fulfillment?.productionStartedAt, true);
+const productionReadyFrom = formatShippingDate(fulfillment?.productionReadyFrom);
+const productionReadyBy = formatShippingDate(fulfillment?.productionReadyBy);
+const productionReadyAt = formatShippingDate(fulfillment?.productionReadyAt, true);
+const promisedDelivery = formatShippingDate(fulfillment?.promisedDelivery || selectedShipping?.customerEstimatedDelivery);
+const productionStatusLabels: Record<string, string> = {
+    awaiting_payment: 'Esperando pago',
+    in_production: 'En elaboración',
+    ready_for_dispatch: 'Listo para despachar',
+    shipment_created: 'Despacho creado',
+};
 const dropoffDeadline = formatShippingDate(shipment?.dropoffDeadlineAt, true);
 const preparationDuration = formatIsoDuration(shipment?.preparationTime || selectedShipping?.preparationTime);
 const carrierDuration = formatIsoDuration(shipment?.carrierTime || selectedShipping?.shippingTime);
@@ -256,6 +268,35 @@ const customerDisplayPhone = shipping?.phone || order.user?.phone || '-';
                     <p class="text-sm text-gray-500">No hace falta etiqueta porque el cliente retira su pedido.</p>
                 ) : (
                     <div class="space-y-5">
+                        {fulfillment && (
+                            <div class:list={[
+                                "rounded-2xl border p-4",
+                                fulfillment.status === 'ready_for_dispatch'
+                                    ? "border-emerald-200 bg-emerald-50"
+                                    : "border-amber-100 bg-amber-50/60",
+                            ]}>
+                                <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                                    <div>
+                                        <p class="text-xs font-bold uppercase tracking-wider text-gray-500">Producción</p>
+                                        <p class="mt-1 text-base font-bold text-gray-900">{productionStatusLabels[fulfillment.status] || fulfillment.status}</p>
+                                        <p class="mt-1 text-sm text-gray-600">Elaboración estimada: {fulfillment.productionTimeLabel || 'sin demora configurada'}</p>
+                                    </div>
+                                    {order.paymentStatus === 'approved' && !order.zipnovaShipmentId && (
+                                        fulfillment.status === 'ready_for_dispatch' ? (
+                                            <button id="production-resume-btn" type="button" class="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-bold text-gray-700 hover:bg-gray-50">Volver a elaboración</button>
+                                        ) : (
+                                            <button id="production-ready-btn" type="button" class="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-700">Marcar listo para despachar</button>
+                                        )
+                                    )}
+                                </div>
+                                <div class="mt-4 grid grid-cols-1 gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
+                                    {productionStarted && <div><span class="block text-[10px] font-bold uppercase text-gray-400">Comenzó</span><strong>{productionStarted}</strong></div>}
+                                    {(productionReadyFrom || productionReadyBy) && <div><span class="block text-[10px] font-bold uppercase text-gray-400">Ventana de finalización</span><strong>{productionReadyFrom || '-'} a {productionReadyBy || '-'}</strong></div>}
+                                    {productionReadyAt && <div><span class="block text-[10px] font-bold uppercase text-gray-400">Finalizado</span><strong>{productionReadyAt}</strong></div>}
+                                    {promisedDelivery && <div><span class="block text-[10px] font-bold uppercase text-gray-400">Promesa al cliente</span><strong>Hasta el {promisedDelivery}</strong></div>}
+                                </div>
+                            </div>
+                        )}
                         <div class="grid grid-cols-1 gap-4 text-sm sm:grid-cols-3">
                             <div>
                                 <span class="block text-[10px] font-bold uppercase tracking-wider text-gray-400">Transporte</span>
@@ -333,7 +374,11 @@ const customerDisplayPhone = shipping?.phone || order.user?.phone || '-';
                             </div>
                         ) : order.paymentStatus !== 'approved' ? (
                             <div class="rounded-xl border border-amber-100 bg-amber-50 p-4 text-sm text-amber-800">
-                                Cuando el pago figure como aprobado vas a poder generar el despacho y descargar su etiqueta desde acá.
+                                Cuando el pago figure como aprobado comenzará la elaboración del pedido.
+                            </div>
+                        ) : fulfillment && fulfillment.status !== 'ready_for_dispatch' ? (
+                            <div class="rounded-xl border border-amber-100 bg-amber-50 p-4 text-sm text-amber-800">
+                                Primero marcá el pedido como listo para despachar. Recién entonces se creará el envío en Zipnova y comenzará su plazo logístico.
                             </div>
                         ) : (
                             <div class="rounded-2xl border border-indigo-100 bg-indigo-50/50 p-4">
@@ -439,6 +484,35 @@ const customerDisplayPhone = shipping?.phone || order.user?.phone || '-';
         const refreshShipmentBtn = document.getElementById('refresh-shipment-btn');
         const downloadLabelBtn = document.getElementById('download-label-btn');
         const notifyCustomerBtn = document.getElementById('notify-customer-btn');
+        const productionReadyBtn = document.getElementById('production-ready-btn');
+        const productionResumeBtn = document.getElementById('production-resume-btn');
+
+        const updateProduction = async (button, action) => {
+            if (!button || button.dataset.handled) return;
+            button.dataset.handled = 'true';
+            button.addEventListener('click', async () => {
+                const original = button.innerHTML;
+                button.disabled = true;
+                button.innerHTML = 'Guardando...';
+                try {
+                    const response = await fetch(`/api/admin/orders/${id}/production`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ action }),
+                    });
+                    const payload = await response.json();
+                    if (!response.ok) throw new Error(payload.error || 'No se pudo actualizar la producción');
+                    window.showToast(action === 'ready' ? 'Pedido listo para despachar' : 'Pedido nuevamente en elaboración');
+                    setTimeout(() => window.location.reload(), 700);
+                } catch (error) {
+                    window.showToast(error instanceof Error ? error.message : 'No se pudo actualizar la producción', 'error');
+                    button.disabled = false;
+                    button.innerHTML = original;
+                }
+            });
+        };
+        updateProduction(productionReadyBtn, 'ready');
+        updateProduction(productionResumeBtn, 'resume');
 
         if (createShipmentBtn && !createShipmentBtn.dataset.handled) {
             createShipmentBtn.dataset.handled = 'true';

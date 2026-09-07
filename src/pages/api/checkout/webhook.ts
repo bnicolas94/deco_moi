@@ -6,6 +6,7 @@ import { db } from '@/lib/db/connection';
 import { payments } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { EmailService } from '@/lib/services/EmailService';
+import { buildFulfillmentSnapshot } from '@/lib/shipping/productionLeadTime';
 
 const MONEY_TOLERANCE = 0.01;
 
@@ -101,8 +102,23 @@ export const POST: APIRoute = async ({ request }) => {
                                 }
 
                                 if (matchedOrder) {
+                                    const paidAt = new Date();
+                                    const matchedShipping = (matchedOrder.shippingData || {}) as Record<string, any>;
                                     await db.update(orders)
-                                        .set({ paymentStatus: PaymentStatus.APPROVED, updatedAt: new Date() })
+                                        .set({
+                                            paymentStatus: PaymentStatus.APPROVED,
+                                            status: matchedOrder.status === 'pending' || matchedOrder.status === 'confirmed'
+                                                ? 'processing'
+                                                : matchedOrder.status,
+                                            paidAt,
+                                            shippingData: matchedOrder.shippingMethod === 'delivery'
+                                                ? {
+                                                    ...matchedShipping,
+                                                    fulfillment: buildFulfillmentSnapshot(matchedShipping.selectedShipping, true, paidAt),
+                                                }
+                                                : matchedShipping,
+                                            updatedAt: paidAt,
+                                        })
                                         .where(eq(orders.id, matchedOrder.id));
 
                                     await db.insert(payments).values({

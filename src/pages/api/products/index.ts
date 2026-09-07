@@ -8,6 +8,7 @@ import {
     saveUploadedImage,
     saveUploadedImages,
 } from '@/lib/security/uploads';
+import { formatProductionLeadTime } from '@/lib/shipping/productionLeadTime';
 
 export const POST: APIRoute = async (context) => {
     if (!context.locals.user || context.locals.user.role !== 'admin') {
@@ -39,6 +40,12 @@ export const POST: APIRoute = async (context) => {
     const sku = formData.get('sku')?.toString() || null;
     const isActive = formData.get('isActive') === 'true'; // Checkbox boolean
     const isFeatured = formData.get('isFeatured') === 'true';
+    const productionMinBusinessDays = Number(formData.get('productionMinBusinessDays') || 0);
+    const productionMaxBusinessDays = Number(formData.get('productionMaxBusinessDays') || productionMinBusinessDays);
+    if (!Number.isSafeInteger(productionMinBusinessDays) || !Number.isSafeInteger(productionMaxBusinessDays)
+        || productionMinBusinessDays < 0 || productionMaxBusinessDays < productionMinBusinessDays || productionMaxBusinessDays > 365) {
+        return new Response(JSON.stringify({ error: 'Los días de elaboración deben ser enteros y el máximo no puede ser menor al mínimo' }), { status: 400 });
+    }
     const measurements = Object.fromEntries(['weight', 'height', 'width', 'length'].map((field) => {
         const raw = formData.get(field)?.toString().trim() || '';
         return [field, raw === '' ? null : Number(raw)];
@@ -78,7 +85,9 @@ export const POST: APIRoute = async (context) => {
                 categoryId,
                 description,
                 shortDescription: sanitizeRichText(formData.get('shortDescription')?.toString()) || null,
-                productionTime: formData.get('productionTime')?.toString() || null,
+                productionTime: formatProductionLeadTime(productionMinBusinessDays, productionMaxBusinessDays),
+                productionMinBusinessDays,
+                productionMaxBusinessDays,
                 minOrder: formData.get('minOrder') ? parseInt(formData.get('minOrder')!.toString()) : 1,
                 sku,
                 isActive,

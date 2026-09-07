@@ -21,6 +21,8 @@ interface ShippingQuoteResult {
     priceInclTax: number;
     estimatedDelivery: string;
     quotedEstimatedDelivery?: string;
+    customerEstimatedDelivery?: string;
+    productionTimeLabel?: string;
     deliveryTimeHours: number | null;
     estimationExpiresAt?: string;
     preparationTime?: string;
@@ -492,8 +494,11 @@ export default function CheckoutForm({ fields, shippingConfig, bankConfig }: Pro
                                                 )}
                                                 {option.estimatedDelivery && (
                                                     <p className="text-xs text-gray-500">
-                                                        Fecha máxima estimada: {formatDate(option.estimatedDelivery)}
+                                                        Entrega total estimada: {formatDate(option.estimatedDelivery)}
                                                     </p>
+                                                )}
+                                                {option.productionTimeLabel && (
+                                                    <p className="text-[11px] text-gray-400">Incluye {option.productionTimeLabel} de elaboración</p>
                                                 )}
                                             </div>
                                             <span className="text-sm font-bold text-brand-black whitespace-nowrap">

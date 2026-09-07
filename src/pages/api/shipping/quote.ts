@@ -2,8 +2,13 @@ import type { APIRoute } from 'astro';
 import { quoteShipment, getShippingConfig } from '@/lib/services/ShippingService';
 import type { ShippingQuoteItem, ShippingDestination } from '@/lib/services/ShippingService';
 import { db } from '@/lib/db/connection';
-import { products } from '@/lib/db/schema';
+import { products, productionTimeRules } from '@/lib/db/schema';
 import { inArray } from 'drizzle-orm';
+import {
+    enrichQuoteWithProduction,
+    resolveCartProductionLeadTime,
+    resolveProductionLeadTime,
+} from '@/lib/shipping/productionLeadTime';
 
 export const POST: APIRoute = async ({ request }) => {
     try {
@@ -35,7 +40,11 @@ export const POST: APIRoute = async ({ request }) => {
                 headers: { 'Content-Type': 'application/json' },
             });
         }
-        const dbProducts = await db.select().from(products).where(inArray(products.id, [...new Set(productIds)]));
+        const uniqueProductIds = [...new Set(productIds)];
+        const [dbProducts, timeRules] = await Promise.all([
+            db.select().from(products).where(inArray(products.id, uniqueProductIds)),
+            db.select().from(productionTimeRules).where(inArray(productionTimeRules.productId, uniqueProductIds)),
+        ]);
         const productById = new Map(dbProducts.map((product) => [product.id, product]));
         if (dbProducts.length !== new Set(productIds).size || dbProducts.some((product) => !product.isActive)) {
             return new Response(JSON.stringify({ error: 'Uno o más productos ya no están disponibles' }), {
@@ -56,12 +65,24 @@ export const POST: APIRoute = async ({ request }) => {
                 quantity,
             };
         });
+        const productionLead = resolveCartProductionLeadTime(requestedItems.map((item) => {
+            const product = productById.get(Number(item.productId))!;
+            const quantity = Math.min(1_000, Math.max(1, Number(item.quantity) || 1));
+            return resolveProductionLeadTime(
+                product,
+                quantity,
+                timeRules.filter((rule) => rule.productId === product.id),
+            );
+        }));
+        const quotedAt = new Date();
+        const includeProduction = (options: Awaited<ReturnType<typeof quoteShipment>>) =>
+            options.map((option) => enrichQuoteWithProduction(option, productionLead, quotedAt));
 
         const config = await getShippingConfig();
 
         // Verificar si aplica envío gratis
         if (config.freeShippingEnabled && declaredValue >= config.freeShippingThreshold) {
-            const quotedOptions = await quoteShipment(items, destination, declaredValue);
+            const quotedOptions = includeProduction(await quoteShipment(items, destination, declaredValue));
             return new Response(JSON.stringify({
                 results: quotedOptions.map((option) => ({
                     ...option,
@@ -70,15 +91,16 @@ export const POST: APIRoute = async ({ request }) => {
                     priceInclTax: 0,
                 })),
                 freeShipping: true,
+                productionLead,
             }), {
                 status: 200,
                 headers: { 'Content-Type': 'application/json' },
             });
         }
 
-        const results = await quoteShipment(items, destination, declaredValue);
+        const results = includeProduction(await quoteShipment(items, destination, declaredValue));
 
-        return new Response(JSON.stringify({ results, freeShipping: false }), {
+        return new Response(JSON.stringify({ results, freeShipping: false, productionLead }), {
             status: 200,
             headers: { 'Content-Type': 'application/json' },
         });

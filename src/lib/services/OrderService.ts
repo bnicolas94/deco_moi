@@ -2,6 +2,7 @@ import { db } from '@/lib/db/connection';
 import { orders, orderItems, payments } from '@/lib/db/schema';
 import { OrderStatus, PaymentStatus } from '@/types/order';
 import { CostSnapshotService } from './CostSnapshotService';
+import { buildFulfillmentSnapshot } from '@/lib/shipping/productionLeadTime';
 
 export interface CreateOrderData {
     items: any[];
@@ -38,12 +39,24 @@ export class OrderService {
 
         // 1. Crear la Orden
         const initialPaymentStatus = paymentMethod === 'transfer' ? PaymentStatus.PENDING_TRANSFER : PaymentStatus.APPROVED;
+        const createdAt = new Date();
+        const selectedShipping = shippingData?.selectedShipping || null;
+        const shippingDataWithFulfillment = shippingMethod === 'delivery'
+            ? {
+                ...shippingData,
+                fulfillment: buildFulfillmentSnapshot(
+                    selectedShipping,
+                    initialPaymentStatus === PaymentStatus.APPROVED,
+                    createdAt,
+                ),
+            }
+            : shippingData;
 
         const [newOrder] = await db.insert(orders).values({
             id: crypto.randomUUID(),
             orderNumber,
             userId,
-            status: OrderStatus.PENDING, // Siempre inicia como Pendiente para gestión interna de Deco Moi
+            status: initialPaymentStatus === PaymentStatus.APPROVED ? OrderStatus.PROCESSING : OrderStatus.PENDING,
             subtotal: String(subtotal),
             total: String(total),
             discountAmount: String(discountAmount),
@@ -53,11 +66,11 @@ export class OrderService {
             salesChannel: 'app',
             financialStatus: 'provisional',
             paidAt: initialPaymentStatus === PaymentStatus.APPROVED ? new Date() : null,
-            shippingData,
+            shippingData: shippingDataWithFulfillment,
             shippingMethod,
             notes: notes || `Pago ${paymentMethod} ${paymentId ? '#' + paymentId : ''} procesado.`,
-            createdAt: new Date(),
-            updatedAt: new Date(),
+            createdAt,
+            updatedAt: createdAt,
         }).returning();
 
         // 2. Crear los ítems
@@ -86,6 +99,8 @@ export class OrderService {
                 customization: Object.keys(customization).length > 0 ? customization : null,
                 variantId: item.variantId || null,
                 productionTime: item.productionTime || null,
+                productionMinBusinessDays: item.productionMinBusinessDays ?? null,
+                productionMaxBusinessDays: item.productionMaxBusinessDays ?? null,
                 packQuantity: 1,
                 internalUnits: item.quantity,
                 grossAmount: String(itemGross),

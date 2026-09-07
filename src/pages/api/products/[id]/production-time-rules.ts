@@ -2,6 +2,7 @@ import type { APIRoute } from 'astro';
 import { db } from '@/lib/db/connection';
 import { productionTimeRules } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
+import { formatProductionLeadTime } from '@/lib/shipping/productionLeadTime';
 
 export const PUT: APIRoute = async (context) => {
     if (!context.locals.user || context.locals.user.role !== 'admin') {
@@ -15,7 +16,12 @@ export const PUT: APIRoute = async (context) => {
 
     try {
         const body = await context.request.json();
-        const rules: Array<{ minQuantity: number; maxQuantity: number | null; productionTime: string }> = body.rules || [];
+        const rules: Array<{
+            minQuantity: number;
+            maxQuantity: number | null;
+            productionMinBusinessDays: number;
+            productionMaxBusinessDays: number;
+        }> = body.rules || [];
 
         // Validar que no haya solapamientos
         for (let i = 0; i < rules.length; i++) {
@@ -26,8 +32,10 @@ export const PUT: APIRoute = async (context) => {
             if (ruleA.maxQuantity !== null && ruleA.maxQuantity < ruleA.minQuantity) {
                 return new Response(JSON.stringify({ error: `La cantidad máxima no puede ser menor que la mínima (rango ${i + 1})` }), { status: 400 });
             }
-            if (!ruleA.productionTime || ruleA.productionTime.trim() === '') {
-                return new Response(JSON.stringify({ error: `El tiempo de producción es requerido (rango ${i + 1})` }), { status: 400 });
+            if (!Number.isSafeInteger(ruleA.productionMinBusinessDays) || !Number.isSafeInteger(ruleA.productionMaxBusinessDays)
+                || ruleA.productionMinBusinessDays < 0 || ruleA.productionMaxBusinessDays < ruleA.productionMinBusinessDays
+                || ruleA.productionMaxBusinessDays > 365) {
+                return new Response(JSON.stringify({ error: `Los días de elaboración son inválidos (rango ${i + 1})` }), { status: 400 });
             }
 
             for (let j = i + 1; j < rules.length; j++) {
@@ -53,7 +61,9 @@ export const PUT: APIRoute = async (context) => {
                         productId,
                         minQuantity: r.minQuantity,
                         maxQuantity: r.maxQuantity,
-                        productionTime: r.productionTime.trim(),
+                        productionTime: formatProductionLeadTime(r.productionMinBusinessDays, r.productionMaxBusinessDays),
+                        productionMinBusinessDays: r.productionMinBusinessDays,
+                        productionMaxBusinessDays: r.productionMaxBusinessDays,
                     }))
                 );
             }

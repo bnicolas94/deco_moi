@@ -11,6 +11,11 @@ import {
 import { getBankTransferConfig, getCheckoutFields } from '@/lib/services/ConfigService';
 import { getShippingConfig, quoteShipment } from '@/lib/services/ShippingService';
 import type { ShippingQuoteItem, ShippingQuoteResult } from '@/lib/services/ShippingService';
+import {
+    enrichQuoteWithProduction,
+    resolveCartProductionLeadTime,
+    resolveProductionLeadTime,
+} from '@/lib/shipping/productionLeadTime';
 
 const MAX_ITEMS = 50;
 const MAX_QUANTITY = 10_000;
@@ -44,6 +49,8 @@ export interface ValidatedCheckoutItem {
     }>;
     customization?: string;
     productionTime: string | null;
+    productionMinBusinessDays: number;
+    productionMaxBusinessDays: number;
     shippingItem: ShippingQuoteItem;
 }
 
@@ -167,17 +174,6 @@ function getApplicableUnitPrice(
     const effectiveBase = basePrice + optionsModifier;
     const discount = applicableRule?.discountPercentage ? Number(applicableRule.discountPercentage) : 0;
     return roundMoney(effectiveBase * (1 - discount / 100));
-}
-
-function getProductionTime(
-    fallback: string | null,
-    quantity: number,
-    rules: Array<typeof productionTimeRules.$inferSelect>,
-): string | null {
-    return rules
-        .filter((rule) => quantity >= rule.minQuantity && (rule.maxQuantity === null || quantity <= rule.maxQuantity))
-        .sort((a, b) => b.minQuantity - a.minQuantity)[0]?.productionTime
-        || fallback;
 }
 
 export async function validateCheckoutPayload(payload: unknown): Promise<ValidatedCheckout> {
@@ -352,6 +348,11 @@ export async function validateCheckoutPayload(payload: unknown): Promise<Validat
         }
 
         const sku = variant?.sku || product.sku || `SKU-${product.id}`;
+        const productionLead = resolveProductionLeadTime(
+            product,
+            quantity,
+            allTimeRules.filter((rule) => rule.productId === productId),
+        );
         validatedItems.push({
             id: product.id,
             name: product.name,
@@ -369,11 +370,9 @@ export async function validateCheckoutPayload(payload: unknown): Promise<Validat
                 priceModifier: Number(selection.option.priceModifier || 0),
             })),
             customization: sanitizeText(rawItem?.customization, 2_000) || undefined,
-            productionTime: getProductionTime(
-                product.productionTime,
-                quantity,
-                allTimeRules.filter((rule) => rule.productId === productId),
-            ),
+            productionTime: productionLead.label,
+            productionMinBusinessDays: productionLead.minBusinessDays,
+            productionMaxBusinessDays: productionLead.maxBusinessDays,
             shippingItem: {
                 sku,
                 description: product.name,
@@ -396,6 +395,14 @@ export async function validateCheckoutPayload(payload: unknown): Promise<Validat
     }
 
     const shippingConfig = await getShippingConfig();
+    const productionLead = resolveCartProductionLeadTime(validatedItems.map((item) => ({
+        minBusinessDays: item.productionMinBusinessDays,
+        maxBusinessDays: item.productionMaxBusinessDays,
+        label: item.productionTime || '',
+    })));
+    const quotedAt = new Date();
+    const includeProduction = (quotes: ShippingQuoteResult[]) =>
+        quotes.map((quote) => enrichQuoteWithProduction(quote, productionLead, quotedAt));
     let selectedShipping: ShippingQuoteResult | null = null;
     let shippingCost = 0;
 
@@ -427,7 +434,7 @@ export async function validateCheckoutPayload(payload: unknown): Promise<Validat
 
         if (shippingConfig.freeShippingEnabled && subtotal >= shippingConfig.freeShippingThreshold) {
             const quoteId = sanitizeText(body.selectedShipping?.id, 200);
-            const quotes = await quoteShipment(validatedItems.map((item) => item.shippingItem), destination, subtotal);
+            const quotes = includeProduction(await quoteShipment(validatedItems.map((item) => item.shippingItem), destination, subtotal));
             const quotedOption = quotes.find((quote) => quote.id === quoteId) || null;
             if (!quotedOption) {
                 throw new CheckoutValidationError('La opción de envío gratis ya no está disponible. Volvé a cotizar.');
@@ -444,7 +451,7 @@ export async function validateCheckoutPayload(payload: unknown): Promise<Validat
                 throw new CheckoutValidationError('Debés seleccionar una opción de envío');
             }
 
-            const quotes = await quoteShipment(validatedItems.map((item) => item.shippingItem), destination, subtotal);
+            const quotes = includeProduction(await quoteShipment(validatedItems.map((item) => item.shippingItem), destination, subtotal));
             selectedShipping = quotes.find((quote) => quote.id === quoteId) || null;
             if (!selectedShipping) {
                 throw new CheckoutValidationError('La opción de envío ya no está disponible. Volvé a cotizar.');
