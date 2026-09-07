@@ -2,11 +2,11 @@ import { randomUUID } from 'node:crypto';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import sharp from 'sharp';
+import { MAX_IMAGE_INPUT_PIXELS } from '@/lib/images';
 
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 const MAX_MULTIPART_BYTES = 50 * 1024 * 1024;
 const MAX_FILES_PER_FIELD = 20;
-const MAX_IMAGE_PIXELS = 40_000_000;
 const MAX_IMAGE_DIMENSION = 2000;
 
 const IMAGE_TYPES = {
@@ -80,7 +80,8 @@ async function prepareImage(file: File): Promise<PreparedImage> {
     try {
         const image = sharp(bytes, {
             failOn: 'error',
-            limitInputPixels: MAX_IMAGE_PIXELS,
+            limitInputPixels: MAX_IMAGE_INPUT_PIXELS,
+            sequentialRead: true,
         });
         const metadata = await image.metadata();
         if (!metadata.width || !metadata.height) {
@@ -100,7 +101,10 @@ async function prepareImage(file: File): Promise<PreparedImage> {
             .toBuffer();
 
         return { bytes: new Uint8Array(optimized), extension: 'webp' };
-    } catch {
+    } catch (error) {
+        if (error instanceof Error && /pixel limit/i.test(error.message)) {
+            throw new ImageUploadError('La imagen supera los 64 megapíxeles. Reducí sus dimensiones y volvé a intentar.');
+        }
         throw new ImageUploadError('No se pudo procesar la imagen. Verificá que el archivo no esté dañado.');
     }
 }

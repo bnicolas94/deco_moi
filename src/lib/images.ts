@@ -1,4 +1,5 @@
 export const RESPONSIVE_IMAGE_WIDTHS = [160, 320, 480, 640, 960, 1280, 1600] as const;
+export const MAX_IMAGE_INPUT_PIXELS = 64_000_000;
 
 type ResponsiveImageWidth = (typeof RESPONSIVE_IMAGE_WIDTHS)[number];
 

@@ -2,9 +2,9 @@ import type { APIRoute } from 'astro';
 import sharp from 'sharp';
 import { basename, extname } from 'node:path';
 import { getSafeUploadPath, readUploadedFile } from '@/lib/security/uploadFiles';
+import { MAX_IMAGE_INPUT_PIXELS } from '@/lib/images';
 
 const ALLOWED_WIDTHS = new Set([160, 320, 480, 640, 960, 1280, 1600]);
-const MAX_INPUT_PIXELS = 40_000_000;
 const MAX_CACHE_ENTRIES = 64;
 const optimizedImageCache = new Map<string, Promise<Buffer | null>>();
 
@@ -31,7 +31,8 @@ async function getOptimizedImage(relativePath: string, width: number): Promise<B
 
         return sharp(source, {
             failOn: 'error',
-            limitInputPixels: MAX_INPUT_PIXELS,
+            limitInputPixels: MAX_IMAGE_INPUT_PIXELS,
+            sequentialRead: true,
         })
             .rotate()
             .resize({ width, fit: 'inside', withoutEnlargement: true })

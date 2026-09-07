@@ -1054,6 +1054,7 @@ const SUPPLY_ICONS: Record<string, string> = {
                             <div class="p-2.5 bg-gray-50 border border-gray-100 rounded-xl group-hover:bg-indigo-50 transition-colors">
                                 <Plus className="w-5 h-5 text-gray-400 group-hover:text-indigo-500" />
                             </div>
+                            <span class="text-[10px] text-gray-400">JPG, PNG o WEBP · Máx. 8 MB y 64 MP</span>
                         </div>
                         <input 
                             type="file" 
@@ -1920,8 +1921,16 @@ const SUPPLY_ICONS: Record<string, string> = {
                     else window.location.reload();
                 }, 1000);
             } else {
-                const text = await response.text();
-                alert('Error al guardar: ' + text);
+                const responseBody = await response.text();
+                let errorMessage = responseBody || 'No se pudo guardar el producto';
+                try {
+                    const errorData = JSON.parse(responseBody);
+                    if (typeof errorData?.error === 'string') errorMessage = errorData.error;
+                } catch {
+                    // La API puede devolver texto plano en errores no estructurados.
+                }
+                if (window.showToast) window.showToast(errorMessage, 'error');
+                else alert('Error al guardar: ' + errorMessage);
                 // Reset loading state
                 saveBtns.forEach(btn => btn.disabled = false);
                 saveSpinners.forEach(s => s.classList.add('hidden'));
