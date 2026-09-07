@@ -1,6 +1,11 @@
 import { db } from '../db/connection';
 import { siteConfig } from '../db/schema';
 import { eq } from 'drizzle-orm';
+import { normalizeZipnovaQuoteResult } from '../shipping/zipnovaQuote.ts';
+import type { ShippingQuoteResult } from '../shipping/zipnovaQuote.ts';
+
+export { normalizeZipnovaQuoteResult } from '../shipping/zipnovaQuote.ts';
+export type { ShippingQuoteResult } from '../shipping/zipnovaQuote.ts';
 
 // ============================================
 // TIPOS
@@ -36,24 +41,6 @@ export interface ShippingDestination {
     state: string;
     zipcode: string;
     country?: string;
-}
-
-export interface ShippingQuoteResult {
-    id: string;
-    serviceType: string;
-    serviceTypeName: string;
-    logisticType: string;
-    logisticTypeName: string;
-    carrierName: string;
-    carrierId: number;
-    price: number;
-    priceInclTax: number;
-    carrierCost?: number;
-    estimatedDelivery: string;
-    deliveryTimeHours: number | null;
-    pickupPointId?: number;
-    pickupPointName?: string;
-    pickupPointAddress?: string;
 }
 
 export interface ZipnovaQuoteResponse {
@@ -186,7 +173,8 @@ function areCredentialsConfigured(): boolean {
 export async function quoteShipment(
     items: ShippingQuoteItem[],
     destination: ShippingDestination,
-    declaredValue: number
+    declaredValue: number,
+    options: { includeAllResults?: boolean } = {},
 ): Promise<ShippingQuoteResult[]> {
     const config = await getShippingConfig();
 
@@ -275,7 +263,9 @@ export async function quoteShipment(
         // Buscar el array de resultados — la API puede retornarlo en diferentes estructuras
         let resultsArray: any[] = [];
 
-        if (Array.isArray(data)) {
+        if (options.includeAllResults && Array.isArray(data.all_results)) {
+            resultsArray = data.all_results;
+        } else if (Array.isArray(data)) {
             // La respuesta es directamente un array
             resultsArray = data;
         } else if (Array.isArray(data.results)) {
@@ -296,42 +286,9 @@ export async function quoteShipment(
             return [];
         }
 
-        return resultsArray.filter((result: any) => result?.selectable !== false).flatMap((result: any, index: number) => {
-            // Manejar diferentes posibles estructuras de cada resultado
-            const serviceType = result.service_type || {};
-            const logisticType = result.logistic_type || {};
-            const carrier = result.carrier || {};
-            const amounts = result.amounts || result.price || {};
-            const deliveryTime = result.delivery_time || {};
-            const pickupPoints = Array.isArray(result.pickup_points) ? result.pickup_points : [];
-            const baseResult = {
-                serviceType: serviceType.code || serviceType.id?.toString() || '',
-                serviceTypeName: serviceType.name || serviceType.description || 'Envío estándar',
-                logisticType: logisticType.code || logisticType.id?.toString() || '',
-                logisticTypeName: logisticType.name || logisticType.description || '',
-                carrierName: carrier.name || 'Correo',
-                carrierId: carrier.id || 0,
-                price: amounts.price_incl_tax || amounts.price || amounts.total || 0,
-                priceInclTax: amounts.price_incl_tax || amounts.price || amounts.total || 0,
-                estimatedDelivery: deliveryTime.estimated_delivery || '',
-                deliveryTimeHours: null,
-            };
-
-            if (baseResult.serviceType === 'pickup_point' && pickupPoints.length > 0) {
-                return pickupPoints.map((point: any) => ({
-                    ...baseResult,
-                    id: `zipnova_${carrier.id || index}_${baseResult.serviceType}_${baseResult.logisticType}_${point.point_id || point.id}`,
-                    pickupPointId: Number(point.point_id || point.id),
-                    pickupPointName: point.name || point.description || 'Punto de entrega',
-                    pickupPointAddress: point.address || point.full_address || '',
-                }));
-            }
-
-            return [{
-                ...baseResult,
-                id: `zipnova_${carrier.id || index}_${baseResult.serviceType || 'std'}_${baseResult.logisticType || 'std'}`,
-            }];
-        });
+        return resultsArray
+            .filter((result: any) => result?.selectable !== false)
+            .flatMap((result: any, index: number) => normalizeZipnovaQuoteResult(result, index));
     } catch (error) {
         console.error('[Zipnova] Error de red al cotizar:', error);
         return [];

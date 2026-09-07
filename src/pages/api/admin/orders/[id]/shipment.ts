@@ -2,7 +2,9 @@ import type { APIRoute } from 'astro';
 import { eq } from 'drizzle-orm';
 import { db } from '@/lib/db/connection';
 import { orders } from '@/lib/db/schema';
-import { createShipment, getShipment } from '@/lib/services/ShippingService';
+import { createShipment, getShipment, quoteShipment } from '@/lib/services/ShippingService';
+import type { ShippingQuoteResult } from '@/lib/services/ShippingService';
+import { recoverShippingSelection } from '@/lib/shipping/recoverSelection';
 
 function json(data: unknown, status = 200): Response {
     return new Response(JSON.stringify(data), {
@@ -72,10 +74,7 @@ export const POST: APIRoute = async (context) => {
     if (order.status === 'cancelled') return json({ error: 'No se puede despachar una orden cancelada.' }, 409);
 
     const shipping = (order.shippingData || {}) as Record<string, any>;
-    const selected = shipping.selectedShipping;
-    if (!selected?.serviceType || !selected?.logisticType || !Number(selected?.carrierId)) {
-        return json({ error: 'La orden no tiene una opción válida de Zipnova. Las tarifas fijas se despachan manualmente.' }, 409);
-    }
+    let selected = shipping.selectedShipping as ShippingQuoteResult | undefined;
 
     let requestBody: Record<string, any> = {};
     try {
@@ -103,7 +102,7 @@ export const POST: APIRoute = async (context) => {
         email: String(shipping.email || '').trim(),
         phone: String(shipping.phone || '').trim(),
         country: 'AR',
-        pointId: selected.pickupPointId ? Number(selected.pickupPointId) : undefined,
+        pointId: selected?.pickupPointId ? Number(selected.pickupPointId) : undefined,
     };
     const missing = Object.entries({
         nombre: destination.name,
@@ -115,7 +114,7 @@ export const POST: APIRoute = async (context) => {
         email: destination.email,
         teléfono: destination.phone,
     }).filter(([, value]) => !value).map(([label]) => label);
-    if (selected.serviceType === 'pickup_point') {
+    if (selected?.serviceType === 'pickup_point') {
         const addressOnly = new Set(['calle', 'número', 'localidad', 'provincia', 'código postal']);
         for (let index = missing.length - 1; index >= 0; index--) {
             if (addressOnly.has(missing[index])) missing.splice(index, 1);
@@ -124,19 +123,44 @@ export const POST: APIRoute = async (context) => {
     }
     if (missing.length > 0) return json({ error: `Faltan datos de envío: ${missing.join(', ')}.` }, 400);
 
+    const shipmentItems = order.items.map((item) => ({
+        sku: item.productSku || `PRODUCT-${item.productId}`,
+        description: item.productName,
+        weight: item.product?.weight || 0,
+        height: item.product?.height || 0,
+        width: item.product?.width || 0,
+        length: item.product?.length || 0,
+        quantity: item.quantity,
+    }));
+    const declaredValue = Math.max(0, Number(order.subtotal) - Number(order.discountAmount || 0));
+
     try {
+        if (!selected?.serviceType || !selected?.logisticType || !Number(selected?.carrierId)) {
+            if (selected?.id === 'flat_rate' || selected?.serviceType === 'flat_rate') {
+                return json({ error: 'Esta orden usa una tarifa fija y debe despacharse manualmente.' }, 409);
+            }
+
+            const previousSelection = selected;
+            const quotes = await quoteShipment(shipmentItems, {
+                city: destination.city,
+                state: destination.state,
+                zipcode: destination.zipcode,
+                country: destination.country,
+            }, declaredValue, { includeAllResults: true });
+            const recovered = recoverShippingSelection(previousSelection, quotes, Number(order.shippingCost));
+
+            if (!recovered) {
+                return json({ error: 'No pudimos reconstruir la opción elegida. Volvé a cotizar o gestioná el envío manualmente.' }, 409);
+            }
+
+            selected = recovered;
+            destination.pointId = selected.pickupPointId;
+        }
+
         const createdPayload = await createShipment({
-            items: order.items.map((item) => ({
-                sku: item.productSku || `PRODUCT-${item.productId}`,
-                description: item.productName,
-                weight: item.product?.weight || 0,
-                height: item.product?.height || 0,
-                width: item.product?.width || 0,
-                length: item.product?.length || 0,
-                quantity: item.quantity,
-            })),
+            items: shipmentItems,
             destination,
-            declaredValue: Math.max(0, Number(order.subtotal) - Number(order.discountAmount || 0)),
+            declaredValue,
             externalId: order.orderNumber.slice(0, 30),
             serviceType: selected.serviceType,
             logisticType: selected.logisticType,
@@ -148,6 +172,7 @@ export const POST: APIRoute = async (context) => {
         const shippingData = {
             ...shipping,
             document,
+            selectedShipping: selected,
             zipnovaShipment: shipment,
         };
         await db.update(orders).set({
