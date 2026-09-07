@@ -3,7 +3,8 @@ import AdminLayout from '@/layouts/AdminLayout.astro';
 import { db } from '@/lib/db/connection';
 import { orders, addresses } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
-import { ArrowLeft, Package, User, MapPin, CreditCard, Trash2, Save } from 'lucide-react';
+import { ArrowLeft, Package, User, MapPin, CreditCard, Trash2, Save, Truck, Download, RefreshCw, ExternalLink } from 'lucide-react';
+import { sanitizePublicUrl } from '@/lib/security/html';
 
 const { id } = Astro.params;
 
@@ -48,7 +49,18 @@ const paymentStatusOptions = [
 
 // Procesar shippingData fuera del template para evitar errores de compilación
 const shipping = order.shippingData as any;
-const shippingDataEntries = order.shippingData ? Object.entries(order.shippingData as Record<string, any>) : [];
+const selectedShipping = shipping?.selectedShipping;
+const shipment = shipping?.zipnovaShipment;
+const trackingUrl = sanitizePublicUrl(shipment?.trackingExternal || shipment?.tracking);
+const documentValue = String(shipping?.document || shipping?.dni || shipping?.cuit || shipping?.transfer_dni || '').replace(/\D/g, '');
+const deliveryAddress = {
+    street: shippingAddress?.street || shipping?.street || '',
+    number: shippingAddress?.number || shipping?.number || shipping?.street_number || '',
+    extras: [shippingAddress?.floor, shippingAddress?.apartment].filter(Boolean).join(' ') || shipping?.floor_apt || '',
+    city: shippingAddress?.city || shipping?.city || '',
+    state: shippingAddress?.state || shipping?.state || '',
+    postalCode: shippingAddress?.postalCode || shipping?.postal_code || shipping?.zipcode || '',
+};
 
 const customerDisplayName = shipping?.full_name || order.user?.name || 'Invitado';
 const customerDisplayEmail = shipping?.email || order.user?.email || 'N/A';
@@ -67,7 +79,7 @@ const customerDisplayPhone = shipping?.phone || order.user?.phone || '-';
                     Orden <span class="text-indigo-600">#{order.orderNumber}</span>
                 </h1>
                 <p class="text-sm text-gray-500">
-                    Realizada el {new Date(order.createdAt).toLocaleString()}
+                    Realizada el {order.createdAt ? new Date(order.createdAt).toLocaleString() : '-'}
                 </p>
             </div>
             <div class="flex items-center gap-3" id="delete-container">
@@ -145,16 +157,16 @@ const customerDisplayPhone = shipping?.phone || order.user?.phone || '-';
                                 <td colspan="3" class="px-3 py-3 text-sm font-medium text-gray-900 text-right">Subtotal:</td>
                                 <td class="px-3 py-3 text-sm text-gray-900 text-right">${parseFloat(order.subtotal).toFixed(2)}</td>
                             </tr>
-                            {parseFloat(order.shippingCost) > 0 && (
+                            {parseFloat(order.shippingCost || '0') > 0 && (
                                 <tr>
                                     <td colspan="3" class="px-3 py-3 text-sm font-medium text-gray-900 text-right">Envío:</td>
-                                    <td class="px-3 py-3 text-sm text-gray-900 text-right">${parseFloat(order.shippingCost).toFixed(2)}</td>
+                                    <td class="px-3 py-3 text-sm text-gray-900 text-right">${parseFloat(order.shippingCost || '0').toFixed(2)}</td>
                                 </tr>
                             )}
-                            {parseFloat(order.discountAmount) > 0 && (
+                            {parseFloat(order.discountAmount || '0') > 0 && (
                                 <tr>
                                     <td colspan="3" class="px-3 py-3 text-sm font-medium text-gray-900 text-right text-green-600">Descuento:</td>
-                                    <td class="px-3 py-3 text-sm text-green-600 text-right">-${parseFloat(order.discountAmount).toFixed(2)}</td>
+                                    <td class="px-3 py-3 text-sm text-green-600 text-right">-${parseFloat(order.discountAmount || '0').toFixed(2)}</td>
                                 </tr>
                             )}
                             <tr class="bg-gray-50">
@@ -172,37 +184,117 @@ const customerDisplayPhone = shipping?.phone || order.user?.phone || '-';
                     <MapPin className="w-5 h-5 mr-2 text-gray-400" />
                     Datos de Envío y Entrega
                 </h2>
-                {shippingAddress ? (
+                {order.salesChannel !== 'app' ? (
+                    <div class="rounded-xl border border-sky-100 bg-sky-50 p-4 text-sm text-sky-800">
+                        La dirección y los datos protegidos del comprador se consultan en la orden de Mercado Libre.
+                    </div>
+                ) : order.shippingMethod === 'pickup' ? (
+                    <div class="rounded-xl border border-amber-100 bg-amber-50 p-4 text-sm text-amber-800">
+                        Retiro en local. No requiere generar una etiqueta de transporte.
+                    </div>
+                ) : (
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-6 text-sm">
                         <div class="space-y-1">
                             <span class="text-xs text-gray-400 uppercase font-bold block">Destinatario</span>
-                            <p class="font-medium text-gray-900">{shippingAddress.name}</p>
+                            <p class="font-medium text-gray-900">{customerDisplayName}</p>
                             <p class="text-gray-600">{customerDisplayPhone}</p>
                         </div>
                         <div class="space-y-1">
                             <span class="text-xs text-gray-400 uppercase font-bold block">Dirección</span>
-                            <p class="text-gray-900">{shippingAddress.street} {shippingAddress.number}</p>
-                            {shippingAddress.floor && <p class="text-gray-900">{shippingAddress.floor} {shippingAddress.apartment}</p>}
+                            <p class="text-gray-900">{deliveryAddress.street} {deliveryAddress.number}</p>
+                            {deliveryAddress.extras && <p class="text-gray-600">{deliveryAddress.extras}</p>}
                         </div>
                         <div class="space-y-1">
                             <span class="text-xs text-gray-400 uppercase font-bold block">Localidad</span>
-                            <p class="text-gray-900">{shippingAddress.city}, {shippingAddress.state}</p>
-                            <p class="text-gray-600">CP: {shippingAddress.postalCode}</p>
+                            <p class="text-gray-900">{deliveryAddress.city}, {deliveryAddress.state}</p>
+                            <p class="text-gray-600">CP: {deliveryAddress.postalCode}</p>
                         </div>
                     </div>
+                )}
+            </div>
+
+            <!-- Fulfillment / Zipnova -->
+            <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-100">
+                <div class="mb-4 flex flex-col gap-3 border-b pb-4 sm:flex-row sm:items-center sm:justify-between">
+                    <h2 class="flex items-center text-lg font-medium text-gray-900">
+                        <Truck className="mr-2 h-5 w-5 text-gray-400" />
+                        Despacho y etiqueta
+                    </h2>
+                    {shipment?.statusName && (
+                        <span class="inline-flex w-fit items-center rounded-full border border-sky-100 bg-sky-50 px-3 py-1 text-xs font-bold text-sky-700">
+                            {shipment.statusName}
+                        </span>
+                    )}
+                </div>
+
+                {order.salesChannel !== 'app' ? (
+                    <div class="rounded-xl border border-sky-100 bg-sky-50 p-4 text-sm text-sky-800">
+                        Esta venta proviene de Mercado Libre. La etiqueta se gestiona con Mercado Envíos desde la orden de Mercado Libre.
+                    </div>
+                ) : order.shippingMethod !== 'delivery' ? (
+                    <p class="text-sm text-gray-500">No hace falta etiqueta porque el cliente retira su pedido.</p>
                 ) : (
-                    <div>
-                         {shippingDataEntries.length > 0 ? (
-                            <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4 text-sm">
-                                {shippingDataEntries.map(([key, val]) => (
-                                    <div class="border-b border-gray-50 pb-2">
-                                        <span class="text-[10px] text-gray-400 uppercase font-bold block mb-1 truncate" title={key}>{key.replace(/_/g, ' ')}</span>
-                                        <span class="text-gray-900 font-medium block truncate" title={val as string}>{val}</span>
+                    <div class="space-y-5">
+                        <div class="grid grid-cols-1 gap-4 text-sm sm:grid-cols-3">
+                            <div>
+                                <span class="block text-[10px] font-bold uppercase tracking-wider text-gray-400">Transporte</span>
+                                <p class="mt-1 font-semibold text-gray-900">{shipment?.carrierName || selectedShipping?.carrierName || 'Sin seleccionar'}</p>
+                            </div>
+                            <div>
+                                <span class="block text-[10px] font-bold uppercase tracking-wider text-gray-400">Servicio</span>
+                                <p class="mt-1 font-semibold text-gray-900">{selectedShipping?.serviceTypeName || '-'}</p>
+                            </div>
+                            <div>
+                                <span class="block text-[10px] font-bold uppercase tracking-wider text-gray-400">Costo cobrado</span>
+                                <p class="mt-1 font-semibold text-gray-900">${Number(order.shippingCost || 0).toLocaleString('es-AR')}</p>
+                            </div>
+                        </div>
+
+                        {order.zipnovaShipmentId ? (
+                            <div class="rounded-2xl border border-emerald-100 bg-emerald-50/60 p-4">
+                                <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                    <div>
+                                        <p class="text-xs font-bold uppercase tracking-wider text-emerald-700">Despacho Zipnova creado</p>
+                                        <p class="mt-1 font-mono text-sm text-gray-700">ID {order.zipnovaShipmentId}</p>
+                                        {shipment?.carrierTrackingId && <p class="mt-1 text-xs text-gray-500">Seguimiento: {shipment.carrierTrackingId}</p>}
                                     </div>
-                                ))}
+                                    <div class="flex flex-wrap gap-2">
+                                        <button id="download-label-btn" type="button" class="inline-flex items-center rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-emerald-700">
+                                            <Download className="mr-2 h-4 w-4" /> Descargar etiqueta
+                                        </button>
+                                        <button id="refresh-shipment-btn" type="button" class="inline-flex items-center rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-bold text-gray-700 transition hover:bg-gray-50">
+                                            <RefreshCw className="mr-2 h-4 w-4" /> Actualizar
+                                        </button>
+                                        {trackingUrl && (
+                                            <a href={trackingUrl} target="_blank" rel="noopener noreferrer" class="inline-flex items-center rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-bold text-gray-700 transition hover:bg-gray-50">
+                                                <ExternalLink className="mr-2 h-4 w-4" /> Seguimiento
+                                            </a>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        ) : !Number(selectedShipping?.carrierId) ? (
+                            <div class="rounded-xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700">
+                                Esta orden usa una tarifa manual. Prepará el envío fuera de Zipnova o volvé a cotizar con un transporte integrado.
+                            </div>
+                        ) : order.paymentStatus !== 'approved' ? (
+                            <div class="rounded-xl border border-amber-100 bg-amber-50 p-4 text-sm text-amber-800">
+                                Cuando el pago figure como aprobado vas a poder generar el despacho y descargar su etiqueta desde acá.
                             </div>
                         ) : (
-                            <p class="text-sm text-gray-500 italic">No hay datos de envío disponibles.</p>
+                            <div class="rounded-2xl border border-indigo-100 bg-indigo-50/50 p-4">
+                                <p class="text-sm font-semibold text-gray-900">Listo para generar el despacho</p>
+                                <p class="mt-1 text-xs leading-relaxed text-gray-500">Esta acción crea el envío real en Zipnova. Se puede ejecutar una sola vez por orden.</p>
+                                <div class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
+                                    <label class="flex-1 text-xs font-bold text-gray-600">
+                                        DNI/CUIT del destinatario
+                                        <input id="shipment-document" type="text" inputmode="numeric" value={documentValue} placeholder="Ej: 30123456" class="mt-1 block h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-sm font-normal focus:border-indigo-500 focus:ring-indigo-500" />
+                                    </label>
+                                    <button id="create-shipment-btn" type="button" class="inline-flex h-11 items-center justify-center rounded-xl bg-indigo-600 px-5 text-sm font-bold text-white transition hover:bg-indigo-700">
+                                        <Truck className="mr-2 h-4 w-4" /> Generar despacho
+                                    </button>
+                                </div>
+                            </div>
                         )}
                     </div>
                 )}
@@ -280,7 +372,7 @@ const customerDisplayPhone = shipping?.phone || order.user?.phone || '-';
     </div>
 </AdminLayout>
 
-<script define:vars={{ id }}>
+<script is:inline define:vars={{ id }}>
     console.log('Controlador de orden cargado:', id);
 
     function initHandlers() {
@@ -289,6 +381,89 @@ const customerDisplayPhone = shipping?.phone || order.user?.phone || '-';
         const finalDeleteBtn = document.getElementById('final-delete-btn');
         const cancelDeleteBtn = document.getElementById('cancel-delete-btn');
         const statusForm = document.getElementById('status-form');
+        const createShipmentBtn = document.getElementById('create-shipment-btn');
+        const refreshShipmentBtn = document.getElementById('refresh-shipment-btn');
+        const downloadLabelBtn = document.getElementById('download-label-btn');
+
+        if (createShipmentBtn && !createShipmentBtn.dataset.handled) {
+            createShipmentBtn.dataset.handled = 'true';
+            createShipmentBtn.addEventListener('click', async () => {
+                const documentInput = document.getElementById('shipment-document');
+                const recipientDocument = documentInput instanceof HTMLInputElement ? documentInput.value.trim() : '';
+                if (!/^\d{7,11}$/.test(recipientDocument.replace(/\D/g, ''))) {
+                    window.showToast('Ingresá un DNI/CUIT válido', 'error');
+                    documentInput?.focus();
+                    return;
+                }
+                if (!window.confirm('Se creará el despacho real en Zipnova para esta orden. ¿Continuar?')) return;
+
+                const original = createShipmentBtn.innerHTML;
+                createShipmentBtn.disabled = true;
+                createShipmentBtn.innerHTML = 'Generando...';
+                try {
+                    const response = await fetch(`/api/admin/orders/${id}/shipment`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ document: recipientDocument }),
+                    });
+                    const payload = await response.json();
+                    if (!response.ok) throw new Error(payload.error || 'No se pudo generar el despacho');
+                    window.showToast('Despacho creado. Ya podés descargar la etiqueta.');
+                    setTimeout(() => window.location.reload(), 900);
+                } catch (error) {
+                    window.showToast(error instanceof Error ? error.message : 'No se pudo generar el despacho', 'error');
+                    createShipmentBtn.disabled = false;
+                    createShipmentBtn.innerHTML = original;
+                }
+            });
+        }
+
+        if (refreshShipmentBtn && !refreshShipmentBtn.dataset.handled) {
+            refreshShipmentBtn.dataset.handled = 'true';
+            refreshShipmentBtn.addEventListener('click', async () => {
+                refreshShipmentBtn.disabled = true;
+                try {
+                    const response = await fetch(`/api/admin/orders/${id}/shipment`);
+                    const payload = await response.json();
+                    if (!response.ok) throw new Error(payload.error || 'No se pudo actualizar');
+                    window.showToast('Estado del despacho actualizado');
+                    setTimeout(() => window.location.reload(), 700);
+                } catch (error) {
+                    window.showToast(error instanceof Error ? error.message : 'No se pudo actualizar', 'error');
+                    refreshShipmentBtn.disabled = false;
+                }
+            });
+        }
+
+        if (downloadLabelBtn && !downloadLabelBtn.dataset.handled) {
+            downloadLabelBtn.dataset.handled = 'true';
+            downloadLabelBtn.addEventListener('click', async () => {
+                const original = downloadLabelBtn.innerHTML;
+                downloadLabelBtn.disabled = true;
+                downloadLabelBtn.innerHTML = 'Preparando...';
+                try {
+                    const response = await fetch(`/api/admin/orders/${id}/shipment/label`);
+                    if (!response.ok) {
+                        const payload = await response.json();
+                        throw new Error(payload.error || 'La etiqueta todavía no está disponible');
+                    }
+                    const blob = await response.blob();
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = `etiqueta-${id}.pdf`;
+                    document.body.appendChild(link);
+                    link.click();
+                    link.remove();
+                    URL.revokeObjectURL(url);
+                } catch (error) {
+                    window.showToast(error instanceof Error ? error.message : 'No se pudo descargar la etiqueta', 'error');
+                } finally {
+                    downloadLabelBtn.disabled = false;
+                    downloadLabelBtn.innerHTML = original;
+                }
+            });
+        }
 
         if (deleteBtn && !deleteBtn.dataset.handled) {
             deleteBtn.dataset.handled = "true";

@@ -29,7 +29,7 @@ const totalRevenue = mappedOrders
     .filter(o => o.paymentStatus === 'approved')
     .reduce((sum, o) => sum + parseFloat(o.total), 0);
 
-const statusColors = {
+const statusColors: Record<string, string> = {
     pending: 'bg-amber-100 text-amber-800 border-amber-200',
     confirmed: 'bg-emerald-100 text-emerald-800 border-emerald-200',
     processing: 'bg-blue-100 text-blue-800 border-blue-200',
@@ -38,7 +38,7 @@ const statusColors = {
     cancelled: 'bg-rose-100 text-rose-800 border-rose-200',
 };
 
-const paymentStatusColors = {
+const paymentStatusColors: Record<string, string> = {
     pending: 'bg-amber-50 text-amber-700 border-amber-100',
     approved: 'bg-emerald-50 text-emerald-700 border-emerald-100',
     rejected: 'bg-rose-50 text-rose-700 border-rose-100',
@@ -123,13 +123,14 @@ const paymentStatusColors = {
                         <th class="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Total</th>
                         <th class="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Estado</th>
                         <th class="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Pago</th>
+                        <th class="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Despacho</th>
                         <th class="px-6 py-4 text-center text-xs font-semibold text-gray-400 uppercase tracking-wider">Acciones</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100 bg-white" id="orders-table-body">
                     {mappedOrders.length === 0 ? (
                         <tr>
-                            <td colspan="7" class="px-6 py-12 text-center">
+                            <td colspan="8" class="px-6 py-12 text-center">
                                 <div class="flex flex-col items-center justify-center text-gray-400">
                                     <ShoppingBag className="w-12 h-12 mb-3 opacity-20" />
                                     <p class="text-sm">No se encontraron órdenes registrados.</p>
@@ -163,7 +164,7 @@ const paymentStatusColors = {
                                         </div>
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                        {new Date(order.date).toLocaleDateString()}
+                                        {order.date ? new Date(order.date).toLocaleDateString() : '-'}
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-bold">
                                          ${parseFloat(order.total).toLocaleString(undefined, { minimumFractionDigits: 2 })}
@@ -221,13 +222,34 @@ const paymentStatusColors = {
                                         )}
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap">
-                                        <span class={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border ${paymentStatusColors[order.paymentStatus] || 'bg-gray-100 text-gray-800 border-gray-200'}`}>
+                                        <span class={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border ${paymentStatusColors[order.paymentStatus || 'pending'] || 'bg-gray-100 text-gray-800 border-gray-200'}`}>
                                             <div class={`w-1.5 h-1.5 rounded-full mr-1.5 ${order.paymentStatus === 'approved' ? 'bg-emerald-500' : order.paymentStatus === 'rejected' ? 'bg-rose-500' : 'bg-amber-500'}`}></div>
                                             {order.paymentStatus === 'approved' ? 'Pagado' : 
                                              order.paymentStatus === 'rejected' ? 'Fallido' : 
                                              order.paymentStatus === 'pending' ? 'Pendiente' : 
                                              order.paymentStatus}
                                         </span>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        {order.salesChannel !== 'app' ? (
+                                            <span class="inline-flex items-center rounded-full border border-sky-100 bg-sky-50 px-2.5 py-1 text-xs font-medium text-sky-700">
+                                                <Truck className="mr-1.5 h-3 w-3" /> Mercado Envíos
+                                            </span>
+                                        ) : order.shippingMethod !== 'delivery' ? (
+                                            <span class="inline-flex items-center rounded-full border border-gray-200 bg-gray-50 px-2.5 py-1 text-xs font-medium text-gray-600">Retiro</span>
+                                        ) : order.zipnovaShipmentId ? (
+                                            <a href={`/admin/orders/${order.id}`} class="inline-flex items-center rounded-full border border-emerald-100 bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700 hover:bg-emerald-100">
+                                                <CheckCircle className="mr-1.5 h-3 w-3" /> Etiqueta lista
+                                            </a>
+                                        ) : order.paymentStatus === 'approved' ? (
+                                            <a href={`/admin/orders/${order.id}`} class="inline-flex items-center rounded-full border border-indigo-100 bg-indigo-50 px-2.5 py-1 text-xs font-bold text-indigo-700 hover:bg-indigo-100">
+                                                <Package className="mr-1.5 h-3 w-3" /> Preparar envío
+                                            </a>
+                                        ) : (
+                                            <span class="inline-flex items-center rounded-full border border-amber-100 bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700">
+                                                <Clock className="mr-1.5 h-3 w-3" /> Esperando pago
+                                            </span>
+                                        )}
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
                                         <div class="flex items-center justify-center gap-2">

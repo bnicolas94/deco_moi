@@ -408,6 +408,13 @@ export async function validateCheckoutPayload(payload: unknown): Promise<Validat
             throw new CheckoutValidationError('Los envíos no están disponibles');
         }
 
+        const destinationDocument = (shippingData.document || shippingData.dni || shippingData.cuit || shippingData.transfer_dni || '')
+            .replace(/\D/g, '');
+        if (destinationDocument.length < 7 || destinationDocument.length > 11) {
+            throw new CheckoutValidationError('Ingresá un DNI/CUIT válido para poder generar la etiqueta del envío');
+        }
+        shippingData.document = destinationDocument;
+
         const destination = {
             city: shippingData.city,
             state: shippingData.state,
@@ -419,18 +426,17 @@ export async function validateCheckoutPayload(payload: unknown): Promise<Validat
         }
 
         if (shippingConfig.freeShippingEnabled && subtotal >= shippingConfig.freeShippingThreshold) {
+            const quoteId = sanitizeText(body.selectedShipping?.id, 200);
+            const quotes = await quoteShipment(validatedItems.map((item) => item.shippingItem), destination, subtotal);
+            const quotedOption = quotes.find((quote) => quote.id === quoteId) || null;
+            if (!quotedOption) {
+                throw new CheckoutValidationError('La opción de envío gratis ya no está disponible. Volvé a cotizar.');
+            }
             selectedShipping = {
-                id: 'free_shipping',
-                serviceType: 'free_shipping',
-                serviceTypeName: 'Envío gratis',
-                logisticType: 'free',
-                logisticTypeName: 'Envío gratis',
-                carrierName: 'Envío gratis',
-                carrierId: 0,
+                ...quotedOption,
+                carrierCost: roundMoney(Number(quotedOption.price)),
                 price: 0,
                 priceInclTax: 0,
-                estimatedDelivery: '',
-                deliveryTimeHours: null,
             };
         } else {
             const quoteId = sanitizeText(body.selectedShipping?.id, 200);

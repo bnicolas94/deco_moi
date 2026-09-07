@@ -1,17 +1,20 @@
 import type { APIRoute } from 'astro';
 import { quoteShipment, getShippingConfig } from '@/lib/services/ShippingService';
 import type { ShippingQuoteItem, ShippingDestination } from '@/lib/services/ShippingService';
+import { db } from '@/lib/db/connection';
+import { products } from '@/lib/db/schema';
+import { inArray } from 'drizzle-orm';
 
 export const POST: APIRoute = async ({ request }) => {
     try {
         const body = await request.json();
-        const { items, destination, declaredValue } = body as {
-            items: ShippingQuoteItem[];
+        const { items: requestedItems, destination, declaredValue } = body as {
+            items: Array<ShippingQuoteItem & { productId?: number }>;
             destination: ShippingDestination;
             declaredValue: number;
         };
 
-        if (!items || items.length === 0) {
+        if (!requestedItems || requestedItems.length === 0 || requestedItems.length > 50) {
             return new Response(JSON.stringify({ error: 'No se proporcionaron items para cotizar' }), {
                 status: 400,
                 headers: { 'Content-Type': 'application/json' },
@@ -25,24 +28,47 @@ export const POST: APIRoute = async ({ request }) => {
             });
         }
 
+        const productIds = requestedItems.map((item) => Number(item.productId));
+        if (productIds.some((id) => !Number.isSafeInteger(id) || id <= 0)) {
+            return new Response(JSON.stringify({ error: 'Los productos de la cotización no son válidos' }), {
+                status: 400,
+                headers: { 'Content-Type': 'application/json' },
+            });
+        }
+        const dbProducts = await db.select().from(products).where(inArray(products.id, [...new Set(productIds)]));
+        const productById = new Map(dbProducts.map((product) => [product.id, product]));
+        if (dbProducts.length !== new Set(productIds).size || dbProducts.some((product) => !product.isActive)) {
+            return new Response(JSON.stringify({ error: 'Uno o más productos ya no están disponibles' }), {
+                status: 409,
+                headers: { 'Content-Type': 'application/json' },
+            });
+        }
+        const items: ShippingQuoteItem[] = requestedItems.map((item) => {
+            const product = productById.get(Number(item.productId))!;
+            const quantity = Math.min(1_000, Math.max(1, Number(item.quantity) || 1));
+            return {
+                sku: product.sku || `PRODUCT-${product.id}`,
+                description: product.name,
+                weight: product.weight || 0,
+                height: product.height || 0,
+                width: product.width || 0,
+                length: product.length || 0,
+                quantity,
+            };
+        });
+
         const config = await getShippingConfig();
 
         // Verificar si aplica envío gratis
         if (config.freeShippingEnabled && declaredValue >= config.freeShippingThreshold) {
+            const quotedOptions = await quoteShipment(items, destination, declaredValue);
             return new Response(JSON.stringify({
-                results: [{
-                    id: 'free_shipping',
-                    serviceType: 'free_shipping',
-                    serviceTypeName: 'Envío gratis',
-                    logisticType: 'free',
-                    logisticTypeName: 'Envío gratis',
-                    carrierName: 'Envío gratis',
-                    carrierId: 0,
+                results: quotedOptions.map((option) => ({
+                    ...option,
+                    carrierCost: option.price,
                     price: 0,
                     priceInclTax: 0,
-                    estimatedDelivery: '',
-                    deliveryTimeHours: null,
-                }],
+                })),
                 freeShipping: true,
             }), {
                 status: 200,

@@ -17,13 +17,33 @@ const DEFAULT_CHECKOUT_FIELDS: CheckoutField[] = [
     { id: 'full_name', label: 'Nombre Completo', type: 'text', required: true, order: 1, width: 'full' },
     { id: 'email', label: 'Correo Electrónico', type: 'email', required: true, order: 2, width: 'half' },
     { id: 'phone', label: 'Teléfono / WhatsApp', type: 'tel', required: true, order: 3, width: 'half' },
-    { id: 'street', label: 'Calle', type: 'text', required: true, order: 4, width: 'full' },
-    { id: 'number', label: 'Número', type: 'text', required: true, order: 5, width: 'half' },
-    { id: 'floor_apt', label: 'Piso / Depto (Opcional)', type: 'text', required: false, order: 6, width: 'half' },
-    { id: 'city', label: 'Ciudad / Localidad', type: 'text', required: true, order: 7, width: 'full' },
-    { id: 'state', label: 'Provincia', type: 'text', required: true, order: 8, width: 'half' },
-    { id: 'postal_code', label: 'Código Postal', type: 'text', required: true, order: 9, width: 'half' },
+    { id: 'document', label: 'DNI/CUIT del destinatario', type: 'text', required: false, order: 4, width: 'half' },
+    { id: 'street', label: 'Calle', type: 'text', required: true, order: 5, width: 'full' },
+    { id: 'number', label: 'Número', type: 'text', required: true, order: 6, width: 'half' },
+    { id: 'floor_apt', label: 'Piso / Depto (Opcional)', type: 'text', required: false, order: 7, width: 'half' },
+    { id: 'city', label: 'Ciudad / Localidad', type: 'text', required: true, order: 8, width: 'full' },
+    { id: 'state', label: 'Provincia', type: 'text', required: true, order: 9, width: 'half' },
+    { id: 'postal_code', label: 'Código Postal', type: 'text', required: true, order: 10, width: 'half' },
 ];
+
+function ensureShipmentDocumentField(fields: CheckoutField[]): CheckoutField[] {
+    if (fields.some((field) => ['document', 'dni', 'cuit'].includes(field.id))) {
+        return fields;
+    }
+
+    return [
+        ...fields,
+        {
+            id: 'document',
+            label: 'DNI/CUIT del destinatario',
+            type: 'text',
+            required: false,
+            order: Math.max(0, ...fields.map((field) => field.order)) + 1,
+            width: 'half',
+            placeholder: 'Necesario para generar la etiqueta',
+        },
+    ];
+}
 
 export async function getCheckoutFields(): Promise<CheckoutField[]> {
     const result = await db.select().from(siteConfig).where(eq(siteConfig.key, 'checkout_form_fields')).limit(1);
@@ -32,7 +52,7 @@ export async function getCheckoutFields(): Promise<CheckoutField[]> {
         return DEFAULT_CHECKOUT_FIELDS;
     }
 
-    return result[0].value as CheckoutField[];
+    return ensureShipmentDocumentField(result[0].value as CheckoutField[]);
 }
 
 export async function updateCheckoutFields(fields: CheckoutField[]) {

@@ -21,6 +21,10 @@ interface ShippingQuoteResult {
     priceInclTax: number;
     estimatedDelivery: string;
     deliveryTimeHours: number | null;
+    carrierCost?: number;
+    pickupPointId?: number;
+    pickupPointName?: string;
+    pickupPointAddress?: string;
 }
 
 interface ShippingConfig {
@@ -98,6 +102,7 @@ export default function CheckoutForm({ fields, shippingConfig, bankConfig }: Pro
 
         try {
             const quoteItems = items.map(item => ({
+                productId: item.id,
                 sku: item.sku || `SKU-${item.id}`,
                 description: item.name,
                 weight: 0, // Se usan los defaults del servidor
@@ -475,6 +480,11 @@ export default function CheckoutForm({ fields, shippingConfig, bankConfig }: Pro
                                                 <p className="text-sm font-bold text-brand-black">
                                                     {option.carrierName} — {option.serviceTypeName}
                                                 </p>
+                                                {option.pickupPointName && (
+                                                    <p className="text-xs font-medium text-gray-700">
+                                                        {option.pickupPointName}{option.pickupPointAddress ? ` · ${option.pickupPointAddress}` : ''}
+                                                    </p>
+                                                )}
                                                 {option.estimatedDelivery && (
                                                     <p className="text-xs text-gray-500">
                                                         Llega el {formatDate(option.estimatedDelivery)}

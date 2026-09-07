@@ -39,6 +39,13 @@ export const POST: APIRoute = async (context) => {
     const sku = formData.get('sku')?.toString() || null;
     const isActive = formData.get('isActive') === 'true'; // Checkbox boolean
     const isFeatured = formData.get('isFeatured') === 'true';
+    const measurements = Object.fromEntries(['weight', 'height', 'width', 'length'].map((field) => {
+        const raw = formData.get(field)?.toString().trim() || '';
+        return [field, raw === '' ? null : Number(raw)];
+    })) as Record<'weight' | 'height' | 'width' | 'length', number | null>;
+    if (Object.values(measurements).some((value) => value !== null && (!Number.isSafeInteger(value) || value <= 0))) {
+        return new Response(JSON.stringify({ error: 'El peso y las medidas deben ser números enteros mayores a cero' }), { status: 400 });
+    }
 
     const imageFiles = formData.getAll('image').filter((value): value is File => value instanceof File);
     let imageUrls: string[] = [];
@@ -76,6 +83,10 @@ export const POST: APIRoute = async (context) => {
                 sku,
                 isActive,
                 isFeatured,
+                weight: measurements.weight,
+                height: measurements.height,
+                width: measurements.width,
+                length: measurements.length,
                 showDiscountRanges: formData.get('showDiscountRanges') === 'true',
                 images: imageUrls,
             }).returning({ id: products.id });

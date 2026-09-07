@@ -100,7 +100,7 @@ const allTemplates = await db.select().from(mockupTemplates).orderBy(mockupTempl
 
 // Load variant groups with their options
 const existingVariantGroups = isNew ? [] : await db.query.variantGroups.findMany({
-    where: eq(variantGroups.productId, parseInt(id)),
+    where: eq(variantGroups.productId, parseInt(id!)),
     with: { options: true },
     orderBy: asc(variantGroups.displayOrder),
 });
@@ -345,6 +345,31 @@ const SUPPLY_ICONS: Record<string, string> = {
                                     placeholder="PRD-001"
                                     class="block w-full rounded-xl border-gray-200 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm h-11 border px-4"
                                 />
+                            </div>
+                        </div>
+
+                        <div class="rounded-2xl border border-sky-100 bg-sky-50/50 p-5">
+                            <div class="mb-4">
+                                <h3 class="text-sm font-bold text-gray-900">Medidas para cotizar el envío</h3>
+                                <p class="mt-1 text-xs text-gray-500">Se aplican a una unidad. Si quedan vacías, se usan los valores generales de Envíos.</p>
+                            </div>
+                            <div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
+                                <label class="space-y-1.5 text-xs font-bold text-gray-600">
+                                    Peso (gramos)
+                                    <input type="number" name="weight" min="1" step="1" value={product?.weight || ''} placeholder="500" class="block h-10 w-full rounded-xl border border-gray-200 bg-white px-3 text-sm font-normal focus:border-sky-500 focus:ring-sky-500" />
+                                </label>
+                                <label class="space-y-1.5 text-xs font-bold text-gray-600">
+                                    Alto (cm)
+                                    <input type="number" name="height" min="1" step="1" value={product?.height || ''} placeholder="10" class="block h-10 w-full rounded-xl border border-gray-200 bg-white px-3 text-sm font-normal focus:border-sky-500 focus:ring-sky-500" />
+                                </label>
+                                <label class="space-y-1.5 text-xs font-bold text-gray-600">
+                                    Ancho (cm)
+                                    <input type="number" name="width" min="1" step="1" value={product?.width || ''} placeholder="15" class="block h-10 w-full rounded-xl border border-gray-200 bg-white px-3 text-sm font-normal focus:border-sky-500 focus:ring-sky-500" />
+                                </label>
+                                <label class="space-y-1.5 text-xs font-bold text-gray-600">
+                                    Largo (cm)
+                                    <input type="number" name="length" min="1" step="1" value={product?.length || ''} placeholder="20" class="block h-10 w-full rounded-xl border border-gray-200 bg-white px-3 text-sm font-normal focus:border-sky-500 focus:ring-sky-500" />
+                                </label>
                             </div>
                         </div>
 

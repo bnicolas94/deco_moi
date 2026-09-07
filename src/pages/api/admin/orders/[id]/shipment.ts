@@ -1,0 +1,165 @@
+import type { APIRoute } from 'astro';
+import { eq } from 'drizzle-orm';
+import { db } from '@/lib/db/connection';
+import { orders } from '@/lib/db/schema';
+import { createShipment, getShipment } from '@/lib/services/ShippingService';
+
+function json(data: unknown, status = 200): Response {
+    return new Response(JSON.stringify(data), {
+        status,
+        headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
+    });
+}
+
+function normalizeShipment(payload: any) {
+    const shipment = payload?.data || payload?.shipment || payload || {};
+    return {
+        id: shipment.id !== undefined && shipment.id !== null ? String(shipment.id) : '',
+        status: shipment.status || '',
+        statusName: shipment.status_name || shipment.statusName || shipment.status || 'Creado',
+        tracking: shipment.tracking || shipment.tracking_url || null,
+        trackingExternal: shipment.tracking_external || null,
+        carrierTrackingId: shipment.carrier_tracking_id || shipment.delivery_id || null,
+        carrierName: shipment.carrier?.name || null,
+        estimatedDelivery: shipment.delivery_time?.estimated_delivery || null,
+        createdAt: shipment.created_at || new Date().toISOString(),
+    };
+}
+
+async function loadOrder(id: string) {
+    return db.query.orders.findFirst({
+        where: eq(orders.id, id),
+        with: {
+            items: {
+                with: { product: true },
+            },
+        },
+    });
+}
+
+export const GET: APIRoute = async (context) => {
+    if (!context.locals.user || context.locals.user.role !== 'admin') return json({ error: 'No autorizado' }, 401);
+    const order = await loadOrder(context.params.id || '');
+    if (!order) return json({ error: 'Orden no encontrada' }, 404);
+    if (!order.zipnovaShipmentId) return json({ error: 'La orden todavía no tiene un despacho creado' }, 409);
+
+    try {
+        const shipment = normalizeShipment(await getShipment(order.zipnovaShipmentId));
+        const shippingData = { ...(order.shippingData || {}), zipnovaShipment: shipment };
+        await db.update(orders).set({ shippingData, updatedAt: new Date() }).where(eq(orders.id, order.id));
+        return json({ shipment });
+    } catch (error) {
+        console.error('[Admin shipment] Error al actualizar:', error);
+        return json({ error: error instanceof Error ? error.message : 'No se pudo actualizar el despacho' }, 502);
+    }
+};
+
+export const POST: APIRoute = async (context) => {
+    if (!context.locals.user || context.locals.user.role !== 'admin') return json({ error: 'No autorizado' }, 401);
+    const order = await loadOrder(context.params.id || '');
+    if (!order) return json({ error: 'Orden no encontrada' }, 404);
+
+    if (order.zipnovaShipmentId) {
+        try {
+            return json({ created: false, shipment: normalizeShipment(await getShipment(order.zipnovaShipmentId)) });
+        } catch {
+            return json({ created: false, shipment: (order.shippingData as any)?.zipnovaShipment || { id: order.zipnovaShipmentId } });
+        }
+    }
+    if (order.salesChannel !== 'app') return json({ error: 'Los envíos de Mercado Libre se gestionan con la etiqueta de Mercado Envíos.' }, 409);
+    if (order.shippingMethod !== 'delivery') return json({ error: 'Esta orden es para retiro y no necesita etiqueta.' }, 409);
+    if (order.paymentStatus !== 'approved') return json({ error: 'Confirmá el pago antes de generar el despacho.' }, 409);
+    if (order.status === 'cancelled') return json({ error: 'No se puede despachar una orden cancelada.' }, 409);
+
+    const shipping = (order.shippingData || {}) as Record<string, any>;
+    const selected = shipping.selectedShipping;
+    if (!selected?.serviceType || !selected?.logisticType || !Number(selected?.carrierId)) {
+        return json({ error: 'La orden no tiene una opción válida de Zipnova. Las tarifas fijas se despachan manualmente.' }, 409);
+    }
+
+    let requestBody: Record<string, any> = {};
+    try {
+        requestBody = await context.request.json();
+    } catch {
+        requestBody = {};
+    }
+
+    const document = String(
+        requestBody.document || shipping.document || shipping.dni || shipping.cuit || shipping.transfer_dni || '',
+    ).replace(/\D/g, '');
+    if (document.length < 7 || document.length > 11) {
+        return json({ error: 'Ingresá el DNI/CUIT del destinatario para generar la etiqueta.' }, 400);
+    }
+
+    const destination = {
+        name: String(shipping.full_name || shipping.name || '').trim(),
+        street: String(shipping.street || '').trim(),
+        streetNumber: String(shipping.number || shipping.street_number || '').trim(),
+        streetExtras: String(shipping.floor_apt || shipping.street_extras || '').trim(),
+        city: String(shipping.city || '').trim(),
+        state: String(shipping.state || '').trim(),
+        zipcode: String(shipping.postal_code || shipping.zipcode || '').trim(),
+        document,
+        email: String(shipping.email || '').trim(),
+        phone: String(shipping.phone || '').trim(),
+        country: 'AR',
+        pointId: selected.pickupPointId ? Number(selected.pickupPointId) : undefined,
+    };
+    const missing = Object.entries({
+        nombre: destination.name,
+        calle: destination.street,
+        número: destination.streetNumber,
+        localidad: destination.city,
+        provincia: destination.state,
+        'código postal': destination.zipcode,
+        email: destination.email,
+        teléfono: destination.phone,
+    }).filter(([, value]) => !value).map(([label]) => label);
+    if (selected.serviceType === 'pickup_point') {
+        const addressOnly = new Set(['calle', 'número', 'localidad', 'provincia', 'código postal']);
+        for (let index = missing.length - 1; index >= 0; index--) {
+            if (addressOnly.has(missing[index])) missing.splice(index, 1);
+        }
+        if (!destination.pointId) missing.push('punto de entrega');
+    }
+    if (missing.length > 0) return json({ error: `Faltan datos de envío: ${missing.join(', ')}.` }, 400);
+
+    try {
+        const createdPayload = await createShipment({
+            items: order.items.map((item) => ({
+                sku: item.productSku || `PRODUCT-${item.productId}`,
+                description: item.productName,
+                weight: item.product?.weight || 0,
+                height: item.product?.height || 0,
+                width: item.product?.width || 0,
+                length: item.product?.length || 0,
+                quantity: item.quantity,
+            })),
+            destination,
+            declaredValue: Math.max(0, Number(order.subtotal) - Number(order.discountAmount || 0)),
+            externalId: order.orderNumber.slice(0, 30),
+            serviceType: selected.serviceType,
+            logisticType: selected.logisticType,
+            carrierId: Number(selected.carrierId),
+        });
+        const shipment = normalizeShipment(createdPayload);
+        if (!shipment.id) throw new Error('Zipnova creó el envío pero no devolvió su identificador');
+
+        const shippingData = {
+            ...shipping,
+            document,
+            zipnovaShipment: shipment,
+        };
+        await db.update(orders).set({
+            zipnovaShipmentId: shipment.id,
+            shippingData,
+            status: ['pending', 'confirmed'].includes(order.status) ? 'processing' : order.status,
+            updatedAt: new Date(),
+        }).where(eq(orders.id, order.id));
+
+        return json({ created: true, shipment }, 201);
+    } catch (error) {
+        console.error('[Admin shipment] Error al crear:', error);
+        return json({ error: error instanceof Error ? error.message : 'No se pudo crear el despacho' }, 502);
+    }
+};

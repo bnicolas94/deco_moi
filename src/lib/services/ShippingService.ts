@@ -48,8 +48,12 @@ export interface ShippingQuoteResult {
     carrierId: number;
     price: number;
     priceInclTax: number;
+    carrierCost?: number;
     estimatedDelivery: string;
     deliveryTimeHours: number | null;
+    pickupPointId?: number;
+    pickupPointName?: string;
+    pickupPointAddress?: string;
 }
 
 export interface ZipnovaQuoteResponse {
@@ -276,11 +280,11 @@ export async function quoteShipment(
             resultsArray = data;
         } else if (Array.isArray(data.results)) {
             resultsArray = data.results;
+        } else if (data.results && typeof data.results === 'object') {
+            // Zipnova devuelve aquí la mejor opción por modalidad.
+            resultsArray = Object.values(data.results);
         } else if (Array.isArray(data.all_results)) {
             resultsArray = data.all_results;
-        } else if (data.results && typeof data.results === 'object') {
-            // Si results es un objeto, intentar convertirlo a array
-            resultsArray = Object.values(data.results);
         } else if (data.data && Array.isArray(data.data)) {
             resultsArray = data.data;
         }
@@ -292,16 +296,15 @@ export async function quoteShipment(
             return [];
         }
 
-        return resultsArray.map((result: any, index: number) => {
+        return resultsArray.filter((result: any) => result?.selectable !== false).flatMap((result: any, index: number) => {
             // Manejar diferentes posibles estructuras de cada resultado
             const serviceType = result.service_type || {};
             const logisticType = result.logistic_type || {};
             const carrier = result.carrier || {};
             const amounts = result.amounts || result.price || {};
             const deliveryTime = result.delivery_time || {};
-
-            return {
-                id: `zipnova_${index}_${carrier.id || index}_${serviceType.code || 'std'}`,
+            const pickupPoints = Array.isArray(result.pickup_points) ? result.pickup_points : [];
+            const baseResult = {
                 serviceType: serviceType.code || serviceType.id?.toString() || '',
                 serviceTypeName: serviceType.name || serviceType.description || 'Envío estándar',
                 logisticType: logisticType.code || logisticType.id?.toString() || '',
@@ -313,6 +316,21 @@ export async function quoteShipment(
                 estimatedDelivery: deliveryTime.estimated_delivery || '',
                 deliveryTimeHours: null,
             };
+
+            if (baseResult.serviceType === 'pickup_point' && pickupPoints.length > 0) {
+                return pickupPoints.map((point: any) => ({
+                    ...baseResult,
+                    id: `zipnova_${carrier.id || index}_${baseResult.serviceType}_${baseResult.logisticType}_${point.point_id || point.id}`,
+                    pickupPointId: Number(point.point_id || point.id),
+                    pickupPointName: point.name || point.description || 'Punto de entrega',
+                    pickupPointAddress: point.address || point.full_address || '',
+                }));
+            }
+
+            return [{
+                ...baseResult,
+                id: `zipnova_${carrier.id || index}_${baseResult.serviceType || 'std'}_${baseResult.logisticType || 'std'}`,
+            }];
         });
     } catch (error) {
         console.error('[Zipnova] Error de red al cotizar:', error);
@@ -338,6 +356,7 @@ export interface CreateShipmentData {
         email: string;
         phone: string;
         country?: string;
+        pointId?: number;
     };
     declaredValue: number;
     externalId: string;
@@ -379,7 +398,14 @@ export async function createShipment(data: CreateShipmentData): Promise<any> {
         declared_value: data.declaredValue,
         external_id: data.externalId,
         source: 'decomoi_web',
-        destination: {
+        destination: data.destination.pointId ? {
+            name: data.destination.name,
+            document: data.destination.document,
+            email: data.destination.email,
+            phone: data.destination.phone,
+            country: data.destination.country || 'AR',
+            point_id: data.destination.pointId,
+        } : {
             name: data.destination.name,
             street: data.destination.street,
             street_number: data.destination.streetNumber,
@@ -411,4 +437,72 @@ export async function createShipment(data: CreateShipmentData): Promise<any> {
     }
 
     return await response.json();
+}
+
+export async function getShipment(shipmentId: string): Promise<any> {
+    if (!areCredentialsConfigured()) {
+        throw new Error('Credenciales de Zipnova no configuradas');
+    }
+
+    const response = await fetch(`${getBaseUrl()}/shipments/${encodeURIComponent(shipmentId)}`, {
+        headers: {
+            'Authorization': getAuthHeader(),
+            'Accept': 'application/json',
+        },
+    });
+
+    if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Error al consultar el envío en Zipnova: ${response.status} - ${errorText}`);
+    }
+
+    return await response.json();
+}
+
+export async function downloadShipmentDocument(
+    shipmentId: string,
+    what: 'label' | 'document' = 'label',
+    format: 'pdf' | 'zpl' = 'pdf',
+): Promise<{ bytes: Uint8Array; contentType: string }> {
+    if (!areCredentialsConfigured()) {
+        throw new Error('Credenciales de Zipnova no configuradas');
+    }
+
+    const response = await fetch(
+        `${getBaseUrl()}/shipments/${encodeURIComponent(shipmentId)}/${what}.${format}?no_status_change=1`,
+        {
+            headers: {
+                'Authorization': getAuthHeader(),
+                'Accept': 'application/json',
+            },
+        },
+    );
+
+    if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Documento de despacho no disponible: ${response.status} - ${errorText}`);
+    }
+
+    const contentType = response.headers.get('content-type') || '';
+    if (!contentType.includes('application/json')) {
+        return {
+            bytes: new Uint8Array(await response.arrayBuffer()),
+            contentType: format === 'pdf' ? 'application/pdf' : 'text/plain',
+        };
+    }
+
+    const payload = await response.json();
+    const encoded = typeof payload === 'string'
+        ? payload
+        : payload?.content || payload?.data?.content || payload?.data || payload?.document || payload?.file;
+
+    if (typeof encoded !== 'string' || encoded.length === 0) {
+        throw new Error('Zipnova no devolvió el contenido del documento solicitado');
+    }
+
+    const cleanBase64 = encoded.includes(',') ? encoded.slice(encoded.indexOf(',') + 1) : encoded;
+    return {
+        bytes: new Uint8Array(Buffer.from(cleanBase64, 'base64')),
+        contentType: format === 'pdf' ? 'application/pdf' : 'text/plain',
+    };
 }

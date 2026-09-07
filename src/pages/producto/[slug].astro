@@ -2,6 +2,7 @@
 import BaseLayout from "../../layouts/BaseLayout.astro";
 import ProductGrid from "../../components/product/ProductGrid.astro";
 import PriceTable from "../../components/product/PriceTable.astro";
+import ProductShippingQuote from "../../components/product/ProductShippingQuote";
 import {
   getProductBySlug,
   getRelatedProducts,
@@ -519,6 +520,14 @@ const initialProductionTime =
             </button>
           </div>
         </div>
+      </div>
+
+      <div class="mb-6">
+        <ProductShippingQuote
+          client:only="react"
+          productId={product.id}
+          minimumQuantity={product.minOrder || 1}
+        />
       </div>
 
       <!-- Personalización -->
