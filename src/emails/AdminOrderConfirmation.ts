@@ -24,7 +24,7 @@ export const AdminOrderConfirmationTemplate = (data: any) => {
             ? `CP ${shipping.postal_code || shipping.postalCode || shipping.zipcode}`
             : '',
     ].filter(Boolean).join(', ');
-    const estimatedDelivery = formatDate(shipment.estimatedDelivery || selectedShipping.estimatedDelivery);
+    const estimatedDelivery = formatDate(selectedShipping.quotedEstimatedDelivery || selectedShipping.estimatedDelivery);
     const productionTimes = [...new Set(items.map((item: any) => item.productionTime).filter(Boolean))];
 
     // items is array of { productName, productSku, quantity, unitPrice, subtotal, customization }

@@ -47,6 +47,7 @@ test('conserva logistic_type cuando Zipnova lo devuelve como texto', () => {
     assert.equal(quote.preparationTime, 'P2D');
     assert.equal(quote.shippingTime, 'P4D');
     assert.equal(quote.totalTime, 'P6D');
+    assert.equal(quote.quotedEstimatedDelivery, '2026-09-18');
 });
 
 test('recupera una selección histórica sin logistic_type y conserva el precio cobrado', () => {
@@ -66,6 +67,26 @@ test('recupera una selección histórica sin logistic_type y conserva el precio 
 
     assert.equal(recovered?.logisticType, 'carrier_dropoff');
     assert.equal(recovered?.price, 14650);
+    assert.equal(recovered?.quotedEstimatedDelivery, freshQuote.estimatedDelivery);
+});
+
+test('conserva la fecha prometida aunque Zipnova recalcule el despacho', () => {
+    const [freshQuote] = normalizeZipnovaQuoteResult({
+        logistic_type: 'carrier_dropoff',
+        service_type: { code: 'standard_delivery', name: 'Entrega a domicilio' },
+        carrier: { id: 233, name: 'Correo Argentino' },
+        amounts: { price_incl_tax: 14650 },
+        delivery_time: { estimated_delivery: '2026-09-21T23:59:00Z' },
+    });
+    const recovered = recoverShippingSelection({
+        carrierId: 233,
+        serviceType: 'standard_delivery',
+        estimatedDelivery: '2026-09-18T23:59:00Z',
+        price: 14650,
+    }, [freshQuote], 14650);
+
+    assert.equal(recovered?.quotedEstimatedDelivery, '2026-09-18T23:59:00Z');
+    assert.equal(recovered?.estimatedDelivery, '2026-09-21T23:59:00Z');
 });
 
 test('bloquea la etiqueta si Zipnova permanece procesando y la habilita con documentación lista', () => {

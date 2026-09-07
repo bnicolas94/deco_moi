@@ -16,6 +16,10 @@ export function recoverShippingSelection(
 
     return {
         ...recovered,
+        quotedEstimatedDelivery: previousSelection?.quotedEstimatedDelivery
+            || previousSelection?.estimatedDelivery
+            || recovered.quotedEstimatedDelivery
+            || recovered.estimatedDelivery,
         price: Number(previousSelection?.price ?? chargedPrice),
         priceInclTax: Number(previousSelection?.priceInclTax ?? previousSelection?.price ?? chargedPrice),
     };

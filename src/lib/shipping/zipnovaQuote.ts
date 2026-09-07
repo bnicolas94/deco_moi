@@ -10,6 +10,7 @@ export interface ShippingQuoteResult {
     priceInclTax: number;
     carrierCost?: number;
     estimatedDelivery: string;
+    quotedEstimatedDelivery?: string;
     estimationExpiresAt?: string;
     deliveryTimeHours: number | null;
     preparationTime?: string;
@@ -54,6 +55,7 @@ export function normalizeZipnovaQuoteResult(result: any, index = 0): ShippingQuo
         price: Number(amounts.price_incl_tax ?? amounts.price ?? amounts.total) || 0,
         priceInclTax: Number(amounts.price_incl_tax ?? amounts.price ?? amounts.total) || 0,
         estimatedDelivery: deliveryTime.estimated_delivery || '',
+        quotedEstimatedDelivery: deliveryTime.estimated_delivery || '',
         estimationExpiresAt: deliveryTime.estimation_expires_at || '',
         deliveryTimeHours: null,
         preparationTime: deliveryTime.times?.preparation || '',

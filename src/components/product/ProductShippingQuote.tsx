@@ -6,6 +6,7 @@ interface QuoteResult {
     serviceTypeName: string;
     price: number;
     estimatedDelivery: string;
+    quotedEstimatedDelivery?: string;
     estimationExpiresAt?: string;
     preparationTime?: string;
     shippingTime?: string;

@@ -20,6 +20,7 @@ interface ShippingQuoteResult {
     price: number;
     priceInclTax: number;
     estimatedDelivery: string;
+    quotedEstimatedDelivery?: string;
     deliveryTimeHours: number | null;
     estimationExpiresAt?: string;
     preparationTime?: string;
