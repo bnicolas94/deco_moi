@@ -6,6 +6,10 @@ interface QuoteResult {
     serviceTypeName: string;
     price: number;
     estimatedDelivery: string;
+    estimationExpiresAt?: string;
+    preparationTime?: string;
+    shippingTime?: string;
+    totalTime?: string;
 }
 
 interface QuoteResponse {
@@ -154,14 +158,14 @@ export default function ProductShippingQuote({ productId, minimumQuantity }: Pro
                             <div className="min-w-0">
                                 <p className="truncate text-sm font-semibold text-brand-black">{result.carrierName}</p>
                                 <p className="truncate text-[11px] text-gray-500">
-                                    {result.serviceTypeName}{formatDate(result.estimatedDelivery) ? ` · Llega aprox. ${formatDate(result.estimatedDelivery)}` : ''}
+                                    {result.serviceTypeName}{formatDate(result.estimatedDelivery) ? ` · Fecha máxima estimada: ${formatDate(result.estimatedDelivery)}` : ''}
                                 </p>
                             </div>
                             <span className="whitespace-nowrap text-sm font-bold text-brand-black">{formatPrice(result.price)}</span>
                         </div>
                     ))}
                     <p className="pt-1 text-[10px] leading-relaxed text-gray-400">
-                        La opción y el importe final se confirman en el checkout según el carrito y la dirección completa.
+                        La opción, el importe y la fecha se confirman en el checkout. El correo puede actualizar la estimación al generar el despacho.
                     </p>
                 </div>
             )}

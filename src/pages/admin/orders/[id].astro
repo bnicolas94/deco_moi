@@ -3,8 +3,9 @@ import AdminLayout from '@/layouts/AdminLayout.astro';
 import { db } from '@/lib/db/connection';
 import { orders, addresses } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
-import { ArrowLeft, Package, User, MapPin, CreditCard, Trash2, Save, Truck, Download, RefreshCw, ExternalLink } from 'lucide-react';
+import { ArrowLeft, Package, User, MapPin, CreditCard, Trash2, Save, Truck, Download, RefreshCw, ExternalLink, Mail, AlertTriangle } from 'lucide-react';
 import { sanitizePublicUrl } from '@/lib/security/html';
+import { formatIsoDuration, getZipnovaLabelState } from '@/lib/shipping/zipnovaShipment';
 
 const { id } = Astro.params;
 
@@ -52,6 +53,24 @@ const shipping = order.shippingData as any;
 const selectedShipping = shipping?.selectedShipping;
 const shipment = shipping?.zipnovaShipment;
 const trackingUrl = sanitizePublicUrl(shipment?.trackingExternal || shipment?.tracking);
+const labelState = getZipnovaLabelState(shipment);
+const formatShippingDate = (value: unknown, includeTime = false) => {
+    if (!value) return '';
+    const date = new Date(String(value));
+    if (Number.isNaN(date.getTime())) return '';
+    return date.toLocaleString('es-AR', {
+        timeZone: 'America/Argentina/Buenos_Aires',
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        ...(includeTime ? { hour: '2-digit', minute: '2-digit' } : {}),
+    });
+};
+const quotedDelivery = formatShippingDate(selectedShipping?.estimatedDelivery);
+const currentDelivery = formatShippingDate(shipment?.estimatedDelivery);
+const dropoffDeadline = formatShippingDate(shipment?.dropoffDeadlineAt, true);
+const preparationDuration = formatIsoDuration(shipment?.preparationTime || selectedShipping?.preparationTime);
+const carrierDuration = formatIsoDuration(shipment?.carrierTime || selectedShipping?.shippingTime);
 const documentValue = String(shipping?.document || shipping?.dni || shipping?.cuit || shipping?.transfer_dni || '').replace(/\D/g, '');
 const deliveryAddress = {
     street: shippingAddress?.street || shipping?.street || '',
@@ -250,20 +269,41 @@ const customerDisplayPhone = shipping?.phone || order.user?.phone || '-';
                             </div>
                         </div>
 
+                        {(quotedDelivery || currentDelivery || preparationDuration || carrierDuration) && (
+                            <div class="grid grid-cols-1 gap-3 rounded-xl border border-gray-100 bg-gray-50 p-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
+                                {quotedDelivery && (
+                                    <div><span class="block text-[10px] font-bold uppercase text-gray-400">Estimación al comprar</span><strong class="mt-1 block text-gray-800">Hasta el {quotedDelivery}</strong></div>
+                                )}
+                                {currentDelivery && (
+                                    <div><span class="block text-[10px] font-bold uppercase text-gray-400">Estimación actual</span><strong class="mt-1 block text-gray-800">Hasta el {currentDelivery}</strong></div>
+                                )}
+                                {preparationDuration && (
+                                    <div><span class="block text-[10px] font-bold uppercase text-gray-400">Preparación logística</span><strong class="mt-1 block text-gray-800">{preparationDuration}</strong></div>
+                                )}
+                                {carrierDuration && (
+                                    <div><span class="block text-[10px] font-bold uppercase text-gray-400">Trayecto del correo</span><strong class="mt-1 block text-gray-800">{carrierDuration}</strong></div>
+                                )}
+                            </div>
+                        )}
+
                         {order.zipnovaShipmentId ? (
-                            <div class="rounded-2xl border border-emerald-100 bg-emerald-50/60 p-4">
+                            <div class:list={["rounded-2xl p-4", labelState.stalled ? "border border-rose-200 bg-rose-50" : "border border-emerald-100 bg-emerald-50/60"]}>
                                 <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                                     <div>
-                                        <p class="text-xs font-bold uppercase tracking-wider text-emerald-700">Despacho Zipnova creado</p>
+                                        <p class:list={["text-xs font-bold uppercase tracking-wider", labelState.stalled ? "text-rose-700" : "text-emerald-700"]}>Despacho Zipnova creado</p>
                                         <p class="mt-1 font-mono text-sm text-gray-700">ID {order.zipnovaShipmentId}</p>
                                         {shipment?.carrierTrackingId && <p class="mt-1 text-xs text-gray-500">Seguimiento: {shipment.carrierTrackingId}</p>}
+                                        {dropoffDeadline && <p class="mt-1 text-xs text-gray-500">Despachar antes del {dropoffDeadline}</p>}
                                     </div>
                                     <div class="flex flex-wrap gap-2">
-                                        <button id="download-label-btn" type="button" class="inline-flex items-center rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-emerald-700">
+                                        <button id="download-label-btn" type="button" disabled={!labelState.ready} title={!labelState.ready ? labelState.message || 'Etiqueta pendiente' : 'Descargar etiqueta'} class:list={["inline-flex items-center rounded-xl px-4 py-2.5 text-sm font-bold text-white transition", labelState.ready ? "bg-emerald-600 hover:bg-emerald-700" : "cursor-not-allowed bg-gray-300"]}>
                                             <Download className="mr-2 h-4 w-4" /> Descargar etiqueta
                                         </button>
                                         <button id="refresh-shipment-btn" type="button" class="inline-flex items-center rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-bold text-gray-700 transition hover:bg-gray-50">
                                             <RefreshCw className="mr-2 h-4 w-4" /> Actualizar
+                                        </button>
+                                        <button id="notify-customer-btn" type="button" disabled={!labelState.ready} title={!labelState.ready ? 'Se habilita cuando Zipnova genere la documentación' : 'Enviar los datos de seguimiento'} class:list={["inline-flex items-center rounded-xl border px-4 py-2.5 text-sm font-bold transition", labelState.ready ? "border-gray-200 bg-white text-gray-700 hover:bg-gray-50" : "cursor-not-allowed border-gray-100 bg-gray-100 text-gray-400"]}>
+                                            <Mail className="mr-2 h-4 w-4" /> {shipment?.customerNotifiedAt ? 'Reenviar seguimiento' : 'Avisar al comprador'}
                                         </button>
                                         {trackingUrl && (
                                             <a href={trackingUrl} target="_blank" rel="noopener noreferrer" class="inline-flex items-center rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-bold text-gray-700 transition hover:bg-gray-50">
@@ -272,6 +312,18 @@ const customerDisplayPhone = shipping?.phone || order.user?.phone || '-';
                                         )}
                                     </div>
                                 </div>
+                                {!labelState.ready && (
+                                    <div class:list={["mt-4 flex gap-3 rounded-xl border p-3 text-sm", labelState.stalled ? "border-rose-200 bg-white text-rose-800" : "border-amber-100 bg-amber-50 text-amber-800"]}>
+                                        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                                        <div>
+                                            <p class="font-bold">{labelState.stalled ? 'Acción necesaria en Zipnova' : 'Documentación en preparación'}</p>
+                                            <p class="mt-1 text-xs leading-relaxed">{labelState.message}</p>
+                                        </div>
+                                    </div>
+                                )}
+                                {shipment?.customerNotifiedAt && (
+                                    <p class="mt-3 text-xs text-gray-500">Último aviso al comprador: {formatShippingDate(shipment.customerNotifiedAt, true)}</p>
+                                )}
                             </div>
                         ) : !Number(selectedShipping?.carrierId) ? (
                             <div class="rounded-xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700">
@@ -384,6 +436,7 @@ const customerDisplayPhone = shipping?.phone || order.user?.phone || '-';
         const createShipmentBtn = document.getElementById('create-shipment-btn');
         const refreshShipmentBtn = document.getElementById('refresh-shipment-btn');
         const downloadLabelBtn = document.getElementById('download-label-btn');
+        const notifyCustomerBtn = document.getElementById('notify-customer-btn');
 
         if (createShipmentBtn && !createShipmentBtn.dataset.handled) {
             createShipmentBtn.dataset.handled = 'true';
@@ -408,7 +461,7 @@ const customerDisplayPhone = shipping?.phone || order.user?.phone || '-';
                     });
                     const payload = await response.json();
                     if (!response.ok) throw new Error(payload.error || 'No se pudo generar el despacho');
-                    window.showToast('Despacho creado. Ya podés descargar la etiqueta.');
+                    window.showToast('Despacho creado. Zipnova está preparando la documentación.');
                     setTimeout(() => window.location.reload(), 900);
                 } catch (error) {
                     window.showToast(error instanceof Error ? error.message : 'No se pudo generar el despacho', 'error');
@@ -461,6 +514,28 @@ const customerDisplayPhone = shipping?.phone || order.user?.phone || '-';
                 } finally {
                     downloadLabelBtn.disabled = false;
                     downloadLabelBtn.innerHTML = original;
+                }
+            });
+        }
+
+        if (notifyCustomerBtn && !notifyCustomerBtn.dataset.handled) {
+            notifyCustomerBtn.dataset.handled = 'true';
+            notifyCustomerBtn.addEventListener('click', async () => {
+                if (notifyCustomerBtn.disabled) return;
+                if (!window.confirm('Se enviará al comprador un email con el transporte, la fecha estimada y el enlace de seguimiento. ¿Continuar?')) return;
+                const original = notifyCustomerBtn.innerHTML;
+                notifyCustomerBtn.disabled = true;
+                notifyCustomerBtn.innerHTML = 'Enviando...';
+                try {
+                    const response = await fetch(`/api/admin/orders/${id}/shipment/notify`, { method: 'POST' });
+                    const payload = await response.json();
+                    if (!response.ok) throw new Error(payload.error || 'No se pudo avisar al comprador');
+                    window.showToast('Datos de seguimiento enviados al comprador');
+                    setTimeout(() => window.location.reload(), 800);
+                } catch (error) {
+                    window.showToast(error instanceof Error ? error.message : 'No se pudo avisar al comprador', 'error');
+                    notifyCustomerBtn.disabled = false;
+                    notifyCustomerBtn.innerHTML = original;
                 }
             });
         }

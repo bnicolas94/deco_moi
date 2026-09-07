@@ -10,7 +10,11 @@ export interface ShippingQuoteResult {
     priceInclTax: number;
     carrierCost?: number;
     estimatedDelivery: string;
+    estimationExpiresAt?: string;
     deliveryTimeHours: number | null;
+    preparationTime?: string;
+    shippingTime?: string;
+    totalTime?: string;
     pickupPointId?: number;
     pickupPointName?: string;
     pickupPointAddress?: string;
@@ -50,7 +54,11 @@ export function normalizeZipnovaQuoteResult(result: any, index = 0): ShippingQuo
         price: Number(amounts.price_incl_tax ?? amounts.price ?? amounts.total) || 0,
         priceInclTax: Number(amounts.price_incl_tax ?? amounts.price ?? amounts.total) || 0,
         estimatedDelivery: deliveryTime.estimated_delivery || '',
+        estimationExpiresAt: deliveryTime.estimation_expires_at || '',
         deliveryTimeHours: null,
+        preparationTime: deliveryTime.times?.preparation || '',
+        shippingTime: deliveryTime.times?.shipping || deliveryTime.times?.carrier || '',
+        totalTime: deliveryTime.times?.total || '',
     };
 
     if (baseResult.serviceType === 'pickup_point' && pickupPoints.length > 0) {

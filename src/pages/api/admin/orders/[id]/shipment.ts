@@ -5,27 +5,13 @@ import { orders } from '@/lib/db/schema';
 import { createShipment, getShipment, quoteShipment } from '@/lib/services/ShippingService';
 import type { ShippingQuoteResult } from '@/lib/services/ShippingService';
 import { recoverShippingSelection } from '@/lib/shipping/recoverSelection';
+import { normalizeZipnovaShipment } from '@/lib/shipping/zipnovaShipment';
 
 function json(data: unknown, status = 200): Response {
     return new Response(JSON.stringify(data), {
         status,
         headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
     });
-}
-
-function normalizeShipment(payload: any) {
-    const shipment = payload?.data || payload?.shipment || payload || {};
-    return {
-        id: shipment.id !== undefined && shipment.id !== null ? String(shipment.id) : '',
-        status: shipment.status || '',
-        statusName: shipment.status_name || shipment.statusName || shipment.status || 'Creado',
-        tracking: shipment.tracking || shipment.tracking_url || null,
-        trackingExternal: shipment.tracking_external || null,
-        carrierTrackingId: shipment.carrier_tracking_id || shipment.delivery_id || null,
-        carrierName: shipment.carrier?.name || null,
-        estimatedDelivery: shipment.delivery_time?.estimated_delivery || null,
-        createdAt: shipment.created_at || new Date().toISOString(),
-    };
 }
 
 async function loadOrder(id: string) {
@@ -46,8 +32,9 @@ export const GET: APIRoute = async (context) => {
     if (!order.zipnovaShipmentId) return json({ error: 'La orden todavía no tiene un despacho creado' }, 409);
 
     try {
-        const shipment = normalizeShipment(await getShipment(order.zipnovaShipmentId));
-        const shippingData = { ...(order.shippingData || {}), zipnovaShipment: shipment };
+        const shipment = normalizeZipnovaShipment(await getShipment(order.zipnovaShipmentId));
+        const previousShipment = (order.shippingData as any)?.zipnovaShipment || {};
+        const shippingData = { ...(order.shippingData || {}), zipnovaShipment: { ...previousShipment, ...shipment } };
         await db.update(orders).set({ shippingData, updatedAt: new Date() }).where(eq(orders.id, order.id));
         return json({ shipment });
     } catch (error) {
@@ -63,7 +50,7 @@ export const POST: APIRoute = async (context) => {
 
     if (order.zipnovaShipmentId) {
         try {
-            return json({ created: false, shipment: normalizeShipment(await getShipment(order.zipnovaShipmentId)) });
+            return json({ created: false, shipment: normalizeZipnovaShipment(await getShipment(order.zipnovaShipmentId)) });
         } catch {
             return json({ created: false, shipment: (order.shippingData as any)?.zipnovaShipment || { id: order.zipnovaShipmentId } });
         }
@@ -166,7 +153,7 @@ export const POST: APIRoute = async (context) => {
             logisticType: selected.logisticType,
             carrierId: Number(selected.carrierId),
         });
-        const shipment = normalizeShipment(createdPayload);
+        const shipment = normalizeZipnovaShipment(createdPayload);
         if (!shipment.id) throw new Error('Zipnova creó el envío pero no devolvió su identificador');
 
         const shippingData = {

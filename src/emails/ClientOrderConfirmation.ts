@@ -1,6 +1,49 @@
 export const ClientOrderConfirmationTemplate = (data: any) => {
     const { order, items, customer } = data;
 
+    const shipping = order.shippingData || {};
+    const selectedShipping = shipping.selectedShipping || {};
+    const shipment = shipping.zipnovaShipment || {};
+    const isPickup = order.shippingMethod === 'pickup';
+    const formatDate = (value: unknown) => {
+        if (!value) return '';
+        const date = new Date(String(value));
+        return Number.isNaN(date.getTime()) ? '' : date.toLocaleDateString('es-AR', {
+            timeZone: 'America/Argentina/Buenos_Aires',
+            day: 'numeric',
+            month: 'long',
+            year: 'numeric',
+        });
+    };
+    const addressLine = [
+        [shipping.street, shipping.number || shipping.street_number].filter(Boolean).join(' '),
+        shipping.floor_apt || [shipping.floor, shipping.apartment].filter(Boolean).join(' '),
+        shipping.city,
+        shipping.state,
+        shipping.postal_code || shipping.postalCode || shipping.zipcode
+            ? `CP ${shipping.postal_code || shipping.postalCode || shipping.zipcode}`
+            : '',
+    ].filter(Boolean).join(', ');
+    const estimatedDelivery = formatDate(shipment.estimatedDelivery || selectedShipping.estimatedDelivery);
+    const productionTimes = [...new Set(items.map((item: any) => item.productionTime).filter(Boolean))];
+    const shippingDetailsHtml = isPickup ? `
+        <p><strong>Modalidad:</strong> Retiro en el punto acordado</p>
+        ${shipping.pickupAddress ? `<p><strong>Dirección de retiro:</strong> ${shipping.pickupAddress}</p>` : ''}
+        <p style="color:#666;font-size:13px;">Te avisaremos cuando el pedido esté listo para retirar.</p>
+    ` : `
+        <p><strong>Modalidad:</strong> Envío a domicilio</p>
+        <p><strong>Dirección:</strong> ${addressLine || 'A confirmar'}</p>
+        ${selectedShipping.carrierName ? `<p><strong>Transporte:</strong> ${selectedShipping.carrierName}${selectedShipping.serviceTypeName ? ` — ${selectedShipping.serviceTypeName}` : ''}</p>` : ''}
+        ${productionTimes.length ? `<p><strong>Preparación del producto:</strong> ${productionTimes.join(' / ')}</p>` : ''}
+        ${estimatedDelivery ? `<p><strong>Fecha máxima estimada por el correo:</strong> ${estimatedDelivery}</p>` : ''}
+        <p style="color:#666;font-size:13px;line-height:1.5;">La fecha es estimada y puede actualizarse al generar el despacho. Cuando el correo habilite el seguimiento, te enviaremos el enlace y la fecha logística vigente.</p>
+    `;
+    const whatsappNumber = process.env.PUBLIC_WHATSAPP_NUMBER || (import.meta as any).env?.PUBLIC_WHATSAPP_NUMBER;
+    const contactLinks = [
+        whatsappNumber ? `<a href="https://wa.me/${String(whatsappNumber).replace(/\D/g, '')}">WhatsApp</a>` : '',
+        '<a href="https://instagram.com/deco.moi">Instagram (@deco.moi)</a>',
+    ].filter(Boolean).join(' o por ');
+
     const itemsHtml = items.map((item: any) => `
         <tr>
             <td style="padding: 12px; border-bottom: 1px solid #eee;">
@@ -86,15 +129,13 @@ export const ClientOrderConfirmationTemplate = (data: any) => {
                 ${Number(order.discountAmount) > 0 ? `<p>Descuento por método de pago: -$${Number(order.discountAmount).toLocaleString('es-AR')}</p>` : ''}
                 <p>Costo de Envío: $${Number(order.shippingCost).toLocaleString('es-AR')}</p>
                 <div class="total-highlight">
-                    Total Pagado: $${Number(order.total).toLocaleString('es-AR')}
+                    ${order.paymentStatus === 'approved' ? 'Total pagado' : 'Total del pedido'}: $${Number(order.total).toLocaleString('es-AR')}
                 </div>
             </div>
 
             <div class="section-title">Datos de Envío</div>
             <div class="shipping-info">
-                <p><strong>Dirección:</strong> ${order.shippingData?.street} ${order.shippingData?.number || ''} ${order.shippingData?.floor ? `Piso ${order.shippingData.floor}` : ''} ${order.shippingData?.apartment ? `Depto ${order.shippingData.apartment}` : ''}, ${order.shippingData?.city}, ${order.shippingData?.state}, ${order.shippingData?.postalCode}</p>
-                <p><strong>Zona y tiempo estimado:</strong> ${order.shippingData?.selectedShipping?.estimatedDays || 'No especificado'} (${order.shippingMethod})</p>
-                <!-- <p><em>* Recuerda que el tiempo total suma los días de producción más el tiempo de envío.</em></p> -->
+                ${shippingDetailsHtml}
             </div>
 
             <div style="margin-top: 30px; background-color: #fdfbf7; padding: 15px; border-radius: 6px; text-align: center;">
@@ -102,7 +143,7 @@ export const ClientOrderConfirmationTemplate = (data: any) => {
             </div>
 
             <div class="footer">
-                <p>¿Tenés alguna duda? Contactanos por <a href="https://wa.me/${process.env.PUBLIC_WHATSAPP_NUMBER}">WhatsApp</a> o en <a href="https://instagram.com/deco.moi">Instagram (@deco.moi)</a>.</p>
+                <p>¿Tenés alguna duda? Contactanos por ${contactLinks}.</p>
                 <p>&copy; ${new Date().getFullYear()} Deco Moi. Todos los derechos reservados.</p>
             </div>
         </div>

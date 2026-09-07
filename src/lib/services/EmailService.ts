@@ -1,8 +1,10 @@
 import { db } from '@/lib/db/connection';
-import { orders, orderItems, emailQueue, users, siteConfig, addresses } from '@/lib/db/schema';
+import { orders, orderItems, emailQueue, users, siteConfig } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { ClientOrderConfirmationTemplate } from '@/emails/ClientOrderConfirmation';
 import { AdminOrderConfirmationTemplate } from '@/emails/AdminOrderConfirmation';
+import { ClientShipmentUpdateTemplate } from '@/emails/ClientShipmentUpdate';
+import { sanitizePublicUrl } from '@/lib/security/html';
 
 export class EmailService {
     private static async getAdminEmail() {
@@ -245,6 +247,41 @@ export class EmailService {
             console.log(`Email de confirmación de pago enviado para orden ${order.orderNumber}`);
         } catch (e) {
             console.error('EmailService: Error enviando email de pago confirmado', e);
+        }
+    }
+
+    public static async sendShipmentUpdateEmail(orderId: string): Promise<boolean> {
+        try {
+            const order = await db.query.orders.findFirst({
+                where: eq(orders.id, orderId),
+                with: { user: true },
+            });
+            if (!order) return false;
+
+            const shipping = (order.shippingData || {}) as Record<string, any>;
+            const customer = {
+                name: shipping.full_name || shipping.name || order.user?.name || 'Cliente',
+                email: shipping.email || order.user?.email || '',
+                phone: shipping.phone || order.user?.phone || '',
+            };
+            if (!customer.email) return false;
+
+            const shipment = shipping.zipnovaShipment || {};
+            const trackingUrl = sanitizePublicUrl(shipment.trackingExternal || shipment.tracking) || '';
+            const html = ClientShipmentUpdateTemplate({ order, customer, trackingUrl });
+            const adminEmail = await this.getAdminEmail();
+
+            return await this.sendWithRetry(
+                orderId,
+                'client',
+                customer.email,
+                `📦 Tu pedido está listo para despachar — Orden #${order.orderNumber}`,
+                html,
+                adminEmail,
+            );
+        } catch (error) {
+            console.error(`EmailService: Error enviando seguimiento para orden ${orderId}`, error);
+            return false;
         }
     }
 }

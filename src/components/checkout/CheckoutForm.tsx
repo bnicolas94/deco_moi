@@ -21,6 +21,10 @@ interface ShippingQuoteResult {
     priceInclTax: number;
     estimatedDelivery: string;
     deliveryTimeHours: number | null;
+    estimationExpiresAt?: string;
+    preparationTime?: string;
+    shippingTime?: string;
+    totalTime?: string;
     carrierCost?: number;
     pickupPointId?: number;
     pickupPointName?: string;
@@ -487,7 +491,7 @@ export default function CheckoutForm({ fields, shippingConfig, bankConfig }: Pro
                                                 )}
                                                 {option.estimatedDelivery && (
                                                     <p className="text-xs text-gray-500">
-                                                        Llega el {formatDate(option.estimatedDelivery)}
+                                                        Fecha máxima estimada: {formatDate(option.estimatedDelivery)}
                                                     </p>
                                                 )}
                                             </div>
@@ -503,6 +507,9 @@ export default function CheckoutForm({ fields, shippingConfig, bankConfig }: Pro
                                     >
                                         Volver a cotizar
                                     </button>
+                                    <p className="pt-1 text-[11px] leading-relaxed text-gray-400">
+                                        La fecha la calcula el correo e incluye su preparación logística. Puede actualizarse cuando se genere el despacho.
+                                    </p>
                                 </div>
                             )}
                         </div>

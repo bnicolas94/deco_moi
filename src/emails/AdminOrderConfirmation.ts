@@ -1,6 +1,32 @@
 export const AdminOrderConfirmationTemplate = (data: any) => {
     const { order, items, customer } = data;
 
+    const shipping = order.shippingData || {};
+    const selectedShipping = shipping.selectedShipping || {};
+    const shipment = shipping.zipnovaShipment || {};
+    const isPickup = order.shippingMethod === 'pickup';
+    const formatDate = (value: unknown) => {
+        if (!value) return '';
+        const date = new Date(String(value));
+        return Number.isNaN(date.getTime()) ? '' : date.toLocaleDateString('es-AR', {
+            timeZone: 'America/Argentina/Buenos_Aires',
+            day: 'numeric',
+            month: 'long',
+            year: 'numeric',
+        });
+    };
+    const addressLine = [
+        [shipping.street, shipping.number || shipping.street_number].filter(Boolean).join(' '),
+        shipping.floor_apt || [shipping.floor, shipping.apartment].filter(Boolean).join(' '),
+        shipping.city,
+        shipping.state,
+        shipping.postal_code || shipping.postalCode || shipping.zipcode
+            ? `CP ${shipping.postal_code || shipping.postalCode || shipping.zipcode}`
+            : '',
+    ].filter(Boolean).join(', ');
+    const estimatedDelivery = formatDate(shipment.estimatedDelivery || selectedShipping.estimatedDelivery);
+    const productionTimes = [...new Set(items.map((item: any) => item.productionTime).filter(Boolean))];
+
     // items is array of { productName, productSku, quantity, unitPrice, subtotal, customization }
     const itemsHtml = items.map((item: any) => `
         <tr>
@@ -81,9 +107,11 @@ export const AdminOrderConfirmationTemplate = (data: any) => {
 
             <div class="section">
                 <div class="section-title">Datos de Envío</div>
-                <p><strong>Dirección:</strong> ${order.shippingData?.street} ${order.shippingData?.number || ''} ${order.shippingData?.floor ? `Piso ${order.shippingData.floor}` : ''} ${order.shippingData?.apartment ? `Depto ${order.shippingData.apartment}` : ''}, ${order.shippingData?.city}, ${order.shippingData?.state}, ${order.shippingData?.postalCode}</p>
-                <p><strong>Zona / Método:</strong> ${order.shippingMethod}</p>
-                <p><strong>Tiempo estimado:</strong> ${order.shippingData?.selectedShipping?.estimatedDays || 'No especificado'}</p>
+                <p><strong>Modalidad:</strong> ${isPickup ? 'Retiro' : 'Envío a domicilio'}</p>
+                ${!isPickup ? `<p><strong>Dirección:</strong> ${addressLine || 'A confirmar'}</p>` : ''}
+                ${selectedShipping.carrierName ? `<p><strong>Transporte:</strong> ${selectedShipping.carrierName}${selectedShipping.serviceTypeName ? ` — ${selectedShipping.serviceTypeName}` : ''}</p>` : ''}
+                ${productionTimes.length ? `<p><strong>Preparación:</strong> ${productionTimes.join(' / ')}</p>` : ''}
+                ${estimatedDelivery ? `<p><strong>Fecha máxima estimada:</strong> ${estimatedDelivery}</p>` : ''}
             </div>
 
             ${order.notes ? `
