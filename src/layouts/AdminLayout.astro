@@ -23,23 +23,48 @@ interface Props {
 const { title } = Astro.props;
 const currentPath = Astro.url.pathname;
 
-const navItems = [
-    { href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
-    { href: '/admin/products', label: 'Productos', icon: Package },
-    { href: '/admin/categories', label: 'Categorías', icon: FolderTree },
-    { href: '/admin/orders', label: 'Órdenes', icon: ShoppingCart },
-    { href: '/admin/users', label: 'Usuarios', icon: Users },
-    { href: '/admin/costs/dashboard', label: 'Rentabilidad', icon: TrendingUp },
-    { href: '/admin/costs/supplies', label: 'Insumos', icon: Package },
-    { href: '/admin/costs/config', label: 'Config Costos', icon: Calculator },
-    { href: '/admin/meli', label: 'Mercado Libre', icon: ShoppingCart },
-    { href: '/admin/settings/shipping', label: 'Envíos', icon: Truck },
-    { href: '/admin/settings/general', label: 'Config. General', icon: Settings },
-    { href: '/admin/settings/faq', label: 'Preguntas frecuentes', icon: CircleHelp },
-    { href: '/admin/settings/home', label: 'Constructor Home', icon: LayoutDashboard },
-    { href: '/admin/paginas', label: 'Páginas Dinámicas', icon: Globe },
-    { href: '/admin/settings/checkout', label: 'Config. Checkout', icon: Settings },
-    { href: '/admin/account', label: 'Mi cuenta', icon: KeyRound },
+const navSections = [
+    {
+        label: 'Principal',
+        items: [
+            { href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
+        ],
+    },
+    {
+        label: 'Gestión',
+        items: [
+            { href: '/admin/categories', label: 'Categorías', icon: FolderTree },
+            { href: '/admin/settings/shipping', label: 'Envíos', icon: Truck },
+            { href: '/admin/costs/supplies', label: 'Insumos', icon: Package },
+            { href: '/admin/orders', label: 'Órdenes', icon: ShoppingCart },
+            { href: '/admin/products', label: 'Productos', icon: Package },
+            { href: '/admin/costs/dashboard', label: 'Rentabilidad', icon: TrendingUp },
+            { href: '/admin/users', label: 'Usuarios', icon: Users },
+        ],
+    },
+    {
+        label: 'Canales',
+        items: [
+            { href: '/admin/meli', label: 'Mercado Libre', icon: ShoppingCart },
+        ],
+    },
+    {
+        label: 'Contenido',
+        items: [
+            { href: '/admin/settings/home', label: 'Constructor Home', icon: LayoutDashboard },
+            { href: '/admin/paginas', label: 'Páginas Dinámicas', icon: Globe },
+            { href: '/admin/settings/faq', label: 'Preguntas frecuentes', icon: CircleHelp },
+        ],
+    },
+    {
+        label: 'Configuración',
+        items: [
+            { href: '/admin/settings/checkout', label: 'Config. Checkout', icon: Settings },
+            { href: '/admin/costs/config', label: 'Config. Costos', icon: Calculator },
+            { href: '/admin/settings/general', label: 'Config. General', icon: Settings },
+            { href: '/admin/account', label: 'Mi cuenta', icon: KeyRound },
+        ],
+    },
 ];
 
 const user = Astro.locals.user;
@@ -66,24 +91,38 @@ const user = Astro.locals.user;
                     <h1 class="text-xl font-bold tracking-wider">DECOMOI <span class="text-indigo-400">ADMIN</span></h1>
                 </div>
                 
-                <nav class="flex-1 p-4 space-y-1 overflow-y-auto">
-                    {navItems.map((item) => {
-                        const Icon = item.icon;
-                        const isActive = currentPath === item.href || (item.href !== '/admin' && currentPath.startsWith(item.href));
-                        
+                <nav class="flex-1 p-4 space-y-5 overflow-y-auto" aria-label="Navegación del panel de administración">
+                    {navSections.map((section, sectionIndex) => {
+                        const sectionId = `admin-nav-section-${sectionIndex}`;
+
                         return (
-                            <a 
-                                href={item.href}
-                                class:list={[
-                                    "flex items-center px-3 py-2.5 rounded-lg transition-colors group",
-                                    isActive 
-                                        ? "bg-indigo-600 text-white shadow-md" 
-                                        : "text-slate-300 hover:bg-slate-800 hover:text-white"
-                                ]}
-                            >
-                                <Icon className={`w-5 h-5 mr-3 ${isActive ? 'text-white' : 'text-slate-400 group-hover:text-white'}`} />
-                                <span class="font-medium">{item.label}</span>
-                            </a>
+                            <section aria-labelledby={sectionId}>
+                                <h2 id={sectionId} class="px-3 mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                                    {section.label}
+                                </h2>
+                                <div class="space-y-1">
+                                    {section.items.map((item) => {
+                                        const Icon = item.icon;
+                                        const isActive = currentPath === item.href || (item.href !== '/admin' && currentPath.startsWith(item.href));
+
+                                        return (
+                                            <a
+                                                href={item.href}
+                                                aria-current={isActive ? 'page' : undefined}
+                                                class:list={[
+                                                    "flex items-center px-3 py-2.5 rounded-lg transition-colors group",
+                                                    isActive
+                                                        ? "bg-indigo-600 text-white shadow-md"
+                                                        : "text-slate-300 hover:bg-slate-800 hover:text-white"
+                                                ]}
+                                            >
+                                                <Icon className={`w-5 h-5 mr-3 ${isActive ? 'text-white' : 'text-slate-400 group-hover:text-white'}`} />
+                                                <span class="font-medium">{item.label}</span>
+                                            </a>
+                                        );
+                                    })}
+                                </div>
+                            </section>
                         );
                     })}
                 </nav>
