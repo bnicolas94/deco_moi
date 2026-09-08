@@ -1,53 +1,175 @@
 ---
+import { sanitizeCssColor, sanitizePublicUrl } from '@/lib/security/html';
+
+interface OccasionCard {
+  id?: string;
+  title?: string;
+  description?: string;
+  image?: string;
+  link?: string;
+  buttonText?: string;
+  newTab?: boolean;
+  isActive?: boolean;
+}
+
+interface LegacyCategory {
+  name?: string;
+  slug?: string;
+  description?: string;
+  image?: string;
+}
+
 interface Props {
   title?: string;
   subtitle?: string;
-  categories?: Array<{
-    name: string;
-    slug: string;
-    description: string;
-    colorClass: string;
-    icon: string;
-  }>;
+  backgroundColor?: string;
+  buttonText?: string;
+  buttonLink?: string;
+  cards?: OccasionCard[];
+  categories?: LegacyCategory[];
 }
 
+const defaultCards: OccasionCard[] = [
+  { id: 'cumpleanos', title: 'Cumpleaños', description: 'Detalles personalizados para sorprender.', link: '/productos', buttonText: 'Ver regalos', isActive: true },
+  { id: 'eventos', title: 'Eventos especiales', description: 'Souvenirs para celebrar momentos únicos.', link: '/productos', buttonText: 'Descubrir', isActive: true },
+  { id: 'intencion', title: 'Regalos con intención', description: 'Para agradecer, acompañar o decir “te quiero”.', link: '/productos', buttonText: 'Encontrar el ideal', isActive: true },
+  { id: 'empresas', title: 'Pedidos empresariales', description: 'Regalos personalizados para equipos y clientes.', link: '/contacto', buttonText: 'Consultar', isActive: true },
+];
+
 const {
-  title = "Nuestros souvenirs",
-  subtitle = "Hechos con el cuidado que cada recuerdo merece",
-  categories = [
-    { name: "Chocolates", slug: "chocolates", description: "Personalizados", colorClass: "bg-primary/30", icon: "M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z" },
-    { name: "Presentes", slug: "presentes", description: "Regalos especiales", colorClass: "bg-rose-gold/30", icon: "M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" },
-    { name: "Tejidos", slug: "tejidos", description: "Artesanales", colorClass: "bg-accent/20", icon: "M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" },
-    { name: "Velas", slug: "velas", description: "Aromáticas", colorClass: "bg-gold/10", icon: "M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z M9.879 16.121A3 3 0 1012.015 11L11 14H9c0 .768.293 1.536.879 2.121z" }
-  ]
+  title = 'Un detalle para cada momento',
+  subtitle = 'Elegí la ocasión y encontrá un regalo hecho para emocionar.',
+  backgroundColor = '#ffffff',
+  buttonText = 'Ver regalos disponibles',
+  buttonLink = '/productos',
+  cards,
+  categories,
 } = Astro.props;
+
+// Los datos antiguos de categorías siguen funcionando hasta que se guarde el bloque nuevo.
+const sourceCards: OccasionCard[] = Array.isArray(cards)
+  ? cards
+  : categories?.length
+    ? categories.map((category) => ({
+        title: category.name,
+        description: category.description,
+        image: category.image,
+        link: `/productos/${category.slug || ''}`,
+        buttonText: 'Ver opciones',
+        isActive: true,
+      }))
+    : defaultCards;
+
+const visibleCards = sourceCards
+  .slice(0, 6)
+  .filter((card) => card.isActive !== false && card.title?.trim())
+  .map((card, index) => ({
+    ...card,
+    title: card.title!.trim().slice(0, 100),
+    description: card.description?.trim().slice(0, 220) || '',
+    image: sanitizePublicUrl(card.image),
+    link: sanitizePublicUrl(card.link, '/productos'),
+    buttonText: card.buttonText?.trim().slice(0, 60) || 'Ver opciones',
+    newTab: card.newTab === true,
+    accent: ['#E8C4A6', '#E0BFB8', '#C9A980', '#D9CDBD', '#E6D7C4', '#D8C4B6'][index % 6],
+  }));
+
+const safeBackground = sanitizeCssColor(backgroundColor, '#ffffff');
+const safeButtonLink = sanitizePublicUrl(buttonLink, '/productos');
 ---
 
-<section class="section bg-white">
-  <div class="container">
-    <div class="text-center mb-12">
-      <h2 class="section-title">{title}</h2>
-      <div class="gold-line mt-4 mb-4"></div>
-      <p class="section-subtitle">{subtitle}</p>
-    </div>
+{visibleCards.length > 0 && (
+  <section class="section overflow-hidden" style={`background-color: ${safeBackground}`} aria-labelledby="occasions-title">
+    <div class="container">
+      <div class="text-center mb-10 md:mb-12">
+        <p class="text-[11px] font-semibold uppercase tracking-[0.28em] text-secondary mb-3">Regalos con intención</p>
+        <h2 id="occasions-title" class="section-title !mb-0">{title}</h2>
+        <div class="gold-line mt-4 mb-4"></div>
+        {subtitle && <p class="section-subtitle !mb-0">{subtitle}</p>}
+      </div>
 
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
-      {categories.map((cat) => (
-        <a href={`/productos/${cat.slug}`} class="group">
-          <div class="card card-hover relative aspect-category overflow-hidden">
-            <div class="absolute inset-0 bg-gradient-to-t from-brand-black/70 via-brand-black/20 to-transparent z-10"></div>
-            <div class={`absolute inset-0 ${cat.colorClass} flex items-center justify-center`}>
-              <svg class="w-16 h-16 text-secondary/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d={cat.icon} />
-              </svg>
+      <div class="occasion-scroll -mx-4 px-4 sm:mx-0 sm:px-0" aria-label="Ocasiones de compra">
+        {visibleCards.map((card, index) => (
+          <a
+            href={card.link}
+            target={card.newTab ? '_blank' : undefined}
+            rel={card.newTab ? 'noopener noreferrer' : undefined}
+            class="occasion-card group"
+            aria-label={`${card.title}: ${card.buttonText}`}
+          >
+            <div class="absolute inset-0" style={`background: linear-gradient(145deg, ${card.accent} 0%, #F7F0E9 100%)`}>
+              {card.image ? (
+                <img src={card.image} alt="" loading="lazy" class="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105" />
+              ) : (
+                <div class="h-full w-full flex items-start justify-end p-5" aria-hidden="true">
+                  <span class="font-heading text-[5.5rem] leading-none text-white/35 italic">{String(index + 1).padStart(2, '0')}</span>
+                </div>
+              )}
             </div>
-            <div class="absolute bottom-0 left-0 right-0 p-4 z-20">
-              <h3 class="font-heading font-bold text-white text-lg group-hover:text-primary transition-colors">{cat.name}</h3>
-              <p class="text-white/70 text-sm">{cat.description}</p>
+            <div class="absolute inset-0 bg-gradient-to-t from-brand-black/85 via-brand-black/25 to-transparent"></div>
+            <div class="absolute inset-x-0 bottom-0 z-10 p-5 md:p-6">
+              <h3 class="font-heading text-2xl font-bold text-white leading-tight mb-1.5">{card.title}</h3>
+              {card.description && <p class="text-sm leading-relaxed text-white/80 line-clamp-2">{card.description}</p>}
+              <span class="mt-4 inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.12em] text-white">
+                {card.buttonText}
+                <svg class="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M5 12h14m-5-5 5 5-5 5" />
+                </svg>
+              </span>
             </div>
-          </div>
-        </a>
-      ))}
+          </a>
+        ))}
+      </div>
+
+      {buttonText && (
+        <div class="mt-9 text-center">
+          <a href={safeButtonLink} class="btn btn-primary btn-lg">{buttonText}</a>
+        </div>
+      )}
     </div>
-  </div>
-</section>
+  </section>
+)}
+
+<style>
+  .occasion-scroll {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(78vw, 1fr);
+    gap: 1rem;
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+    scroll-snap-type: inline mandatory;
+    scrollbar-width: none;
+  }
+
+  .occasion-scroll::-webkit-scrollbar { display: none; }
+
+  .occasion-card {
+    position: relative;
+    display: block;
+    min-height: 21rem;
+    overflow: hidden;
+    border-radius: 1.25rem;
+    scroll-snap-align: center;
+    box-shadow: 0 12px 35px rgba(44, 44, 44, 0.10);
+    transition: transform .35s ease, box-shadow .35s ease;
+  }
+
+  .occasion-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 20px 44px rgba(44, 44, 44, 0.16);
+  }
+
+  @media (min-width: 640px) {
+    .occasion-scroll {
+      grid-auto-flow: row;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      overflow: visible;
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .occasion-scroll { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .occasion-card { min-height: 22rem; }
+  }
+</style>

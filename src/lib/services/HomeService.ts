@@ -1,6 +1,7 @@
 import { db } from '../db/connection';
 import { homeBlocks } from '../db/schema';
 import { eq, asc } from 'drizzle-orm';
+import { sanitizeHomeBlockSettings } from '@/lib/security/homeBlocks';
 
 export interface HomeBlock {
     id: number;
@@ -38,14 +39,24 @@ export async function getAllHomeBlocks(): Promise<HomeBlock[]> {
 }
 
 export async function updateHomeBlock(id: number, data: Partial<HomeBlock>) {
+    let safeData = data;
+    if (data.settings !== undefined) {
+        const [existing] = await db.select({ type: homeBlocks.type })
+            .from(homeBlocks)
+            .where(eq(homeBlocks.id, id))
+            .limit(1);
+        if (!existing) throw new Error('Bloque de inicio inexistente');
+        safeData = { ...data, settings: sanitizeHomeBlockSettings(existing.type, data.settings) };
+    }
     return await db.update(homeBlocks)
-        .set({ ...data, updatedAt: new Date() })
+        .set({ ...safeData, updatedAt: new Date() })
         .where(eq(homeBlocks.id, id));
 }
 
 export async function createHomeBlock(data: Omit<HomeBlock, 'id'>) {
     return await db.insert(homeBlocks).values({
         ...data,
+        settings: sanitizeHomeBlockSettings(data.type, data.settings),
         updatedAt: new Date(),
         createdAt: new Date(),
     });

@@ -17,7 +17,7 @@ const IMAGE_TYPES = {
 } as const;
 
 type AllowedImageMime = keyof typeof IMAGE_TYPES;
-type UploadDirectory = 'products' | 'categories' | 'mockups';
+type UploadDirectory = 'products' | 'categories' | 'mockups' | 'home';
 type PreparedImage = { bytes: Uint8Array; extension: string };
 
 export class ImageUploadError extends Error {

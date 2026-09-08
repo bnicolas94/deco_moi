@@ -1,5 +1,5 @@
 import type { APIRoute } from 'astro';
-import { getHomeBlocks, getAllHomeBlocks, updateHomeBlock, createHomeBlock, deleteHomeBlock, reorderBlocks } from '@/lib/services/HomeService';
+import { getAllHomeBlocks, updateHomeBlock, createHomeBlock, deleteHomeBlock, reorderBlocks } from '@/lib/services/HomeService';
 
 export const GET: APIRoute = async () => {
     try {
