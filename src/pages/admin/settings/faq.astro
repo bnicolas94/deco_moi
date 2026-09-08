@@ -6,146 +6,282 @@ const faqConfig = await getContactFaqConfig();
 ---
 
 <AdminLayout title="Preguntas frecuentes">
-    <div class="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-            <h1 class="text-2xl font-bold text-gray-900">Preguntas frecuentes</h1>
-            <p class="text-gray-500 mt-1">Administrá el contenido que aparece en la página de contacto.</p>
-        </div>
-        <a href="/contacto" target="_blank" rel="noopener noreferrer" class="btn btn-outline btn-sm">
-            Ver página de contacto
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 3h7m0 0v7m0-7L10 14M5 7v12h12v-5" />
-            </svg>
-        </a>
-    </div>
-
-    <form id="faq-form" class="space-y-6">
-        <section class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-            <div class="p-6 border-b border-gray-100 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                    <h2 class="text-lg font-semibold text-gray-800">Configuración de la sección</h2>
-                    <p class="text-xs text-gray-500 mt-1">Podés ocultar temporalmente toda la sección sin borrar su contenido.</p>
-                </div>
-                <label class="inline-flex items-center gap-3 cursor-pointer">
-                    <input id="faq-enabled" type="checkbox" checked={faqConfig.enabled} class="peer sr-only" />
-                    <span class="relative w-11 h-6 rounded-full bg-gray-200 peer-checked:bg-indigo-600 transition-colors after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:w-5 after:h-5 after:bg-white after:rounded-full after:shadow after:transition-transform peer-checked:after:translate-x-5"></span>
-                    <span class="text-sm font-medium text-gray-700">Mostrar sección</span>
-                </label>
+    <div class="faq-admin">
+        <header class="page-header">
+            <div>
+                <p class="eyebrow"><span></span> Contenido del sitio</p>
+                <h1>Preguntas frecuentes</h1>
+                <p class="page-description">Creá y organizá las respuestas que aparecen en la página de contacto.</p>
             </div>
-            <div class="p-6 grid grid-cols-1 gap-5">
-                <div>
-                    <label for="faq-title" class="block text-sm font-semibold text-gray-700 mb-1">Título</label>
-                    <input id="faq-title" type="text" value={faqConfig.title} maxlength="100" required class="input" />
-                </div>
-                <div>
-                    <label for="faq-intro" class="block text-sm font-semibold text-gray-700 mb-1">Texto introductorio <span class="font-normal text-gray-400">(opcional)</span></label>
-                    <textarea id="faq-intro" rows="2" maxlength="300" class="input resize-y" placeholder="Ej: Encontrá respuestas rápidas a las consultas más comunes.">{faqConfig.intro}</textarea>
-                </div>
-            </div>
-        </section>
+            <a class="preview-button" href="/contacto" target="_blank" rel="noopener noreferrer">
+                Vista previa
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M14 3h7m0 0v7m0-7L10 14M5 7v12h12v-5"></path>
+                </svg>
+            </a>
+        </header>
 
-        <section class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-            <div class="p-6 border-b border-gray-100 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                    <h2 class="text-lg font-semibold text-gray-800">Preguntas</h2>
-                    <p class="text-xs text-gray-500 mt-1">Arrastrá las tarjetas para cambiar el orden en el que se muestran.</p>
-                </div>
-                <button id="add-faq-btn" type="button" class="btn btn-primary btn-sm">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-                    </svg>
-                    Agregar pregunta
+        <form id="faq-form">
+            <div class="editor-layout">
+                <aside class="panel settings-panel">
+                    <div class="panel-header">
+                        <span class="header-icon settings-icon">
+                            <svg viewBox="0 0 24 24" aria-hidden="true">
+                                <path d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path>
+                            </svg>
+                        </span>
+                        <div>
+                            <h2>Configuración</h2>
+                            <p>Ajustes generales de la sección</p>
+                        </div>
+                    </div>
+
+                    <div class="settings-body">
+                        <label class="visibility-setting">
+                            <span>
+                                <strong>Sección visible</strong>
+                                <small>Ocultala sin perder contenido</small>
+                            </span>
+                            <input id="faq-enabled" type="checkbox" checked={faqConfig.enabled} />
+                            <span class="toggle" aria-hidden="true"></span>
+                        </label>
+
+                        <div class="field">
+                            <label for="faq-title">Título de la sección</label>
+                            <input id="faq-title" type="text" value={faqConfig.title} maxlength="100" required />
+                        </div>
+
+                        <div class="field">
+                            <div class="field-label-row">
+                                <label for="faq-intro">Introducción</label>
+                                <small>Opcional</small>
+                            </div>
+                            <textarea id="faq-intro" rows="4" maxlength="300" placeholder="Un breve texto antes de las preguntas">{faqConfig.intro}</textarea>
+                        </div>
+                    </div>
+                </aside>
+
+                <section class="panel questions-panel">
+                    <div class="panel-header questions-header">
+                        <div class="header-title">
+                            <span class="header-icon questions-icon">
+                                <svg viewBox="0 0 24 24" aria-hidden="true">
+                                    <path d="M8.2 9a3 3 0 115.8 1c0 2-3 2-3 4m0 4h.01M12 22a10 10 0 110-20 10 10 0 010 20z"></path>
+                                </svg>
+                            </span>
+                            <div>
+                                <div class="title-with-count">
+                                    <h2>Preguntas y respuestas</h2>
+                                    <span id="faq-count">{faqConfig.items.length}</span>
+                                </div>
+                                <p>Arrastrá desde el control lateral para reordenar</p>
+                            </div>
+                        </div>
+                        <button id="add-faq-btn" class="add-button" type="button">
+                            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v16m8-8H4"></path></svg>
+                            Nueva pregunta
+                        </button>
+                    </div>
+
+                    <div class="questions-body">
+                        <div id="faq-empty" class:list={["empty-state", faqConfig.items.length > 0 && "is-hidden"]}>
+                            <span class="empty-icon">
+                                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6v6m0 4h.01M5 19h14L12 4 5 19z"></path></svg>
+                            </span>
+                            <strong>No hay preguntas cargadas</strong>
+                            <p>Usá “Nueva pregunta” para agregar la primera.</p>
+                        </div>
+
+                        <div id="faq-list" class="faq-list">
+                            {faqConfig.items.map((item, index) => (
+                                <article class="faq-item" data-id={item.id}>
+                                    <div class="item-rail">
+                                        <button class="faq-drag-handle" type="button" title="Arrastrar para reordenar" aria-label="Arrastrar para reordenar">
+                                            <svg viewBox="0 0 24 24" aria-hidden="true">
+                                                <circle cx="8" cy="7" r="1.5"></circle><circle cx="16" cy="7" r="1.5"></circle>
+                                                <circle cx="8" cy="12" r="1.5"></circle><circle cx="16" cy="12" r="1.5"></circle>
+                                                <circle cx="8" cy="17" r="1.5"></circle><circle cx="16" cy="17" r="1.5"></circle>
+                                            </svg>
+                                        </button>
+                                        <span class="faq-number">{index + 1}</span>
+                                    </div>
+
+                                    <div class="item-content">
+                                        <div class="field">
+                                            <label>Pregunta</label>
+                                            <input class="faq-question" type="text" value={item.question} maxlength="200" required />
+                                        </div>
+                                        <div class="field">
+                                            <label>Respuesta</label>
+                                            <textarea class="faq-answer" rows="3" maxlength="2000" required>{item.answer}</textarea>
+                                        </div>
+                                        <div class="item-footer">
+                                            <label class="item-visibility">
+                                                <input class="faq-active" type="checkbox" checked={item.isActive} />
+                                                <span class="toggle small" aria-hidden="true"></span>
+                                                <span>Visible en el sitio</span>
+                                            </label>
+                                            <button class="remove-faq-btn" type="button">
+                                                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 7l-.9 12.1A2 2 0 0116.1 21H7.9a2 2 0 01-2-1.9L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                                Eliminar
+                                            </button>
+                                        </div>
+                                    </div>
+                                </article>
+                            ))}
+                        </div>
+                    </div>
+                </section>
+            </div>
+
+            <div class="save-bar">
+                <p id="faq-save-hint">Los cambios se publican cuando presionás Guardar.</p>
+                <button type="submit">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 13l4 4L19 7"></path></svg>
+                    <span>Guardar cambios</span>
                 </button>
             </div>
+        </form>
 
-            <div class="p-6">
-                <div id="faq-empty" class:list={["py-12 text-center border-2 border-dashed border-gray-200 rounded-xl", faqConfig.items.length > 0 && "hidden"]}>
-                    <div class="w-12 h-12 mx-auto mb-3 rounded-full bg-gray-100 flex items-center justify-center text-gray-400">
-                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9a3.001 3.001 0 115.83 1c0 2-3 2-3 4m.01 4h.01M12 22a10 10 0 110-20 10 10 0 010 20z" />
+        <template id="faq-item-template">
+            <article class="faq-item is-new" data-id="">
+                <div class="item-rail">
+                    <button class="faq-drag-handle" type="button" title="Arrastrar para reordenar" aria-label="Arrastrar para reordenar">
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <circle cx="8" cy="7" r="1.5"></circle><circle cx="16" cy="7" r="1.5"></circle>
+                            <circle cx="8" cy="12" r="1.5"></circle><circle cx="16" cy="12" r="1.5"></circle>
+                            <circle cx="8" cy="17" r="1.5"></circle><circle cx="16" cy="17" r="1.5"></circle>
                         </svg>
-                    </div>
-                    <p class="font-medium text-gray-700">Todavía no hay preguntas</p>
-                    <p class="text-sm text-gray-400 mt-1">Agregá la primera para comenzar.</p>
-                </div>
-
-                <div id="faq-list" class="space-y-4">
-                    {faqConfig.items.map((item) => (
-                        <article class="faq-item group rounded-xl border border-gray-200 bg-gray-50 p-4 sm:p-5" data-id={item.id}>
-                            <div class="flex gap-3 sm:gap-4">
-                                <button type="button" class="faq-drag-handle mt-7 flex-none self-start p-1 text-gray-400 hover:text-gray-700 cursor-grab active:cursor-grabbing" title="Arrastrar para reordenar" aria-label="Arrastrar para reordenar">
-                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8h16M4 16h16" />
-                                    </svg>
-                                </button>
-
-                                <div class="flex-1 min-w-0 space-y-4">
-                                    <div>
-                                        <label class="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">Pregunta</label>
-                                        <input type="text" class="faq-question input" value={item.question} maxlength="200" required />
-                                    </div>
-                                    <div>
-                                        <label class="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">Respuesta</label>
-                                        <textarea class="faq-answer input resize-y" rows="3" maxlength="2000" required>{item.answer}</textarea>
-                                    </div>
-                                    <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                                        <label class="inline-flex items-center gap-2 cursor-pointer">
-                                            <input type="checkbox" class="faq-active w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" checked={item.isActive} />
-                                            <span class="text-sm font-medium text-gray-700">Visible en el sitio</span>
-                                        </label>
-                                        <button type="button" class="remove-faq-btn inline-flex items-center gap-2 text-sm font-medium text-red-600 hover:text-red-800">
-                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                            </svg>
-                                            Quitar
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        </article>
-                    ))}
-                </div>
-            </div>
-        </section>
-
-        <div class="sticky bottom-4 z-10 flex justify-end rounded-xl border border-gray-200 bg-white/95 p-4 shadow-lg backdrop-blur">
-            <button type="submit" class="btn btn-primary px-8">Guardar cambios</button>
-        </div>
-    </form>
-<template id="faq-item-template">
-    <article class="faq-item group rounded-xl border border-indigo-200 bg-indigo-50/40 p-4 sm:p-5" data-id="">
-        <div class="flex gap-3 sm:gap-4">
-            <button type="button" class="faq-drag-handle mt-7 flex-none self-start p-1 text-gray-400 hover:text-gray-700 cursor-grab active:cursor-grabbing" title="Arrastrar para reordenar" aria-label="Arrastrar para reordenar">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8h16M4 16h16" />
-                </svg>
-            </button>
-            <div class="flex-1 min-w-0 space-y-4">
-                <div>
-                    <label class="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">Pregunta</label>
-                    <input type="text" class="faq-question input" maxlength="200" required placeholder="Escribí la pregunta" />
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">Respuesta</label>
-                    <textarea class="faq-answer input resize-y" rows="3" maxlength="2000" required placeholder="Escribí una respuesta clara y breve"></textarea>
-                </div>
-                <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <label class="inline-flex items-center gap-2 cursor-pointer">
-                        <input type="checkbox" class="faq-active w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" checked />
-                        <span class="text-sm font-medium text-gray-700">Visible en el sitio</span>
-                    </label>
-                    <button type="button" class="remove-faq-btn inline-flex items-center gap-2 text-sm font-medium text-red-600 hover:text-red-800">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
-                        Quitar
                     </button>
+                    <span class="faq-number"></span>
                 </div>
-            </div>
-        </div>
-    </article>
-</template>
+                <div class="item-content">
+                    <div class="field">
+                        <label>Pregunta</label>
+                        <input class="faq-question" type="text" maxlength="200" required placeholder="Ej: ¿Cuál es el pedido mínimo?" />
+                    </div>
+                    <div class="field">
+                        <label>Respuesta</label>
+                        <textarea class="faq-answer" rows="3" maxlength="2000" required placeholder="Escribí una respuesta clara y breve"></textarea>
+                    </div>
+                    <div class="item-footer">
+                        <label class="item-visibility">
+                            <input class="faq-active" type="checkbox" checked />
+                            <span class="toggle small" aria-hidden="true"></span>
+                            <span>Visible en el sitio</span>
+                        </label>
+                        <button class="remove-faq-btn" type="button">
+                            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 7l-.9 12.1A2 2 0 0116.1 21H7.9a2 2 0 01-2-1.9L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                            Eliminar
+                        </button>
+                    </div>
+                </div>
+            </article>
+        </template>
+    </div>
 </AdminLayout>
+
+<style>
+    .faq-admin { max-width: 1150px; margin: 0 auto; color: #0f172a; }
+    .page-header { display: flex; align-items: center; justify-content: space-between; gap: 24px; margin-bottom: 28px; }
+    .eyebrow { display: flex; align-items: center; gap: 8px; margin: 0 0 7px; color: #4f46e5; font-size: 11px; font-weight: 750; letter-spacing: .16em; text-transform: uppercase; }
+    .eyebrow span { width: 24px; height: 1px; background: #6366f1; }
+    .page-header h1 { margin: 0; color: #0f172a; font-size: 30px; line-height: 1.15; font-weight: 750; letter-spacing: -.025em; }
+    .page-description { margin: 8px 0 0; color: #64748b; font-size: 14px; }
+    svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    .preview-button, .add-button, .save-bar button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 40px; border-radius: 9px; padding: 0 16px; font-size: 14px; font-weight: 650; transition: .18s ease; }
+    .preview-button { flex: none; border: 1px solid #dbe2ea; background: white; color: #334155; box-shadow: 0 1px 2px rgb(15 23 42 / 4%); }
+    .preview-button:hover { border-color: #cbd5e1; background: #f8fafc; }
+    .editor-layout { display: grid; grid-template-columns: 310px minmax(0, 1fr); align-items: start; gap: 20px; }
+    .panel { overflow: hidden; border: 1px solid #e2e8f0; border-radius: 16px; background: white; box-shadow: 0 1px 3px rgb(15 23 42 / 4%); }
+    .settings-panel { position: sticky; top: 24px; }
+    .panel-header { display: flex; align-items: center; gap: 12px; min-height: 72px; padding: 15px 20px; border-bottom: 1px solid #eef2f7; }
+    .panel-header h2 { margin: 0; color: #0f172a; font-size: 15px; line-height: 1.35; font-weight: 700; }
+    .panel-header p { margin: 2px 0 0; color: #64748b; font-size: 12px; }
+    .header-icon { display: grid; flex: none; width: 38px; height: 38px; place-items: center; border-radius: 10px; }
+    .settings-icon { color: #4f46e5; background: #eef2ff; }
+    .questions-icon { color: #d97706; background: #fffbeb; }
+    .settings-body { display: grid; gap: 20px; padding: 20px; }
+    .visibility-setting { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 13px 14px; border: 1px solid #e2e8f0; border-radius: 11px; background: #f8fafc; cursor: pointer; }
+    .visibility-setting strong, .visibility-setting small { display: block; }
+    .visibility-setting strong { color: #334155; font-size: 13px; }
+    .visibility-setting small { margin-top: 2px; color: #64748b; font-size: 11px; }
+    .visibility-setting input, .item-visibility input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+    .toggle { position: relative; flex: none; width: 42px; height: 24px; border-radius: 999px; background: #cbd5e1; transition: background .2s; }
+    .toggle::after { position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; border-radius: 50%; background: white; box-shadow: 0 1px 3px rgb(15 23 42 / 25%); content: ''; transition: transform .2s; }
+    input:checked + .toggle { background: #4f46e5; }
+    input:checked + .toggle::after { transform: translateX(18px); }
+    .toggle.small { width: 36px; height: 20px; }
+    .toggle.small::after { width: 16px; height: 16px; }
+    input:checked + .toggle.small { background: #10b981; }
+    input:checked + .toggle.small::after { transform: translateX(16px); }
+    .field { min-width: 0; }
+    .field > label, .field-label-row label { display: block; margin: 0 0 7px; color: #475569; font-size: 11px; font-weight: 750; letter-spacing: .1em; text-transform: uppercase; }
+    .settings-body .field > label, .settings-body .field-label-row label { font-size: 13px; letter-spacing: 0; text-transform: none; }
+    .field-label-row { display: flex; align-items: baseline; justify-content: space-between; }
+    .field-label-row small { color: #94a3b8; font-size: 11px; }
+    .field input, .field textarea { display: block; width: 100%; min-width: 0; border: 1px solid #cbd5e1; border-radius: 9px; background: white; padding: 10px 12px; color: #1e293b; font: inherit; font-size: 14px; line-height: 1.5; outline: none; box-shadow: 0 1px 2px rgb(15 23 42 / 3%); transition: border .18s, box-shadow .18s; }
+    .field textarea { min-height: 92px; resize: vertical; }
+    .field input:focus, .field textarea:focus { border-color: #6366f1; box-shadow: 0 0 0 3px rgb(99 102 241 / 13%); }
+    .field input::placeholder, .field textarea::placeholder { color: #94a3b8; }
+    .questions-header { justify-content: space-between; }
+    .header-title, .title-with-count { display: flex; align-items: center; gap: 10px; }
+    .title-with-count { gap: 8px; }
+    #faq-count { min-width: 24px; border-radius: 999px; padding: 2px 7px; background: #f1f5f9; color: #64748b; font-size: 11px; font-weight: 750; text-align: center; }
+    .add-button { border: 0; background: #4f46e5; color: white; box-shadow: 0 1px 2px rgb(79 70 229 / 25%); }
+    .add-button:hover { background: #4338ca; }
+    .questions-body { padding: 18px; background: #f8fafc; }
+    .faq-list { display: grid; gap: 12px; }
+    .faq-item { display: flex; overflow: hidden; border: 1px solid #e2e8f0; border-radius: 12px; background: white; box-shadow: 0 1px 2px rgb(15 23 42 / 3%); transition: border .18s, box-shadow .18s; }
+    .faq-item:hover { border-color: #cbd5e1; box-shadow: 0 4px 12px rgb(15 23 42 / 5%); }
+    .faq-item.is-new { border-color: #a5b4fc; box-shadow: 0 0 0 3px #eef2ff; }
+    .item-rail { display: flex; flex: 0 0 50px; flex-direction: column; align-items: center; gap: 8px; padding-top: 14px; border-right: 1px solid #f1f5f9; }
+    .faq-drag-handle { display: grid; width: 32px; height: 32px; place-items: center; border: 0; border-radius: 7px; background: transparent; color: #94a3b8; cursor: grab; transition: .18s; }
+    .faq-drag-handle:hover { background: #f1f5f9; color: #475569; }
+    .faq-drag-handle:active { cursor: grabbing; }
+    .faq-drag-handle svg { fill: currentColor; stroke: none; }
+    .faq-number { display: grid; width: 24px; height: 24px; place-items: center; border-radius: 50%; background: #f1f5f9; color: #64748b; font-size: 11px; font-weight: 750; }
+    .item-content { display: grid; flex: 1; min-width: 0; gap: 15px; padding: 17px 18px 15px; }
+    .item-footer { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-top: 13px; border-top: 1px solid #f1f5f9; }
+    .item-visibility { display: inline-flex; align-items: center; gap: 9px; color: #475569; font-size: 13px; font-weight: 600; cursor: pointer; }
+    .remove-faq-btn { display: inline-flex; align-items: center; gap: 6px; border: 0; border-radius: 7px; padding: 7px 9px; background: transparent; color: #e11d48; font-size: 13px; font-weight: 650; transition: .18s; }
+    .remove-faq-btn:hover { background: #fff1f2; color: #be123c; }
+    .remove-faq-btn svg { width: 16px; height: 16px; }
+    .empty-state { padding: 54px 24px; border: 2px dashed #dbe2ea; border-radius: 12px; background: white; text-align: center; }
+    .empty-state.is-hidden { display: none; }
+    .empty-icon { display: grid; width: 44px; height: 44px; margin: 0 auto 12px; place-items: center; border-radius: 50%; background: #eef2ff; color: #6366f1; }
+    .empty-state strong { color: #334155; font-size: 14px; }
+    .empty-state p { margin: 5px 0 0; color: #64748b; font-size: 13px; }
+    .save-bar { position: sticky; z-index: 10; bottom: 16px; display: flex; align-items: center; justify-content: space-between; gap: 18px; margin-top: 18px; padding: 12px 14px 12px 18px; border: 1px solid #dbe2ea; border-radius: 12px; background: rgb(255 255 255 / 94%); box-shadow: 0 10px 30px rgb(15 23 42 / 10%); backdrop-filter: blur(10px); }
+    .save-bar p { margin: 0; color: #64748b; font-size: 12px; }
+    .save-bar p.is-dirty { color: #d97706; font-weight: 700; }
+    .save-bar p.is-saved { color: #059669; font-weight: 650; }
+    .save-bar button { border: 0; background: #0f172a; color: white; }
+    .save-bar button:hover { background: #1e293b; }
+    .save-bar button:disabled { cursor: wait; opacity: .6; }
+    .save-bar button svg { width: 16px; height: 16px; }
+    .faq-sort-ghost { opacity: .4; }
+
+    @media (max-width: 1023px) {
+        .editor-layout { grid-template-columns: 1fr; }
+        .settings-panel { position: static; }
+        .settings-body { grid-template-columns: 1fr 1fr; }
+        .visibility-setting { grid-column: 1 / -1; }
+    }
+    @media (max-width: 639px) {
+        .page-header, .questions-header, .save-bar { align-items: stretch; flex-direction: column; }
+        .preview-button { align-self: flex-start; }
+        .settings-body { grid-template-columns: 1fr; }
+        .visibility-setting { grid-column: auto; }
+        .questions-header { gap: 14px; }
+        .add-button { width: 100%; }
+        .questions-body { padding: 12px; }
+        .item-rail { flex-basis: 42px; }
+        .item-content { padding: 15px 13px 13px; }
+        .item-footer { align-items: flex-start; flex-direction: column; }
+        .save-bar button { width: 100%; }
+    }
+</style>
 
 <script>
     import Sortable from 'sortablejs';
@@ -155,19 +291,35 @@ const faqConfig = await getContactFaqConfig();
         const list = document.getElementById('faq-list');
         const addButton = document.getElementById('add-faq-btn');
         const emptyState = document.getElementById('faq-empty');
+        const count = document.getElementById('faq-count');
+        const saveHint = document.getElementById('faq-save-hint');
         const template = document.getElementById('faq-item-template') as HTMLTemplateElement | null;
 
         if (!form || !list || form.dataset.initialized === 'true') return;
         form.dataset.initialized = 'true';
 
-        const syncEmptyState = () => {
-            emptyState?.classList.toggle('hidden', list.querySelectorAll('.faq-item').length > 0);
+        const syncItems = () => {
+            const items = list.querySelectorAll<HTMLElement>('.faq-item');
+            emptyState?.classList.toggle('is-hidden', items.length > 0);
+            if (count) count.textContent = String(items.length);
+            items.forEach((item, index) => {
+                const number = item.querySelector('.faq-number');
+                if (number) number.textContent = String(index + 1);
+            });
+        };
+
+        const markUnsaved = () => {
+            if (!saveHint) return;
+            saveHint.textContent = 'Tenés cambios sin guardar.';
+            saveHint.classList.remove('is-saved');
+            saveHint.classList.add('is-dirty');
         };
 
         new Sortable(list, {
-            animation: 150,
+            animation: 180,
             handle: '.faq-drag-handle',
-            ghostClass: 'opacity-40',
+            ghostClass: 'faq-sort-ghost',
+            onEnd: () => { syncItems(); markUnsaved(); },
         });
 
         addButton?.addEventListener('click', () => {
@@ -176,37 +328,40 @@ const faqConfig = await getContactFaqConfig();
                 (window as any).showToast?.('Se permiten hasta 50 preguntas', 'error');
                 return;
             }
-
             const fragment = template.content.cloneNode(true) as DocumentFragment;
             const item = fragment.querySelector('.faq-item') as HTMLElement | null;
             if (!item) return;
             item.dataset.id = crypto.randomUUID();
             list.appendChild(fragment);
-            syncEmptyState();
-            item.querySelector<HTMLInputElement>('.faq-question')?.focus();
+            syncItems();
+            markUnsaved();
+            item.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            item.querySelector<HTMLInputElement>('.faq-question')?.focus({ preventScroll: true });
         });
 
         list.addEventListener('click', (event) => {
-            const target = event.target as HTMLElement;
-            const removeButton = target.closest('.remove-faq-btn');
+            const removeButton = (event.target as HTMLElement).closest('.remove-faq-btn');
             if (!removeButton) return;
-
             const item = removeButton.closest('.faq-item');
-            if (item && confirm('¿Querés quitar esta pregunta? El cambio se aplicará cuando guardes.')) {
+            if (item && confirm('¿Querés eliminar esta pregunta? El cambio se aplicará cuando guardes.')) {
                 item.remove();
-                syncEmptyState();
+                syncItems();
+                markUnsaved();
             }
         });
 
+        form.addEventListener('input', markUnsaved);
+        form.addEventListener('change', markUnsaved);
         form.addEventListener('submit', async (event) => {
             event.preventDefault();
             if (!form.reportValidity()) return;
 
             const submitButton = form.querySelector<HTMLButtonElement>('button[type="submit"]');
-            if (!submitButton) return;
-            const originalText = submitButton.textContent;
+            const submitLabel = submitButton?.querySelector('span');
+            if (!submitButton || !submitLabel) return;
+            const originalText = submitLabel.textContent;
             submitButton.disabled = true;
-            submitButton.textContent = 'Guardando...';
+            submitLabel.textContent = 'Guardando...';
 
             const items = Array.from(list.querySelectorAll<HTMLElement>('.faq-item')).map((item, index) => ({
                 id: item.dataset.id || crypto.randomUUID(),
@@ -215,7 +370,6 @@ const faqConfig = await getContactFaqConfig();
                 isActive: item.querySelector<HTMLInputElement>('.faq-active')?.checked ?? true,
                 order: index + 1,
             }));
-
             const payload = {
                 enabled: (document.getElementById('faq-enabled') as HTMLInputElement).checked,
                 title: (document.getElementById('faq-title') as HTMLInputElement).value.trim(),
@@ -225,31 +379,28 @@ const faqConfig = await getContactFaqConfig();
 
             try {
                 const response = await fetch('/api/admin/config/contact-faq', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload),
+                    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
                 });
                 const result = await response.json().catch(() => ({}));
+                if (!response.ok) throw new Error(result.error || 'No se pudieron guardar los cambios');
 
-                if (!response.ok) {
-                    throw new Error(result.error || 'No se pudieron guardar los cambios');
+                list.querySelectorAll('.faq-item').forEach((item) => item.classList.remove('is-new'));
+                if (saveHint) {
+                    saveHint.textContent = 'Todos los cambios están guardados.';
+                    saveHint.classList.remove('is-dirty');
+                    saveHint.classList.add('is-saved');
                 }
-
-                list.querySelectorAll('.faq-item').forEach((item) => {
-                    item.classList.remove('border-indigo-200', 'bg-indigo-50/40');
-                    item.classList.add('border-gray-200', 'bg-gray-50');
-                });
                 (window as any).showToast?.('Preguntas frecuentes actualizadas');
             } catch (error) {
                 const message = error instanceof Error ? error.message : 'No se pudieron guardar los cambios';
                 (window as any).showToast?.(message, 'error');
             } finally {
                 submitButton.disabled = false;
-                submitButton.textContent = originalText;
+                submitLabel.textContent = originalText;
             }
         });
 
-        syncEmptyState();
+        syncItems();
     }
 
     initFaqAdmin();
