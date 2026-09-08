@@ -1,6 +1,11 @@
 import { db } from '../db/connection';
 import { siteConfig } from '../db/schema';
 import { eq } from 'drizzle-orm';
+import {
+    contactFaqConfigSchema,
+    DEFAULT_CONTACT_FAQ,
+    type ContactFaqConfig,
+} from '../config/contactFaq';
 
 export interface CheckoutField {
     id: string;
@@ -116,4 +121,53 @@ export async function getGeneralConfig(): Promise<GeneralConfig> {
     } catch (e) {
         return defaultData;
     }
+}
+
+export async function getContactFaqConfig(): Promise<ContactFaqConfig> {
+    try {
+        const result = await db.select().from(siteConfig).where(eq(siteConfig.key, 'contact_faq')).limit(1);
+
+        if (result.length === 0) {
+            return DEFAULT_CONTACT_FAQ;
+        }
+
+        const parsed = contactFaqConfigSchema.safeParse(result[0].value);
+        if (!parsed.success) {
+            console.error('Invalid contact FAQ configuration:', parsed.error.flatten());
+            return DEFAULT_CONTACT_FAQ;
+        }
+
+        return {
+            ...parsed.data,
+            items: [...parsed.data.items].sort((a, b) => a.order - b.order),
+        };
+    } catch (error) {
+        console.error('Error fetching contact FAQ configuration:', error);
+        return DEFAULT_CONTACT_FAQ;
+    }
+}
+
+export async function updateContactFaqConfig(config: ContactFaqConfig): Promise<void> {
+    const normalized: ContactFaqConfig = {
+        ...config,
+        items: config.items.map((item, index) => ({
+            ...item,
+            order: index + 1,
+        })),
+    };
+    const existing = await db.select().from(siteConfig).where(eq(siteConfig.key, 'contact_faq')).limit(1);
+
+    if (existing.length === 0) {
+        await db.insert(siteConfig).values({
+            key: 'contact_faq',
+            value: normalized,
+            description: 'Preguntas frecuentes de la página de contacto',
+            updatedAt: new Date(),
+        });
+        return;
+    }
+
+    await db.update(siteConfig)
+        .set({ value: normalized, updatedAt: new Date() })
+        .where(eq(siteConfig.key, 'contact_faq'));
 }

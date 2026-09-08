@@ -1,9 +1,10 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
 import { SOCIAL_LINKS } from '@/lib/utils/constants';
-import { getGeneralConfig } from '@/lib/services/ConfigService';
+import { getContactFaqConfig, getGeneralConfig } from '@/lib/services/ConfigService';
 
-const generalConfig = await getGeneralConfig();
+const [generalConfig, faqConfig] = await Promise.all([getGeneralConfig(), getContactFaqConfig()]);
+const faqItems = faqConfig.items.filter((item) => item.isActive).sort((a, b) => a.order - b.order);
 const whatsappNumber = generalConfig.whatsapp || import.meta.env.PUBLIC_WHATSAPP_NUMBER || '5491112345678';
 const whatsappMessage = generalConfig.whatsappMessage || 'Hola! Tengo una consulta.';
 const cleanWhatsapp = whatsappNumber.replace(/\D/g, '');
@@ -87,60 +88,32 @@ const whatsappUrl = `https://wa.me/${cleanWhatsapp}?text=${encodeURIComponent(wh
         </a>
       </div>
 
-      <!-- FAQ -->
-      <div class="bg-white rounded-2xl p-8 md:p-12 shadow-[0_4px_30px_rgba(0,0,0,0.02)]">
-        <h2 class="font-heading font-bold text-3xl text-brand-black mb-8 text-center">Preguntas frecuentes</h2>
+      {faqConfig.enabled && faqItems.length > 0 && (
+        <section class="bg-white rounded-2xl p-8 md:p-12 shadow-[0_4px_30px_rgba(0,0,0,0.02)]" aria-labelledby="contact-faq-title">
+          <h2 id="contact-faq-title" class="font-heading font-bold text-3xl text-brand-black mb-3 text-center">
+            {faqConfig.title}
+          </h2>
+          {faqConfig.intro && (
+            <p class="text-gray-500 text-center max-w-2xl mx-auto mb-8">{faqConfig.intro}</p>
+          )}
 
-        <div class="space-y-4 max-w-2xl mx-auto">
-          <details class="group border border-gray-100 rounded-xl overflow-hidden">
-            <summary class="flex items-center justify-between p-5 cursor-pointer font-heading font-semibold text-xl text-brand-black hover:bg-gray-50 transition-colors">
-              ¿Cuál es el pedido mínimo?
-              <svg class="w-4 h-4 text-gray-400 group-open:rotate-180 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-              </svg>
-            </summary>
-            <p class="px-5 pb-5 text-base text-gray-600 leading-relaxed">
-              El pedido mínimo varía según el producto. Para chocolates personalizados, generalmente es de 10 a 50 unidades. Consultanos por WhatsApp para tu caso particular.
-            </p>
-          </details>
-
-          <details class="group border border-gray-100 rounded-xl overflow-hidden">
-            <summary class="flex items-center justify-between p-5 cursor-pointer font-heading font-semibold text-xl text-brand-black hover:bg-gray-50 transition-colors">
-              ¿Cuánto tardan en estar listos?
-              <svg class="w-4 h-4 text-gray-400 group-open:rotate-180 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-              </svg>
-            </summary>
-            <p class="px-5 pb-5 text-base text-gray-600 leading-relaxed">
-              El tiempo de producción es de 7 a 15 días hábiles dependiendo del producto y la cantidad. Para pedidos urgentes, contactanos por WhatsApp.
-            </p>
-          </details>
-
-          <details class="group border border-gray-100 rounded-xl overflow-hidden">
-            <summary class="flex items-center justify-between p-5 cursor-pointer font-heading font-semibold text-xl text-brand-black hover:bg-gray-50 transition-colors">
-              ¿Hacen envíos a todo el país?
-              <svg class="w-4 h-4 text-gray-400 group-open:rotate-180 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-              </svg>
-            </summary>
-            <p class="px-5 pb-5 text-base text-gray-600 leading-relaxed">
-              ¡Sí! Hacemos envíos a todo el país a través de correo y transporte. El costo del envío se calcula según la localidad y el peso del pedido.
-            </p>
-          </details>
-
-          <details class="group border border-gray-100 rounded-xl overflow-hidden">
-            <summary class="flex items-center justify-between p-5 cursor-pointer font-heading font-semibold text-xl text-brand-black hover:bg-gray-50 transition-colors">
-              ¿Qué formas de pago aceptan?
-              <svg class="w-4 h-4 text-gray-400 group-open:rotate-180 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-              </svg>
-            </summary>
-            <p class="px-5 pb-5 text-base text-gray-600 leading-relaxed">
-              Aceptamos MercadoPago (tarjetas, efectivo) y transferencia bancaria. Pagando por transferencia tenés un <strong>10% de descuento</strong> en el total.
-            </p>
-          </details>
-        </div>
-      </div>
+          <div class:list={["space-y-4 max-w-2xl mx-auto", !faqConfig.intro && "mt-8"]} itemscope itemtype="https://schema.org/FAQPage">
+            {faqItems.map((item) => (
+              <details class="group border border-gray-100 rounded-xl overflow-hidden" itemscope itemprop="mainEntity" itemtype="https://schema.org/Question">
+                <summary class="flex items-center justify-between gap-4 p-5 cursor-pointer font-heading font-semibold text-xl text-brand-black hover:bg-gray-50 transition-colors">
+                  <span itemprop="name">{item.question}</span>
+                  <svg class="w-4 h-4 flex-none text-gray-400 group-open:rotate-180 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                  </svg>
+                </summary>
+                <div itemscope itemprop="acceptedAnswer" itemtype="https://schema.org/Answer">
+                  <p class="px-5 pb-5 text-base text-gray-600 leading-relaxed whitespace-pre-line" itemprop="text">{item.answer}</p>
+                </div>
+              </details>
+            ))}
+          </div>
+        </section>
+      )}
     </div>
   </div>
 </BaseLayout>

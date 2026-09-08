@@ -1,0 +1,257 @@
+---
+import AdminLayout from '@/layouts/AdminLayout.astro';
+import { getContactFaqConfig } from '@/lib/services/ConfigService';
+
+const faqConfig = await getContactFaqConfig();
+---
+
+<AdminLayout title="Preguntas frecuentes">
+    <div class="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900">Preguntas frecuentes</h1>
+            <p class="text-gray-500 mt-1">Administrá el contenido que aparece en la página de contacto.</p>
+        </div>
+        <a href="/contacto" target="_blank" rel="noopener noreferrer" class="btn btn-outline btn-sm">
+            Ver página de contacto
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 3h7m0 0v7m0-7L10 14M5 7v12h12v-5" />
+            </svg>
+        </a>
+    </div>
+
+    <form id="faq-form" class="space-y-6">
+        <section class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+            <div class="p-6 border-b border-gray-100 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                    <h2 class="text-lg font-semibold text-gray-800">Configuración de la sección</h2>
+                    <p class="text-xs text-gray-500 mt-1">Podés ocultar temporalmente toda la sección sin borrar su contenido.</p>
+                </div>
+                <label class="inline-flex items-center gap-3 cursor-pointer">
+                    <input id="faq-enabled" type="checkbox" checked={faqConfig.enabled} class="peer sr-only" />
+                    <span class="relative w-11 h-6 rounded-full bg-gray-200 peer-checked:bg-indigo-600 transition-colors after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:w-5 after:h-5 after:bg-white after:rounded-full after:shadow after:transition-transform peer-checked:after:translate-x-5"></span>
+                    <span class="text-sm font-medium text-gray-700">Mostrar sección</span>
+                </label>
+            </div>
+            <div class="p-6 grid grid-cols-1 gap-5">
+                <div>
+                    <label for="faq-title" class="block text-sm font-semibold text-gray-700 mb-1">Título</label>
+                    <input id="faq-title" type="text" value={faqConfig.title} maxlength="100" required class="input" />
+                </div>
+                <div>
+                    <label for="faq-intro" class="block text-sm font-semibold text-gray-700 mb-1">Texto introductorio <span class="font-normal text-gray-400">(opcional)</span></label>
+                    <textarea id="faq-intro" rows="2" maxlength="300" class="input resize-y" placeholder="Ej: Encontrá respuestas rápidas a las consultas más comunes.">{faqConfig.intro}</textarea>
+                </div>
+            </div>
+        </section>
+
+        <section class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+            <div class="p-6 border-b border-gray-100 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                    <h2 class="text-lg font-semibold text-gray-800">Preguntas</h2>
+                    <p class="text-xs text-gray-500 mt-1">Arrastrá las tarjetas para cambiar el orden en el que se muestran.</p>
+                </div>
+                <button id="add-faq-btn" type="button" class="btn btn-primary btn-sm">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                    </svg>
+                    Agregar pregunta
+                </button>
+            </div>
+
+            <div class="p-6">
+                <div id="faq-empty" class:list={["py-12 text-center border-2 border-dashed border-gray-200 rounded-xl", faqConfig.items.length > 0 && "hidden"]}>
+                    <div class="w-12 h-12 mx-auto mb-3 rounded-full bg-gray-100 flex items-center justify-center text-gray-400">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9a3.001 3.001 0 115.83 1c0 2-3 2-3 4m.01 4h.01M12 22a10 10 0 110-20 10 10 0 010 20z" />
+                        </svg>
+                    </div>
+                    <p class="font-medium text-gray-700">Todavía no hay preguntas</p>
+                    <p class="text-sm text-gray-400 mt-1">Agregá la primera para comenzar.</p>
+                </div>
+
+                <div id="faq-list" class="space-y-4">
+                    {faqConfig.items.map((item) => (
+                        <article class="faq-item group rounded-xl border border-gray-200 bg-gray-50 p-4 sm:p-5" data-id={item.id}>
+                            <div class="flex gap-3 sm:gap-4">
+                                <button type="button" class="faq-drag-handle mt-7 flex-none self-start p-1 text-gray-400 hover:text-gray-700 cursor-grab active:cursor-grabbing" title="Arrastrar para reordenar" aria-label="Arrastrar para reordenar">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8h16M4 16h16" />
+                                    </svg>
+                                </button>
+
+                                <div class="flex-1 min-w-0 space-y-4">
+                                    <div>
+                                        <label class="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">Pregunta</label>
+                                        <input type="text" class="faq-question input" value={item.question} maxlength="200" required />
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">Respuesta</label>
+                                        <textarea class="faq-answer input resize-y" rows="3" maxlength="2000" required>{item.answer}</textarea>
+                                    </div>
+                                    <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                        <label class="inline-flex items-center gap-2 cursor-pointer">
+                                            <input type="checkbox" class="faq-active w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" checked={item.isActive} />
+                                            <span class="text-sm font-medium text-gray-700">Visible en el sitio</span>
+                                        </label>
+                                        <button type="button" class="remove-faq-btn inline-flex items-center gap-2 text-sm font-medium text-red-600 hover:text-red-800">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                            </svg>
+                                            Quitar
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </article>
+                    ))}
+                </div>
+            </div>
+        </section>
+
+        <div class="sticky bottom-4 z-10 flex justify-end rounded-xl border border-gray-200 bg-white/95 p-4 shadow-lg backdrop-blur">
+            <button type="submit" class="btn btn-primary px-8">Guardar cambios</button>
+        </div>
+    </form>
+<template id="faq-item-template">
+    <article class="faq-item group rounded-xl border border-indigo-200 bg-indigo-50/40 p-4 sm:p-5" data-id="">
+        <div class="flex gap-3 sm:gap-4">
+            <button type="button" class="faq-drag-handle mt-7 flex-none self-start p-1 text-gray-400 hover:text-gray-700 cursor-grab active:cursor-grabbing" title="Arrastrar para reordenar" aria-label="Arrastrar para reordenar">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8h16M4 16h16" />
+                </svg>
+            </button>
+            <div class="flex-1 min-w-0 space-y-4">
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">Pregunta</label>
+                    <input type="text" class="faq-question input" maxlength="200" required placeholder="Escribí la pregunta" />
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">Respuesta</label>
+                    <textarea class="faq-answer input resize-y" rows="3" maxlength="2000" required placeholder="Escribí una respuesta clara y breve"></textarea>
+                </div>
+                <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <label class="inline-flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" class="faq-active w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" checked />
+                        <span class="text-sm font-medium text-gray-700">Visible en el sitio</span>
+                    </label>
+                    <button type="button" class="remove-faq-btn inline-flex items-center gap-2 text-sm font-medium text-red-600 hover:text-red-800">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                        Quitar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </article>
+</template>
+</AdminLayout>
+
+<script>
+    import Sortable from 'sortablejs';
+
+    function initFaqAdmin() {
+        const form = document.getElementById('faq-form') as HTMLFormElement | null;
+        const list = document.getElementById('faq-list');
+        const addButton = document.getElementById('add-faq-btn');
+        const emptyState = document.getElementById('faq-empty');
+        const template = document.getElementById('faq-item-template') as HTMLTemplateElement | null;
+
+        if (!form || !list || form.dataset.initialized === 'true') return;
+        form.dataset.initialized = 'true';
+
+        const syncEmptyState = () => {
+            emptyState?.classList.toggle('hidden', list.querySelectorAll('.faq-item').length > 0);
+        };
+
+        new Sortable(list, {
+            animation: 150,
+            handle: '.faq-drag-handle',
+            ghostClass: 'opacity-40',
+        });
+
+        addButton?.addEventListener('click', () => {
+            if (!template) return;
+            if (list.querySelectorAll('.faq-item').length >= 50) {
+                (window as any).showToast?.('Se permiten hasta 50 preguntas', 'error');
+                return;
+            }
+
+            const fragment = template.content.cloneNode(true) as DocumentFragment;
+            const item = fragment.querySelector('.faq-item') as HTMLElement | null;
+            if (!item) return;
+            item.dataset.id = crypto.randomUUID();
+            list.appendChild(fragment);
+            syncEmptyState();
+            item.querySelector<HTMLInputElement>('.faq-question')?.focus();
+        });
+
+        list.addEventListener('click', (event) => {
+            const target = event.target as HTMLElement;
+            const removeButton = target.closest('.remove-faq-btn');
+            if (!removeButton) return;
+
+            const item = removeButton.closest('.faq-item');
+            if (item && confirm('¿Querés quitar esta pregunta? El cambio se aplicará cuando guardes.')) {
+                item.remove();
+                syncEmptyState();
+            }
+        });
+
+        form.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            if (!form.reportValidity()) return;
+
+            const submitButton = form.querySelector<HTMLButtonElement>('button[type="submit"]');
+            if (!submitButton) return;
+            const originalText = submitButton.textContent;
+            submitButton.disabled = true;
+            submitButton.textContent = 'Guardando...';
+
+            const items = Array.from(list.querySelectorAll<HTMLElement>('.faq-item')).map((item, index) => ({
+                id: item.dataset.id || crypto.randomUUID(),
+                question: item.querySelector<HTMLInputElement>('.faq-question')?.value.trim() || '',
+                answer: item.querySelector<HTMLTextAreaElement>('.faq-answer')?.value.trim() || '',
+                isActive: item.querySelector<HTMLInputElement>('.faq-active')?.checked ?? true,
+                order: index + 1,
+            }));
+
+            const payload = {
+                enabled: (document.getElementById('faq-enabled') as HTMLInputElement).checked,
+                title: (document.getElementById('faq-title') as HTMLInputElement).value.trim(),
+                intro: (document.getElementById('faq-intro') as HTMLTextAreaElement).value.trim(),
+                items,
+            };
+
+            try {
+                const response = await fetch('/api/admin/config/contact-faq', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                });
+                const result = await response.json().catch(() => ({}));
+
+                if (!response.ok) {
+                    throw new Error(result.error || 'No se pudieron guardar los cambios');
+                }
+
+                list.querySelectorAll('.faq-item').forEach((item) => {
+                    item.classList.remove('border-indigo-200', 'bg-indigo-50/40');
+                    item.classList.add('border-gray-200', 'bg-gray-50');
+                });
+                (window as any).showToast?.('Preguntas frecuentes actualizadas');
+            } catch (error) {
+                const message = error instanceof Error ? error.message : 'No se pudieron guardar los cambios';
+                (window as any).showToast?.(message, 'error');
+            } finally {
+                submitButton.disabled = false;
+                submitButton.textContent = originalText;
+            }
+        });
+
+        syncEmptyState();
+    }
+
+    initFaqAdmin();
+    document.addEventListener('astro:page-load', initFaqAdmin);
+</script>
