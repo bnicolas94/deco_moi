@@ -286,14 +286,26 @@ const blockLabels: Record<string, string> = {
         }
 
         const defaultOccasionCards = [
-            { id: 'cumpleanos', title: 'Cumpleaños', description: 'Detalles personalizados para sorprender.', link: '/productos', buttonText: 'Ver regalos', image: '/uploads/products/20250403_111821-scaled-e1756843398571.jpg', isActive: true, newTab: false },
-            { id: 'eventos', title: 'Eventos especiales', description: 'Souvenirs para celebrar momentos únicos.', link: '/productos', buttonText: 'Descubrir', image: '/uploads/products/AirBrush_20220518162032.jpg', isActive: true, newTab: false },
-            { id: 'intencion', title: 'Regalos con intención', description: 'Para agradecer, acompañar o decir “te quiero”.', link: '/productos', buttonText: 'Encontrar el ideal', image: '/uploads/products/AirBrush_20251018125838.jpg', isActive: true, newTab: false },
-            { id: 'empresas', title: 'Pedidos empresariales', description: 'Regalos personalizados para equipos y clientes.', link: '/contacto', buttonText: 'Consultar', image: '/uploads/products/AirBrush_20251106202441-scaled.jpg', isActive: true, newTab: false },
+            { id: 'cumpleanos', title: 'Cumpleaños', description: 'Detalles personalizados para sorprender.', link: '/productos', buttonText: 'Ver regalos', image: '/images/home/occasion-cumpleanos.webp', isActive: true, newTab: false },
+            { id: 'eventos', title: 'Eventos especiales', description: 'Souvenirs para celebrar momentos únicos.', link: '/productos', buttonText: 'Descubrir', image: '/images/home/occasion-eventos.webp', isActive: true, newTab: false },
+            { id: 'intencion', title: 'Regalos con intención', description: 'Para agradecer, acompañar o decir “te quiero”.', link: '/productos', buttonText: 'Encontrar el ideal', image: '/images/home/occasion-regalos.webp', isActive: true, newTab: false },
+            { id: 'empresas', title: 'Pedidos empresariales', description: 'Regalos personalizados para equipos y clientes.', link: '/contacto', buttonText: 'Consultar', image: '/images/home/occasion-empresas.webp', isActive: true, newTab: false },
         ];
 
+        const upgradedDefaultImages: Record<string, string> = {
+            '/uploads/products/20250403_111821-scaled-e1756843398571.jpg': '/images/home/occasion-cumpleanos.webp',
+            '/uploads/products/AirBrush_20220518162032.jpg': '/images/home/occasion-eventos.webp',
+            '/uploads/products/AirBrush_20251018125838.jpg': '/images/home/occasion-regalos.webp',
+            '/uploads/products/AirBrush_20251106202441-scaled.jpg': '/images/home/occasion-empresas.webp',
+        };
+
+        function upgradeDefaultImage(card: any) {
+            const image = upgradedDefaultImages[card?.image] || card?.image || '';
+            return { ...card, image };
+        }
+
         function getOccasionCards(settings: any) {
-            if (Array.isArray(settings.cards)) return settings.cards.slice(0, 6);
+            if (Array.isArray(settings.cards)) return settings.cards.slice(0, 6).map(upgradeDefaultImage);
             if (Array.isArray(settings.categories) && settings.categories.length) {
                 return settings.categories.slice(0, 6).map((category: any, index: number) => ({
                     id: `legacy-${index}`,
