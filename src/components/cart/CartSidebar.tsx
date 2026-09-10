@@ -153,15 +153,20 @@ export default function CartSidebar() {
                                             {/* Cantidad */}
                                             <div className="flex items-center border border-gray-200 rounded-lg overflow-hidden">
                                                 <button
+                                                    type="button"
                                                     onClick={() => updateQuantity(getItemKey(item), item.quantity - 1)}
-                                                    className="w-7 h-7 flex items-center justify-center text-dark-gray hover:bg-gray-100 transition-colors text-sm"
+                                                    disabled={item.quantity <= Math.max(1, item.minOrder || 1)}
+                                                    className="w-7 h-7 flex items-center justify-center text-dark-gray hover:bg-gray-100 transition-colors text-sm disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:bg-transparent"
+                                                    aria-label={`Restar una unidad de ${item.name}`}
                                                 >
                                                     −
                                                 </button>
                                                 <span className="w-8 text-center text-xs font-medium">{item.quantity}</span>
                                                 <button
+                                                    type="button"
                                                     onClick={() => updateQuantity(getItemKey(item), item.quantity + 1)}
                                                     className="w-7 h-7 flex items-center justify-center text-dark-gray hover:bg-gray-100 transition-colors text-sm"
+                                                    aria-label={`Sumar una unidad de ${item.name}`}
                                                 >
                                                     +
                                                 </button>

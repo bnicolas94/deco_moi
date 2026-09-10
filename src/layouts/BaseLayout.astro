@@ -120,6 +120,7 @@ const canonicalURL = new URL(Astro.url.pathname, Astro.site || 'https://decomoi.
           e.preventDefault();
           e.stopPropagation();
           const el = btn as HTMLElement;
+          const minOrder = Math.max(1, parseInt(el.dataset.productMinOrder || '1'));
           addToCart({
             id: parseInt(el.dataset.productId || '0'),
             name: el.dataset.productName || '',
@@ -127,7 +128,8 @@ const canonicalURL = new URL(Astro.url.pathname, Astro.site || 'https://decomoi.
             sku: el.dataset.productSku || '',
             price: parseFloat(el.dataset.productPrice || '0'),
             image: el.dataset.productImage || '',
-          });
+            minOrder,
+          }, minOrder);
         });
       });
 
@@ -151,6 +153,7 @@ const canonicalURL = new URL(Astro.url.pathname, Astro.site || 'https://decomoi.
             basePrice: el.dataset.productBaseprice ? parseFloat(el.dataset.productBaseprice) : undefined,
             priceRules: el.dataset.productPricerules ? JSON.parse(el.dataset.productPricerules) : undefined,
             image: el.dataset.productImage || '',
+            minOrder: Math.max(1, parseInt(el.dataset.productMinOrder || '1')),
             variantId: el.dataset.variantId ? parseInt(el.dataset.variantId) : undefined,
             variantName: el.dataset.variantName || undefined,
             selectedOptions: el.dataset.selectedOptions ? JSON.parse(el.dataset.selectedOptions) : undefined,
@@ -203,6 +206,7 @@ const canonicalURL = new URL(Astro.url.pathname, Astro.site || 'https://decomoi.
             basePrice,
             priceRules: el.dataset.productPricerules ? JSON.parse(el.dataset.productPricerules) : undefined,
             image: el.dataset.productImage || '',
+            minOrder: Math.max(1, parseInt(el.dataset.productMinOrder || '1')),
             variantId,
             variantName,
             selectedOptions,

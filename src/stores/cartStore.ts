@@ -16,6 +16,7 @@ export interface CartItem {
     price: number;
     image: string;
     quantity: number;
+    minOrder?: number;
     customization?: string;
     variantId?: number;
     variantName?: string;

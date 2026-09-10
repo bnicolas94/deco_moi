@@ -130,6 +130,7 @@ const cardImageSrcSet = responsiveImageSrcSet(mainImage, [320, 480, 640]);
       data-product-sku={product.sku}
       data-product-price={finalPrice}
       data-product-image={mainImage || ""}
+      data-product-min-order={product.minOrder || 1}
     >
       <svg
         class="w-4 h-4"

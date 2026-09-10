@@ -490,6 +490,7 @@ const initialProductionTime =
               data-product-baseprice={finalPrice}
               data-product-pricerules={JSON.stringify(priceRules)}
               data-product-image={images[0] || ""}
+              data-product-min-order={product.minOrder || 1}
               disabled={product.variants && product.variants.length > 0}
             >
               {
@@ -510,6 +511,7 @@ const initialProductionTime =
               data-product-baseprice={finalPrice}
               data-product-pricerules={JSON.stringify(priceRules)}
               data-product-image={images[0] || ""}
+              data-product-min-order={product.minOrder || 1}
               disabled={product.variants && product.variants.length > 0}
             >
               {

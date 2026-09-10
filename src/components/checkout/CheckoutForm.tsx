@@ -1,10 +1,12 @@
-import { useState, useEffect } from 'preact/hooks';
+import { useState, useEffect, useRef } from 'preact/hooks';
 import { useStore } from '@nanostores/preact';
 import {
     $cartItems,
     $cartTotal,
     clearCart,
-    $cartCount
+    $cartCount,
+    getItemKey,
+    updateQuantity
 } from '@/stores/cartStore';
 import type { CheckoutField } from '@/lib/services/ConfigService';
 import { optimizedImageUrl } from '@/lib/images';
@@ -72,6 +74,7 @@ export default function CheckoutForm({ fields, shippingConfig, bankConfig }: Pro
     const [isQuoting, setIsQuoting] = useState(false);
     const [quoteError, setQuoteError] = useState<string | null>(null);
     const [hasQuoted, setHasQuoted] = useState(false);
+    const shippingQuoteRequest = useRef(0);
 
     // Determinar si el envío está habilitado
     const shippingEnabled = shippingConfig?.enabled ?? true;
@@ -93,6 +96,7 @@ export default function CheckoutForm({ fields, shippingConfig, bankConfig }: Pro
 
     // Cotizar envío cuando se cambia a delivery y hay CP
     const handleQuoteShipping = async () => {
+        const requestId = ++shippingQuoteRequest.current;
         const city = formData.city || '';
         const state = formData.state || '';
         const postalCode = formData.postal_code || '';
@@ -139,6 +143,8 @@ export default function CheckoutForm({ fields, shippingConfig, bankConfig }: Pro
 
             const data = await res.json();
 
+            if (requestId !== shippingQuoteRequest.current) return;
+
             if (data.results && data.results.length > 0) {
                 setShippingOptions(data.results);
                 setSelectedShipping(data.results[0]); // Seleccionar la primera opción por defecto
@@ -147,15 +153,21 @@ export default function CheckoutForm({ fields, shippingConfig, bankConfig }: Pro
                 setQuoteError('No hay opciones de envío disponibles para tu zona. Probá con retiro en local.');
             }
         } catch (err) {
+            if (requestId !== shippingQuoteRequest.current) return;
             console.error(err);
             setQuoteError('Error al cotizar el envío. Verificá tu dirección e intentá de nuevo.');
         } finally {
-            setIsQuoting(false);
+            if (requestId === shippingQuoteRequest.current) {
+                setIsQuoting(false);
+            }
         }
     };
 
     // Auto-cotizar cuando se selecciona delivery y hay CP
     useEffect(() => {
+        shippingQuoteRequest.current += 1;
+        setIsQuoting(false);
+
         if (deliveryMethod === 'pickup') {
             setShippingOptions([]);
             setSelectedShipping(null);
@@ -172,7 +184,19 @@ export default function CheckoutForm({ fields, shippingConfig, bankConfig }: Pro
             }, 800); // Debounce de 800ms
             return () => clearTimeout(timer);
         }
-    }, [deliveryMethod, formData.postal_code, formData.city, formData.state]);
+    }, [deliveryMethod, formData.postal_code, formData.city, formData.state, items]);
+
+    const handleQuantityChange = (itemKey: string, quantity: number) => {
+        if (deliveryMethod === 'delivery') {
+            shippingQuoteRequest.current += 1;
+            setIsQuoting(false);
+            setSelectedShipping(null);
+            setShippingOptions([]);
+            setHasQuoted(false);
+        }
+
+        updateQuantity(itemKey, quantity);
+    };
 
     const handleSubmit = async (e: any) => {
         e.preventDefault();
@@ -593,8 +617,12 @@ export default function CheckoutForm({ fields, shippingConfig, bankConfig }: Pro
                     <h2 className="text-xl font-heading font-bold text-brand-black mb-6">Tu Pedido</h2>
 
                     <div className="space-y-4 mb-6 max-h-[400px] overflow-y-auto pr-2">
-                        {items.map(item => (
-                            <div key={`${item.id}-${item.variantId || 'base'}`} className="flex gap-4 pb-4 border-b border-gray-50 last:border-0">
+                        {items.map(item => {
+                            const itemKey = getItemKey(item);
+                            const minimumQuantity = Math.max(1, item.minOrder || 1);
+
+                            return (
+                                <div key={itemKey} className="flex gap-4 pb-4 border-b border-gray-50 last:border-0">
                                 <div className="w-16 h-16 rounded-lg overflow-hidden bg-light-gray flex-shrink-0">
                                     <img
                                         src={optimizedImageUrl(item.image, 160)}
@@ -614,13 +642,44 @@ export default function CheckoutForm({ fields, shippingConfig, bankConfig }: Pro
                                             {item.selectedOptions.map((o: any) => `${o.groupName}: ${o.optionName}`).join(' · ')}
                                         </p>
                                     )}
-                                    <p className="text-xs text-gray-400">Cantidad: {item.quantity}</p>
+                                    <div className="mt-2 flex items-center gap-2">
+                                        <span className="text-xs text-gray-400">Cantidad</span>
+                                        <div className="flex items-center overflow-hidden rounded-lg border border-gray-200 bg-white">
+                                            <button
+                                                type="button"
+                                                onClick={() => handleQuantityChange(itemKey, item.quantity - 1)}
+                                                disabled={item.quantity <= minimumQuantity}
+                                                className="flex h-7 w-7 items-center justify-center text-dark-gray transition-colors hover:bg-light-gray focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:bg-white"
+                                                aria-label={`Restar una unidad de ${item.name}`}
+                                                title={item.quantity <= minimumQuantity ? `Cantidad mínima: ${minimumQuantity}` : 'Restar una unidad'}
+                                            >
+                                                <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 12H4" />
+                                                </svg>
+                                            </button>
+                                            <span className="w-8 text-center text-xs font-bold tabular-nums" aria-live="polite">
+                                                {item.quantity}
+                                            </span>
+                                            <button
+                                                type="button"
+                                                onClick={() => handleQuantityChange(itemKey, item.quantity + 1)}
+                                                className="flex h-7 w-7 items-center justify-center text-dark-gray transition-colors hover:bg-light-gray focus:outline-none focus:ring-2 focus:ring-primary/30"
+                                                aria-label={`Sumar una unidad de ${item.name}`}
+                                                title="Sumar una unidad"
+                                            >
+                                                <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
+                                                </svg>
+                                            </button>
+                                        </div>
+                                    </div>
                                 </div>
                                 <p className="text-sm font-bold text-brand-black whitespace-nowrap">
                                     {formatPrice(item.price * item.quantity)}
                                 </p>
-                            </div>
-                        ))}
+                                </div>
+                            );
+                        })}
                     </div>
 
                     <div className="space-y-3 py-6 border-y border-gray-100 mb-6">
@@ -628,10 +687,10 @@ export default function CheckoutForm({ fields, shippingConfig, bankConfig }: Pro
                             <span>Subtotal</span>
                             <span className="font-semibold">{formatPrice(total)}</span>
                         </div>
-                        {paymentMethod === 'transfer' && (
+                        {paymentMethod === 'transfer' && transferDiscount > 0 && (
                             <div className="flex justify-between text-success">
-                                <span>Descuento Transferencia (10%)</span>
-                                <span className="font-semibold">-{formatPrice(total * 0.1)}</span>
+                                <span>Descuento Transferencia ({transferDiscount}%)</span>
+                                <span className="font-semibold">-{formatPrice(total * transferDiscount / 100)}</span>
                             </div>
                         )}
                         <div className="flex justify-between text-dark-gray">

@@ -132,8 +132,11 @@ export default function CartPageContent() {
                                 <div className="flex justify-center">
                                     <div className="flex items-center border border-gray-200 rounded-xl overflow-hidden bg-white">
                                         <button
+                                            type="button"
                                             onClick={() => updateQuantity(getItemKey(item), item.quantity - 1)}
-                                            className="w-8 h-8 flex items-center justify-center text-dark-gray hover:bg-light-gray transition-colors"
+                                            disabled={item.quantity <= Math.max(1, item.minOrder || 1)}
+                                            className="w-8 h-8 flex items-center justify-center text-dark-gray hover:bg-light-gray transition-colors disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:bg-white"
+                                            aria-label={`Restar una unidad de ${item.name}`}
                                         >
                                             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 12H4" />
@@ -141,8 +144,10 @@ export default function CartPageContent() {
                                         </button>
                                         <span className="w-10 text-center text-sm font-bold">{item.quantity}</span>
                                         <button
+                                            type="button"
                                             onClick={() => updateQuantity(getItemKey(item), item.quantity + 1)}
                                             className="w-8 h-8 flex items-center justify-center text-dark-gray hover:bg-light-gray transition-colors"
+                                            aria-label={`Sumar una unidad de ${item.name}`}
                                         >
                                             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
